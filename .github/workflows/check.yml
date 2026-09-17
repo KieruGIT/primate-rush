@@ -1,0 +1,22 @@
+name: project check
+
+# The engine is not available in CI, so this runs the same static checks a
+# developer runs before committing: node paths, resource paths, autoloads,
+# and GDScript formatting. It catches the class of typo that otherwise shows
+# up halfway through a two-phone LAN test.
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Static project check
+        run: python3 tools/check_project.py

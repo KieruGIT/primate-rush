@@ -72,6 +72,7 @@ scripts/
 resources/monkeys/   one .tres per monkey, balancing without code changes
 docs/        design document and build brief
 tools/       check_project.py, static checks the engine only does at runtime
+.github/     CI running that same check on every push
 ```
 
 ## Design notes worth knowing before editing
