@@ -19,6 +19,7 @@ extends Control
 @onready var _leave_button: Button = %LeaveButton
 @onready var _hosts_list: VBoxContainer = %HostsList
 @onready var _monkey_row: HBoxContainer = %MonkeyRow
+@onready var _hat_row: HBoxContainer = %HatRow
 @onready var _map_row: HBoxContainer = %MapRow
 @onready var _mode_row: HBoxContainer = %ModeRow
 @onready var _store_button: Button = %StoreButton
@@ -27,6 +28,7 @@ extends Control
 
 var _selected: StringName = &"gorilla"
 var _monkey_buttons: Dictionary = {}
+var _hat_buttons: Dictionary = {}
 var _map_buttons: Dictionary = {}
 var _mode_buttons: Dictionary = {}
 
@@ -50,8 +52,12 @@ func _ready() -> void:
 	Purchases.purchase_finished.connect(_on_purchase_finished)
 
 	_build_monkey_row()
+	_build_hat_row()
 	_build_match_rows()
 	_refresh_hosts()
+	# After both rows exist: locks set the button labels, and a row built
+	# after the last refresh would otherwise sit there blank.
+	_refresh_locks()
 	_select_monkey(_selected)
 	_refresh_config()
 	_refresh()
@@ -69,6 +75,31 @@ func _build_monkey_row() -> void:
 		_monkey_row.add_child(button)
 		_monkey_buttons[id] = button
 	_refresh_locks()
+
+
+func _build_hat_row() -> void:
+	for id in GameConfig.hat_ids():
+		var button := Button.new()
+		button.toggle_mode = true
+		button.custom_minimum_size = Vector2(130.0, 44.0)
+		button.pressed.connect(_on_hat_pressed.bind(id))
+		_hat_row.add_child(button)
+		_hat_buttons[id] = button
+	_select_hat(Net.local_hat)
+
+
+func _on_hat_pressed(id: StringName) -> void:
+	if not GameConfig.is_hat_unlocked(id):
+		_set_status("%s comes with the premium unlock." % GameConfig.get_hat(id)["name"])
+		_refresh_locks()
+		return
+	_select_hat(id)
+
+
+func _select_hat(id: StringName) -> void:
+	Net.set_local_hat(id)
+	for key in _hat_buttons.keys():
+		(_hat_buttons[key] as Button).button_pressed = key == id
 
 
 func _build_match_rows() -> void:
@@ -153,6 +184,13 @@ func _bar(value: float) -> String:
 
 
 func _refresh_locks() -> void:
+	for id in _hat_buttons.keys():
+		var hat_button := _hat_buttons[id] as Button
+		var hat: Dictionary = GameConfig.get_hat(id)
+		var hat_unlocked := GameConfig.is_hat_unlocked(id)
+		hat_button.text = hat["name"] if hat_unlocked else "%s  (locked)" % hat["name"]
+		hat_button.modulate = Color.WHITE if hat_unlocked else Color(0.65, 0.65, 0.65)
+
 	for id in _monkey_buttons.keys():
 		var button := _monkey_buttons[id] as Button
 		var unlocked := GameConfig.is_unlocked(id)

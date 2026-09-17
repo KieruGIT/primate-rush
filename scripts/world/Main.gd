@@ -100,19 +100,19 @@ func _on_match_over(results: Array) -> void:
 
 func _spawn_all_players() -> void:
 	if not Net.is_online():
-		_spawn_player(1, Net.local_monkey, 0)
+		_spawn_player(1, Net.local_monkey, 0, Net.local_hat)
 		return
 	for peer_id in Net.roster.keys():
 		var entry: Dictionary = Net.roster[peer_id]
-		_spawn_player(int(peer_id), entry["monkey"], int(entry["slot"]))
+		_spawn_player(int(peer_id), entry["monkey"], int(entry["slot"]), entry.get("hat", &"none"))
 
 
-func _spawn_player(id: int, monkey_id: StringName, slot: int) -> Player:
+func _spawn_player(id: int, monkey_id: StringName, slot: int, hat_id: StringName = &"none") -> Player:
 	if players.has(id):
 		return players[id]
 	var player := PLAYER_SCENE.instantiate() as Player
 	player.name = "Player_%d" % id
-	player.setup(GameConfig.get_monkey(monkey_id), id, id == _local_id, GameConfig.tint_for_index(slot))
+	player.setup(GameConfig.get_monkey(monkey_id), id, id == _local_id, GameConfig.tint_for_index(slot), hat_id)
 	player.position = _spawn_position(slot)
 	_player_root.add_child(player)
 	players[id] = player
@@ -232,8 +232,8 @@ func apply_snapshot(snapshot: Dictionary) -> void:
 			# A monkey the host knows about and this client does not: the
 			# roster arrived after the arena loaded, so fill the gap rather
 			# than dropping the player until the next scene change.
-			var entry: Dictionary = Net.roster.get(pid, {"monkey": &"gibbon", "slot": players.size()})
-			player = _spawn_player(pid, entry["monkey"], int(entry["slot"]))
+			var entry: Dictionary = Net.roster.get(pid, {"monkey": &"gibbon", "hat": &"none", "slot": players.size()})
+			player = _spawn_player(pid, entry["monkey"], int(entry["slot"]), entry.get("hat", &"none"))
 		player.apply_net_state(snapshot[id])
 
 

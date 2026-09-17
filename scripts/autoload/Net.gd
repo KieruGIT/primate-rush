@@ -28,8 +28,9 @@ enum Mode { OFFLINE, HOST, CLIENT }
 const SNAPSHOT_HZ: float = 30.0
 
 var mode: int = Mode.OFFLINE
-var roster: Dictionary = {}          # peer_id -> {"monkey": StringName, "slot": int}
+var roster: Dictionary = {}          # peer_id -> {"monkey": StringName, "hat": StringName, "slot": int}
 var local_monkey: StringName = &"gorilla"
+var local_hat: StringName = &"none"
 ## Match setup. Host owns it; clients receive it and never edit it, so two
 ## people cannot load two different maps into the same match.
 var map_id: StringName = &"map_a"
@@ -73,7 +74,7 @@ func host_game(port: int = GameConfig.NET_DEFAULT_PORT) -> String:
 	multiplayer.multiplayer_peer = _peer
 	mode = Mode.HOST
 	roster.clear()
-	roster[1] = {"monkey": local_monkey, "slot": 0}
+	roster[1] = {"monkey": local_monkey, "hat": local_hat, "slot": 0}
 	roster_changed.emit()
 	return ""
 
@@ -121,7 +122,7 @@ func _on_peer_connected(id: int) -> void:
 		return
 	# The host assigns the slot. Letting clients pick would race two players
 	# onto the same colour the moment they connect in the same second.
-	roster[id] = {"monkey": &"gibbon", "slot": roster.size()}
+	roster[id] = {"monkey": &"gibbon", "hat": &"none", "slot": roster.size()}
 	_remote_inputs[id] = InputFrame.new()
 	_broadcast_roster()
 
@@ -136,7 +137,7 @@ func _on_peer_disconnected(id: int) -> void:
 
 
 func _on_connected_to_server() -> void:
-	_register_player.rpc_id(1, String(local_monkey))
+	_register_player.rpc_id(1, String(local_monkey), String(local_hat))
 
 
 func _on_connection_failed() -> void:
@@ -150,30 +151,45 @@ func _on_server_disconnected() -> void:
 
 
 @rpc("any_peer", "reliable")
-func _register_player(monkey_id: String) -> void:
+func _register_player(monkey_id: String, hat_id: String) -> void:
 	if not is_host():
 		return
 	var id := multiplayer.get_remote_sender_id()
 	if not roster.has(id):
-		roster[id] = {"monkey": StringName(monkey_id), "slot": roster.size()}
+		roster[id] = {"monkey": StringName(monkey_id), "hat": StringName(hat_id), "slot": roster.size()}
 	else:
 		roster[id]["monkey"] = StringName(monkey_id)
+		roster[id]["hat"] = StringName(hat_id)
 	_broadcast_roster()
 
 
 func set_local_monkey(id: StringName) -> void:
 	local_monkey = id
+	_push_local_choice()
+
+
+func set_local_hat(id: StringName) -> void:
+	local_hat = id
+	_push_local_choice()
+
+
+func _push_local_choice() -> void:
 	if mode == Mode.HOST:
-		roster[1]["monkey"] = id
+		roster[1]["monkey"] = local_monkey
+		roster[1]["hat"] = local_hat
 		_broadcast_roster()
 	elif mode == Mode.CLIENT and multiplayer.has_multiplayer_peer():
-		_register_player.rpc_id(1, String(id))
+		_register_player.rpc_id(1, String(local_monkey), String(local_hat))
 
 
 func _broadcast_roster() -> void:
 	var wire: Dictionary = {}
 	for id in roster.keys():
-		wire[str(id)] = {"monkey": String(roster[id]["monkey"]), "slot": int(roster[id]["slot"])}
+		wire[str(id)] = {
+			"monkey": String(roster[id]["monkey"]),
+			"hat": String(roster[id].get("hat", &"none")),
+			"slot": int(roster[id]["slot"]),
+		}
 	_sync_roster.rpc(wire)
 	roster_changed.emit()
 
@@ -184,6 +200,7 @@ func _sync_roster(wire: Dictionary) -> void:
 	for key in wire.keys():
 		roster[int(key)] = {
 			"monkey": StringName(wire[key]["monkey"]),
+			"hat": StringName(wire[key].get("hat", "none")),
 			"slot": int(wire[key]["slot"]),
 		}
 	roster_changed.emit()
