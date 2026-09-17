@@ -1,0 +1,171 @@
+extends Control
+
+# ============================================================
+# LOBBY - pick a monkey, host or join by IP, start.
+#
+# Manual IP entry rather than LAN discovery. Discovery films better, but it
+# is a protocol to debug and this is twenty lines that work on any network
+# including a phone hotspot. Discovery is the optional upgrade, not the
+# starting point.
+# ============================================================
+
+signal play_requested
+
+@onready var _status: Label = %Status
+@onready var _roster_list: Label = %RosterList
+@onready var _ip_field: LineEdit = %IpField
+@onready var _host_button: Button = %HostButton
+@onready var _join_button: Button = %JoinButton
+@onready var _solo_button: Button = %SoloButton
+@onready var _start_button: Button = %StartButton
+@onready var _leave_button: Button = %LeaveButton
+@onready var _monkey_row: HBoxContainer = %MonkeyRow
+@onready var _store_button: Button = %StoreButton
+@onready var _restore_button: Button = %RestoreButton
+@onready var _blurb: Label = %Blurb
+
+var _selected: StringName = &"gorilla"
+var _monkey_buttons: Dictionary = {}
+
+
+func _ready() -> void:
+	_host_button.pressed.connect(_on_host)
+	_join_button.pressed.connect(_on_join)
+	_solo_button.pressed.connect(_on_solo)
+	_start_button.pressed.connect(_on_start)
+	_leave_button.pressed.connect(_on_leave)
+	_store_button.pressed.connect(func() -> void: Purchases.buy_premium())
+	_restore_button.pressed.connect(func() -> void: Purchases.restore())
+
+	Net.roster_changed.connect(_refresh)
+	Net.connection_failed.connect(func() -> void: _set_status("Could not reach that host. Same wifi?"))
+	Net.server_disconnected.connect(func() -> void: _set_status("Host closed the game."))
+	Purchases.entitlement_changed.connect(_on_entitlement_changed)
+	Purchases.purchase_finished.connect(_on_purchase_finished)
+
+	_build_monkey_row()
+	_select_monkey(_selected)
+	_refresh()
+	_set_status("Pick a monkey. Host, join, or play solo.")
+
+
+func _build_monkey_row() -> void:
+	for id in GameConfig.roster_ids():
+		var stats := GameConfig.get_monkey(id)
+		var button := Button.new()
+		button.toggle_mode = true
+		button.custom_minimum_size = Vector2(150.0, 54.0)
+		button.text = stats.display_name
+		button.pressed.connect(_on_monkey_pressed.bind(id))
+		_monkey_row.add_child(button)
+		_monkey_buttons[id] = button
+	_refresh_locks()
+
+
+func _on_monkey_pressed(id: StringName) -> void:
+	if not GameConfig.is_unlocked(id):
+		_set_status("%s is locked. Unlock it in the store panel." % GameConfig.get_monkey(id).display_name)
+		_refresh_locks()
+		return
+	_select_monkey(id)
+
+
+func _select_monkey(id: StringName) -> void:
+	_selected = id
+	Net.set_local_monkey(id)
+	var stats := GameConfig.get_monkey(id)
+	_blurb.text = "%s\nSpeed %s  Weight %s  Power %s  Climb %s  Swing %s" % [
+		stats.blurb,
+		_bar(stats.speed), _bar(stats.weight), _bar(stats.power),
+		_bar(stats.climb), _bar(stats.swing),
+	]
+	for key in _monkey_buttons.keys():
+		(_monkey_buttons[key] as Button).button_pressed = key == id
+
+
+## Stats as blocks rather than numbers: nobody reads 1.9 as "very high", but
+## everybody reads a longer bar as a bigger number.
+func _bar(value: float) -> String:
+	var filled := clampi(int(round(value * 2.5)), 1, 5)
+	return "█".repeat(filled) + "·".repeat(5 - filled)
+
+
+func _refresh_locks() -> void:
+	for id in _monkey_buttons.keys():
+		var button := _monkey_buttons[id] as Button
+		var unlocked := GameConfig.is_unlocked(id)
+		var stats := GameConfig.get_monkey(id)
+		button.text = stats.display_name if unlocked else "%s  (locked)" % stats.display_name
+		button.modulate = Color.WHITE if unlocked else Color(0.65, 0.65, 0.65)
+	_store_button.disabled = Purchases.has_premium()
+	_store_button.text = "Unlocked" if Purchases.has_premium() else "Unlock premium monkey"
+
+
+func _refresh() -> void:
+	var online := Net.is_online()
+	_start_button.visible = Net.is_host()
+	_leave_button.visible = online
+	_host_button.disabled = online
+	_join_button.disabled = online
+	_solo_button.disabled = online
+	_ip_field.editable = not online
+
+	if not online:
+		_roster_list.text = "Not connected."
+		return
+	var lines: PackedStringArray = []
+	for id in Net.roster.keys():
+		var entry: Dictionary = Net.roster[id]
+		var who := "you" if int(id) == Net.local_id() else "peer %d" % int(id)
+		lines.append("%s - %s" % [who, GameConfig.get_monkey(entry["monkey"]).display_name])
+	_roster_list.text = "\n".join(lines)
+
+
+# --- Buttons -------------------------------------------------------
+
+func _on_host() -> void:
+	var error := Net.host_game()
+	if error.is_empty():
+		_set_status("Hosting on %s port %d. Start when everyone is in." % [Net.local_ip_hint(), GameConfig.NET_DEFAULT_PORT])
+	else:
+		_set_status(error)
+	_refresh()
+
+
+func _on_join() -> void:
+	var address := _ip_field.text.strip_edges()
+	if address.is_empty():
+		_set_status("Type the host's IP first. It is printed on the host's screen.")
+		return
+	var error := Net.join_game(address)
+	_set_status("Connecting to %s..." % address if error.is_empty() else error)
+	_refresh()
+
+
+func _on_solo() -> void:
+	Net.leave()
+	Net.local_monkey = _selected
+	play_requested.emit()
+
+
+func _on_start() -> void:
+	Net.start_match()
+
+
+func _on_leave() -> void:
+	Net.leave()
+	_set_status("Left the game.")
+	_refresh()
+
+
+func _on_entitlement_changed(_unlocked: bool) -> void:
+	_refresh_locks()
+
+
+func _on_purchase_finished(success: bool, message: String) -> void:
+	_set_status("Purchase succeeded. Premium monkey unlocked." if success else "Purchase did not complete: %s" % message)
+	_refresh_locks()
+
+
+func _set_status(text: String) -> void:
+	_status.text = text

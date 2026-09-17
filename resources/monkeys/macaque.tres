@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="MonkeyStats" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/player/MonkeyStats.gd" id="1_stats"]
+
+[resource]
+script = ExtResource("1_stats")
+id = &"macaque"
+display_name = "Macaque"
+blurb = "The Allrounder. No weakness, no strength. Unlocked by the store demo."
+body_color = Color(0.62, 0.45, 0.33, 1)
+body_size = Vector2(32, 64)
+speed = 1.0
+weight = 1.0
+power = 1.0
+climb = 1.0
+swing = 1.0
+skill_id = &"counter_roll"
+skill_cooldown = 3.0
