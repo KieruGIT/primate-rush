@@ -24,6 +24,9 @@ const RESULTS_SCENE := preload("res://scenes/Results.tscn")
 @export var force_touch_controls: bool = false
 
 var players: Dictionary = {}           # player_id -> Player
+## Bot id -> BotBrain. Host side only: a client receives bots as ordinary
+## monkeys in snapshots, because to the netcode that is what they are.
+var bots: Dictionary = {}
 var map: MapData = null
 
 var _checkpoints: Dictionary = {}      # player_id -> Vector2
@@ -119,19 +122,27 @@ func _record_career(results: Array) -> void:
 # --- Spawning ------------------------------------------------------
 
 func _spawn_all_players() -> void:
-	if not Net.is_online():
+	if Net.roster.is_empty():
+		# Arena opened without a roster, which means a solo session that
+		# skipped the lobby. Spawn the one monkey and carry on.
 		_spawn_player(1, Net.local_monkey, 0, Net.local_hat)
 		return
 	for peer_id in Net.roster.keys():
 		var entry: Dictionary = Net.roster[peer_id]
-		_spawn_player(int(peer_id), entry["monkey"], int(entry["slot"]), entry.get("hat", &"none"))
+		var is_bot := bool(entry.get("bot", false))
+		_spawn_player(int(peer_id), entry["monkey"], int(entry["slot"]), entry.get("hat", &"none"), is_bot)
+		if is_bot and _is_authority():
+			bots[int(peer_id)] = BotBrain.new()
 
 
-func _spawn_player(id: int, monkey_id: StringName, slot: int, hat_id: StringName = &"none") -> Player:
+func _spawn_player(id: int, monkey_id: StringName, slot: int, hat_id: StringName = &"none", is_bot: bool = false) -> Player:
 	if players.has(id):
 		return players[id]
 	var player := PLAYER_SCENE.instantiate() as Player
 	player.name = "Player_%d" % id
+	# Set before the tree readies it, so the name label is right the first
+	# time rather than being corrected a frame later.
+	player.is_bot = is_bot
 	player.setup(GameConfig.get_monkey(monkey_id), id, id == _local_id, GameConfig.tint_for_index(slot), hat_id)
 	player.position = _spawn_position(slot)
 	_player_root.add_child(player)
@@ -157,14 +168,15 @@ func despawn_player(id: int) -> void:
 		return
 	players[id].queue_free()
 	players.erase(id)
+	bots.erase(id)
 	_checkpoints.erase(id)
 	_respawning.erase(id)
 
 
 # --- Per-tick routing ----------------------------------------------
 
-func _physics_process(_delta: float) -> void:
-	_route_input()
+func _physics_process(delta: float) -> void:
+	_route_input(delta)
 	_track_local_fall()
 	if _is_authority():
 		_check_falls()
@@ -174,7 +186,7 @@ func _is_authority() -> bool:
 	return not Net.is_online() or Net.is_host()
 
 
-func _route_input() -> void:
+func _route_input(delta: float) -> void:
 	var local_frame := GameInput.take_local_frame()
 	if _input_locked():
 		# Intent is dropped rather than buffered during the countdown, so a
@@ -192,14 +204,21 @@ func _route_input() -> void:
 		Net.send_local_input(local_frame)
 		return
 
-	if Net.is_host():
-		for id in players.keys():
-			if int(id) == _local_id:
-				continue
-			var frame := Net.take_remote_input(int(id))
-			if _input_locked():
-				frame = _idle_frame
-			players[id].feed_input(frame)
+	for id in players.keys():
+		if int(id) == _local_id:
+			continue
+		var frame := _idle_frame
+		if not _input_locked():
+			frame = _brain_or_remote_input(int(id), delta)
+		players[id].feed_input(frame)
+
+
+## Bots and remote players are the same thing from here: a source of frames.
+func _brain_or_remote_input(id: int, delta: float) -> InputFrame:
+	var brain := bots.get(id) as BotBrain
+	if brain != null:
+		return brain.think(players[id] as Player, self, delta)
+	return Net.take_remote_input(id)
 
 
 ## Counted locally rather than in _begin_respawn, which only runs on the
@@ -273,7 +292,10 @@ func apply_snapshot(snapshot: Dictionary) -> void:
 			# roster arrived after the arena loaded, so fill the gap rather
 			# than dropping the player until the next scene change.
 			var entry: Dictionary = Net.roster.get(pid, {"monkey": &"gibbon", "hat": &"none", "slot": players.size()})
-			player = _spawn_player(pid, entry["monkey"], int(entry["slot"]), entry.get("hat", &"none"))
+			player = _spawn_player(
+				pid, entry["monkey"], int(entry["slot"]),
+				entry.get("hat", &"none"), bool(entry.get("bot", false))
+			)
 		player.apply_net_state(snapshot[id])
 
 

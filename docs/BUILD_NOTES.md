@@ -42,6 +42,15 @@ mistake, or bad tuning. Run the checker before every commit; it is fast.
 5. Switch to Banana Hoard. Confirm bananas spawn, collecting scores, and
    hitting a player scatters a share of theirs.
 
+## Testing with bots
+
+Solo play with bots is the fastest way to exercise everything without a
+second device: set bots to 3 in the lobby, pick Race, and watch whether they
+reach the finish. Bots that pile up against a wall mean the level geometry
+has a jump the movement cannot make, which is a level bug, not an AI bug —
+they use the same input path a player does, so if a bot cannot get past it,
+neither can a person who is not already good at the game.
+
 ## Tuning
 
 Everything worth tuning is an `@export` on the player or a `.tres` in

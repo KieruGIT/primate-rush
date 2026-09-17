@@ -52,6 +52,8 @@ button, which keeps the phone layout down to a stick and two buttons.
 | Rematch from the results screen | done |
 | Headwear attachment point, five hats, two of them premium | done |
 | Local career stats: races, wins, bananas, hits, falls, best times | done |
+| Bots filling empty seats, driven by the same input struct players use | done |
+| Live standings, hit feedback and camera kick | done |
 | Touch controls | done |
 | Character select, map and mode select, lobby, results | done |
 | Race mode: countdown, checkpoints, placement, results | done |
@@ -72,7 +74,7 @@ scripts/
              Discovery (UDP host beacons), Purchases (RevenueCat),
              Profile (local career stats)
   player/    Player.gd (movement, climb, swing, combat), MonkeyStats, InputFrame,
-             Headwear (cosmetic attachment point)
+             BotBrain (AI that emits input frames), Headwear (cosmetic anchor)
   world/     Main.gd (arena, respawn, snapshots), RaceDirector, HoardDirector,
              MapData, Vine, Climbable, Checkpoint, FinishLine, Pickup, BananaSpawn
   ui/        Boot router, Lobby, Hud, TouchControls
@@ -88,6 +90,11 @@ tools/       check_project.py, static checks the engine only does at runtime
 touch. It consumes an `InputFrame`, which keyboard, touch, and the network all
 produce. That is what lets local and networked play share one code path
 instead of two that drift apart.
+
+**Bots get no special access.** A `BotBrain` produces an `InputFrame` and
+nothing else — no teleporting, no ignoring gravity, no reading state through
+a back door. That falls straight out of the input abstraction, and it means
+every movement fix helps bots and players at once.
 
 **The host is truth.** The host simulates every monkey. A client simulates
 only its own as prediction and snaps when the host disagrees by more than
