@@ -1,0 +1,24 @@
+# Godot 4 rebuildable cache and per-machine settings
+.godot/
+.import/
+export.cfg
+export_presets.cfg
+*.translation
+
+# Build output
+build/
+*.apk
+*.aab
+*.keystore
+*.jks
+
+# Secrets. The Test Store key lives here, never in source.
+secrets.cfg
+.env
+
+# OS / editor noise
+.DS_Store
+Thumbs.db
+*.swp
+.vscode/
+.idea/
