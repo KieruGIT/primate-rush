@@ -1,7 +1,7 @@
 # Build notes
 
 Practical notes for taking this repo from a clone to something running on a
-phone. Written for the hackathon path in `CLAUDE_CODE_BRIEF.md`, which means
+phone. Written for the hackathon path in `BUILD_BRIEF.md`, which means
 LAN multiplayer, touch controls, a Test Store purchase, and a debug APK — not
 a store launch.
 
