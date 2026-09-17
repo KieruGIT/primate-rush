@@ -10,6 +10,7 @@ This checks what can be checked without the engine:
   * every ext_resource path in a .tscn or .tres points at a file that exists
   * every preload() path in a script points at a file that exists
   * autoloads named in project.godot exist
+  * scripts are tab indented, brackets balance, and no func has an empty body
 
 Run: python3 tools/check_project.py
 """
@@ -120,6 +121,28 @@ def check_scene_bindings():
                     problems.append("%s uses %%%s, no unique node in %s" % (rel(script_path), ref, rel(scene)))
 
 
+def check_scripts():
+    for dirpath, _dirs, files in os.walk(os.path.join(ROOT, "scripts")):
+        for filename in files:
+            if not filename.endswith(".gd"):
+                continue
+            full = os.path.join(dirpath, filename)
+            raw = open(full, encoding="utf-8").read()
+            clean = "\n".join(COMMENT_RE.sub("", line) for line in STRING_RE.sub('""', raw).splitlines())
+            for opener, closer in (("(", ")"), ("[", "]"), ("{", "}")):
+                if clean.count(opener) != clean.count(closer):
+                    problems.append("%s has unbalanced %s%s" % (rel(full), opener, closer))
+            lines = clean.splitlines()
+            for index, line in enumerate(lines):
+                if line.startswith("func ") or line.startswith("\tfunc "):
+                    body = next((l for l in lines[index + 1:] if l.strip()), "")
+                    if not body.startswith("\t"):
+                        problems.append("%s:%d has an empty body" % (rel(full), index + 1))
+            for index, line in enumerate(raw.splitlines()):
+                if line.startswith(" ") and line.strip():
+                    problems.append("%s:%d is space indented, Godot convention is tabs" % (rel(full), index + 1))
+
+
 def check_autoloads():
     text = open(os.path.join(ROOT, "project.godot"), encoding="utf-8").read()
     section = text.split("[autoload]")[1].split("[display]")[0]
@@ -138,6 +161,7 @@ def rel(path):
 check_resource_paths()
 check_script_loads()
 check_scene_bindings()
+check_scripts()
 check_autoloads()
 
 if problems:
