@@ -36,11 +36,11 @@ func _notification(what: int) -> void:
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed(&"jump"):
-		_frame.press(InputFrame.Button.JUMP)
+		_frame.press(InputFrame.Action.JUMP)
 	elif event.is_action_pressed(&"attack"):
-		_frame.press(InputFrame.Button.ATTACK)
+		_frame.press(InputFrame.Action.ATTACK)
 	elif event.is_action_pressed(&"skill"):
-		_frame.press(InputFrame.Button.SKILL)
+		_frame.press(InputFrame.Action.SKILL)
 	elif event.is_action_pressed(&"ui_cancel"):
 		pause_requested.emit()
 

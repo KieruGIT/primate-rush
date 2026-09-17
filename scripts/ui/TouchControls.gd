@@ -66,14 +66,14 @@ func _handle_touch(event: InputEventScreenTouch) -> void:
 		if _in_button(event.position, _jump_center):
 			_button_touches[event.index] = &"jump"
 			GameInput.touch_jump_held = true
-			GameInput.touch_press(InputFrame.Button.JUMP)
+			GameInput.touch_press(InputFrame.Action.JUMP)
 			_jump_touch = event.index
 		elif _in_button(event.position, _attack_center):
 			_button_touches[event.index] = &"attack"
-			GameInput.touch_press(InputFrame.Button.ATTACK)
+			GameInput.touch_press(InputFrame.Action.ATTACK)
 		elif _in_button(event.position, _skill_center):
 			_button_touches[event.index] = &"skill"
-			GameInput.touch_press(InputFrame.Button.SKILL)
+			GameInput.touch_press(InputFrame.Action.SKILL)
 		elif event.position.distance_to(_pause_center) <= 34.0:
 			_button_touches[event.index] = &"pause"
 			GameInput.pause_requested.emit()

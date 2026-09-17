@@ -35,6 +35,16 @@ func _ready() -> void:
 	set_volume(float(Profile.get_stat("volume", 0.7)))
 
 
+func _exit_tree() -> void:
+	# Released on the way out, or the audio server is still holding every
+	# playback when the object database is checked at exit and each one is
+	# reported as a leak - noise that would bury a real one later.
+	for player in _pool:
+		player.stop()
+		player.stream = null
+	_sounds.clear()
+
+
 func play(id: StringName, pitch: float = 1.0, volume_db: float = 0.0) -> void:
 	var stream: AudioStreamWAV = _sounds.get(id)
 	if stream == null or _pool.is_empty():

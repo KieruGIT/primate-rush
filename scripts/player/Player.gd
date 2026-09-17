@@ -333,11 +333,11 @@ func _tick_timers(delta: float) -> void:
 	_tick_windup(delta)
 	if is_on_floor():
 		_air_launch_ready = true
-	if _input.consume(InputFrame.Button.JUMP):
+	if _input.consume(InputFrame.Action.JUMP):
 		_buffer_timer = jump_buffer_time
-	if _input.consume(InputFrame.Button.ATTACK):
+	if _input.consume(InputFrame.Action.ATTACK):
 		_try_attack()
-	if _input.consume(InputFrame.Button.SKILL):
+	if _input.consume(InputFrame.Action.SKILL):
 		_try_skill()
 
 
@@ -606,15 +606,34 @@ func _tick_attack(delta: float) -> void:
 
 func _set_hitbox_open(open: bool) -> void:
 	_hitbox_open = open
-	hitbox.monitoring = open
-	hitbox_shape.disabled = not open
+	# Deferred because this is reached from area_entered, and the physics
+	# server refuses a monitoring change while it is flushing queries.
+	hitbox.set_deferred(&"monitoring", open)
+	hitbox_shape.set_deferred(&"disabled", not open)
 	if not open:
 		return
 	hitbox.position.x = absf(hitbox.position.x) * facing
 	# Anything already inside the box when it opens never fires area_entered,
-	# so sweep once on open.
+	# so sweep once on open. A direct shape query rather than
+	# get_overlapping_areas(), because monitoring was only just enabled and
+	# deferred, so the area itself does not know what it overlaps yet.
 	if _is_authority():
-		for area in hitbox.get_overlapping_areas():
+		_sweep_hitbox()
+
+
+func _sweep_hitbox() -> void:
+	var shape_2d := hitbox_shape.shape
+	if shape_2d == null:
+		return
+	var query := PhysicsShapeQueryParameters2D.new()
+	query.shape = shape_2d
+	query.transform = hitbox.global_transform
+	query.collision_mask = GameConfig.LAYER_HURTBOX
+	query.collide_with_areas = true
+	query.collide_with_bodies = false
+	for hit in get_world_2d().direct_space_state.intersect_shape(query, GameConfig.NET_MAX_PLAYERS):
+		var area := hit.get("collider") as Area2D
+		if area != null:
 			_resolve_hit(area)
 
 
