@@ -18,6 +18,7 @@ var _current: Node = null
 
 func _ready() -> void:
 	Net.match_started.connect(_show_arena)
+	Net.match_ended.connect(_show_lobby)
 	Net.server_disconnected.connect(_show_lobby)
 	GameInput.pause_requested.connect(_on_pause_requested)
 	_show_lobby()

@@ -1,0 +1,186 @@
+[gd_scene load_steps=14 format=3]
+
+[ext_resource type="Script" path="res://scripts/world/MapData.gd" id="1_map"]
+[ext_resource type="PackedScene" path="res://scenes/Vine.tscn" id="2_vine"]
+[ext_resource type="PackedScene" path="res://scenes/Climbable.tscn" id="3_climb"]
+[ext_resource type="PackedScene" path="res://scenes/Checkpoint.tscn" id="4_check"]
+[ext_resource type="PackedScene" path="res://scenes/FinishLine.tscn" id="5_finish"]
+
+[sub_resource type="RectangleShape2D" id="Rect_GroundStart"]
+size = Vector2(900, 80)
+
+[sub_resource type="RectangleShape2D" id="Rect_GroundMid"]
+size = Vector2(500, 80)
+
+[sub_resource type="RectangleShape2D" id="Rect_PlatformA"]
+size = Vector2(180, 32)
+
+[sub_resource type="RectangleShape2D" id="Rect_PlatformB"]
+size = Vector2(260, 32)
+
+[sub_resource type="RectangleShape2D" id="Rect_ClimbWall"]
+size = Vector2(48, 560)
+
+[sub_resource type="RectangleShape2D" id="Rect_LedgeTop"]
+size = Vector2(380, 32)
+
+[sub_resource type="RectangleShape2D" id="Rect_PlatformC"]
+size = Vector2(260, 32)
+
+[sub_resource type="RectangleShape2D" id="Rect_GroundEnd"]
+size = Vector2(620, 80)
+
+[node name="MapA" type="Node2D"]
+script = ExtResource("1_map")
+display_name = "Horizontal Run"
+spawn_point = Vector2(160, 420)
+spawn_stride = Vector2(72, 0)
+kill_depth = 1400.0
+progress_axis = Vector2(1, 0)
+
+[node name="Background" type="ColorRect" parent="."]
+offset_left = -600
+offset_top = -900
+offset_right = 3800
+offset_bottom = 1500
+color = Color(0.09, 0.11, 0.13, 1)
+mouse_filter = 2
+
+[node name="Level" type="StaticBody2D" parent="."]
+collision_layer = 1
+collision_mask = 0
+
+[node name="ColGroundStart" type="CollisionShape2D" parent="Level"]
+position = Vector2(450, 540)
+shape = SubResource("Rect_GroundStart")
+
+[node name="VisGroundStart" type="ColorRect" parent="Level"]
+offset_left = 0.0
+offset_top = 500.0
+offset_right = 900.0
+offset_bottom = 580.0
+color = Color(0.22, 0.26, 0.24, 1)
+mouse_filter = 2
+
+[node name="ColGroundMid" type="CollisionShape2D" parent="Level"]
+position = Vector2(1400, 540)
+shape = SubResource("Rect_GroundMid")
+
+[node name="VisGroundMid" type="ColorRect" parent="Level"]
+offset_left = 1150.0
+offset_top = 500.0
+offset_right = 1650.0
+offset_bottom = 580.0
+color = Color(0.22, 0.26, 0.24, 1)
+mouse_filter = 2
+
+[node name="ColPlatformA" type="CollisionShape2D" parent="Level"]
+position = Vector2(1000, 380)
+shape = SubResource("Rect_PlatformA")
+
+[node name="VisPlatformA" type="ColorRect" parent="Level"]
+offset_left = 910.0
+offset_top = 364.0
+offset_right = 1090.0
+offset_bottom = 396.0
+color = Color(0.22, 0.26, 0.24, 1)
+mouse_filter = 2
+
+[node name="ColPlatformB" type="CollisionShape2D" parent="Level"]
+position = Vector2(1850, 460)
+shape = SubResource("Rect_PlatformB")
+
+[node name="VisPlatformB" type="ColorRect" parent="Level"]
+offset_left = 1720.0
+offset_top = 444.0
+offset_right = 1980.0
+offset_bottom = 476.0
+color = Color(0.22, 0.26, 0.24, 1)
+mouse_filter = 2
+
+[node name="ColClimbWall" type="CollisionShape2D" parent="Level"]
+position = Vector2(2150, 300)
+shape = SubResource("Rect_ClimbWall")
+
+[node name="VisClimbWall" type="ColorRect" parent="Level"]
+offset_left = 2126.0
+offset_top = 20.0
+offset_right = 2174.0
+offset_bottom = 580.0
+color = Color(0.22, 0.26, 0.24, 1)
+mouse_filter = 2
+
+[node name="ColLedgeTop" type="CollisionShape2D" parent="Level"]
+position = Vector2(2320, 40)
+shape = SubResource("Rect_LedgeTop")
+
+[node name="VisLedgeTop" type="ColorRect" parent="Level"]
+offset_left = 2130.0
+offset_top = 24.0
+offset_right = 2510.0
+offset_bottom = 56.0
+color = Color(0.22, 0.26, 0.24, 1)
+mouse_filter = 2
+
+[node name="ColPlatformC" type="CollisionShape2D" parent="Level"]
+position = Vector2(2600, -120)
+shape = SubResource("Rect_PlatformC")
+
+[node name="VisPlatformC" type="ColorRect" parent="Level"]
+offset_left = 2470.0
+offset_top = -136.0
+offset_right = 2730.0
+offset_bottom = -104.0
+color = Color(0.22, 0.26, 0.24, 1)
+mouse_filter = 2
+
+[node name="ColGroundEnd" type="CollisionShape2D" parent="Level"]
+position = Vector2(2980, 540)
+shape = SubResource("Rect_GroundEnd")
+
+[node name="VisGroundEnd" type="ColorRect" parent="Level"]
+offset_left = 2670.0
+offset_top = 500.0
+offset_right = 3290.0
+offset_bottom = 580.0
+color = Color(0.22, 0.26, 0.24, 1)
+mouse_filter = 2
+
+[node name="Climbables" type="Node2D" parent="."]
+
+[node name="Climbable1" parent="Climbables" instance=ExtResource("3_climb")]
+position = Vector2(2150, 300)
+size = Vector2(96, 560)
+
+[node name="Vines" type="Node2D" parent="."]
+
+[node name="Vine1" parent="Vines" instance=ExtResource("2_vine")]
+position = Vector2(1050, 120)
+length = 210.0
+
+[node name="Vine2" parent="Vines" instance=ExtResource("2_vine")]
+position = Vector2(1260, 90)
+length = 250.0
+
+[node name="Vine3" parent="Vines" instance=ExtResource("2_vine")]
+position = Vector2(1610, 60)
+length = 270.0
+
+[node name="Vine4" parent="Vines" instance=ExtResource("2_vine")]
+position = Vector2(2480, -320)
+length = 300.0
+
+[node name="Checkpoints" type="Node2D" parent="."]
+
+[node name="Checkpoint1" parent="Checkpoints" instance=ExtResource("4_check")]
+position = Vector2(1400, 470)
+
+[node name="Checkpoint2" parent="Checkpoints" instance=ExtResource("4_check")]
+position = Vector2(2320, -20)
+
+[node name="Checkpoint3" parent="Checkpoints" instance=ExtResource("4_check")]
+position = Vector2(2860, 470)
+
+[node name="FinishLine" parent="." instance=ExtResource("5_finish")]
+position = Vector2(3200, 400)
+size = Vector2(80, 320)

@@ -52,6 +52,20 @@ unique_name_in_owner = true
 layout_mode = 2
 text = ""
 
+[node name="MapLabel" type="Label" parent="Margin/Column"]
+layout_mode = 2
+text = "Map and mode (host decides)"
+
+[node name="MapRow" type="HBoxContainer" parent="Margin/Column"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="ModeRow" type="HBoxContainer" parent="Margin/Column"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/separation = 10
+
 [node name="NetRow" type="HBoxContainer" parent="Margin/Column"]
 layout_mode = 2
 theme_override_constants/separation = 10
