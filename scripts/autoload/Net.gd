@@ -36,6 +36,9 @@ var local_hat: StringName = &"none"
 ## people cannot load two different maps into the same match.
 var map_id: StringName = &"map_a"
 var mode: int = GameConfig.Mode.RACE
+## Filled into the roster at match start. Bots are ordinary roster entries
+## with a negative id, so clients spawn them exactly like people.
+var bot_count: int = 0
 var arena: Node = null
 
 var _peer: ENetMultiplayerPeer = null
@@ -191,6 +194,7 @@ func _broadcast_roster() -> void:
 			"monkey": String(roster[id]["monkey"]),
 			"hat": String(roster[id].get("hat", &"none")),
 			"slot": int(roster[id]["slot"]),
+			"bot": bool(roster[id].get("bot", false)),
 		}
 	_sync_roster.rpc(wire)
 	roster_changed.emit()
@@ -204,6 +208,7 @@ func _sync_roster(wire: Dictionary) -> void:
 			"monkey": StringName(wire[key]["monkey"]),
 			"hat": StringName(wire[key].get("hat", "none")),
 			"slot": int(wire[key]["slot"]),
+			"bot": bool(wire[key].get("bot", false)),
 		}
 	roster_changed.emit()
 
@@ -213,13 +218,21 @@ func set_match_config(new_map: StringName, new_mode: int) -> void:
 	mode = new_mode
 	config_changed.emit()
 	if is_host():
-		_sync_config.rpc(String(new_map), new_mode)
+		_sync_config.rpc(String(new_map), new_mode, bot_count)
+
+
+func set_bot_count(count: int) -> void:
+	bot_count = clampi(count, 0, GameConfig.NET_MAX_PLAYERS - 1)
+	config_changed.emit()
+	if is_host():
+		_sync_config.rpc(String(map_id), mode, bot_count)
 
 
 @rpc("authority", "reliable")
-func _sync_config(wire_map: String, wire_mode: int) -> void:
+func _sync_config(wire_map: String, wire_mode: int, wire_bots: int) -> void:
 	map_id = StringName(wire_map)
 	mode = wire_mode
+	bot_count = wire_bots
 	config_changed.emit()
 
 
@@ -227,15 +240,45 @@ func _sync_config(wire_map: String, wire_mode: int) -> void:
 ## instead of the lobby having two ways to start the same thing.
 func start_match() -> void:
 	if not is_online():
+		# Offline still builds a roster, so the arena has one way to spawn a
+		# field instead of a solo path and a networked path that drift.
+		roster.clear()
+		roster[1] = {"monkey": local_monkey, "hat": local_hat, "slot": 0}
+		_assign_bots()
 		_start_match()
 		return
 	if not is_host():
 		return
-	# Config first and reliably, so a client cannot start loading a match
-	# before it knows which map the match is on.
-	_sync_config.rpc(String(map_id), mode)
+	_assign_bots()
+	# Config and roster first, and reliably, so a client cannot start loading
+	# a match before it knows the map or who is in it.
+	_sync_config.rpc(String(map_id), mode, bot_count)
+	_broadcast_roster()
 	_start_match.rpc()
 	_start_match()
+
+
+## Bots fill the seats nobody took. Capped by the same player limit, since a
+## bot costs the host exactly what a person does.
+func _assign_bots() -> void:
+	_clear_bots()
+	var seats := GameConfig.NET_MAX_PLAYERS - roster.size()
+	var wanted := mini(bot_count, maxi(seats, 0))
+	var slot := roster.size()
+	for index in wanted:
+		roster[-(index + 1)] = {
+			"monkey": GameConfig.random_bot_monkey(),
+			"hat": &"none",
+			"slot": slot,
+			"bot": true,
+		}
+		slot += 1
+
+
+func _clear_bots() -> void:
+	for id in roster.keys():
+		if int(id) < 0:
+			roster.erase(id)
 
 
 @rpc("authority", "reliable")
@@ -255,6 +298,8 @@ func end_match() -> void:
 
 @rpc("authority", "reliable")
 func _end_match() -> void:
+	# Bots are reassigned per match, so they never pile up across rematches.
+	_clear_bots()
 	match_ended.emit()
 
 

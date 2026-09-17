@@ -90,7 +90,7 @@ func _board_rows() -> Array:
 		var player := (table as Dictionary)[id] as Player
 		if player == null:
 			continue
-		var label: String = player.stats.display_name
+		var label: String = player.display_label()
 		if int(id) == Net.local_id():
 			label += " (you)"
 		if hoard_running:

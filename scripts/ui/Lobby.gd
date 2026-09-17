@@ -22,6 +22,7 @@ extends Control
 @onready var _hat_row: Container = %HatRow
 @onready var _map_row: Container = %MapRow
 @onready var _mode_row: Container = %ModeRow
+@onready var _bot_row: Container = %BotRow
 @onready var _store_button: Button = %StoreButton
 @onready var _restore_button: Button = %RestoreButton
 @onready var _blurb: Label = %Blurb
@@ -32,6 +33,7 @@ var _monkey_buttons: Dictionary = {}
 var _hat_buttons: Dictionary = {}
 var _map_buttons: Dictionary = {}
 var _mode_buttons: Dictionary = {}
+var _bot_buttons: Dictionary = {}
 
 
 func _ready() -> void:
@@ -124,6 +126,15 @@ func _build_match_rows() -> void:
 		_mode_row.add_child(button)
 		_mode_buttons[mode] = button
 
+	for count in range(GameConfig.NET_MAX_PLAYERS):
+		var button := Button.new()
+		button.toggle_mode = true
+		button.custom_minimum_size = Vector2(80.0, 44.0)
+		button.text = "%d" % count
+		button.pressed.connect(_on_bots_pressed.bind(count))
+		_bot_row.add_child(button)
+		_bot_buttons[count] = button
+
 
 ## Only the host picks the map and the mode. A client that could would load
 ## a different level into the same match and desync on the first frame.
@@ -147,6 +158,17 @@ func _on_mode_pressed(mode: int) -> void:
 	Net.set_match_config(Net.map_id, mode)
 
 
+func _on_bots_pressed(count: int) -> void:
+	if not _can_configure():
+		_set_status("Only the host adds bots.")
+		_refresh_config()
+		return
+	Net.set_bot_count(count)
+	var seats := GameConfig.NET_MAX_PLAYERS - maxi(Net.roster.size(), 1)
+	if count > seats:
+		_set_status("Room for %d bot(s) with the people already in. The rest are dropped." % maxi(seats, 0))
+
+
 func _refresh_config() -> void:
 	for id in _map_buttons.keys():
 		var button := _map_buttons[id] as Button
@@ -155,6 +177,10 @@ func _refresh_config() -> void:
 	for mode in _mode_buttons.keys():
 		var button := _mode_buttons[mode] as Button
 		button.button_pressed = int(mode) == Net.mode
+		button.disabled = not _can_configure()
+	for count in _bot_buttons.keys():
+		var button := _bot_buttons[count] as Button
+		button.button_pressed = int(count) == Net.bot_count
 		button.disabled = not _can_configure()
 
 

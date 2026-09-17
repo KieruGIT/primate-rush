@@ -122,6 +122,18 @@ func is_unlocked(id: StringName) -> bool:
 	return Purchases.has_premium()
 
 
+## Bots never take a premium monkey. A locked character playing itself in
+## front of someone who has not bought it is a bad advert for buying it.
+func random_bot_monkey() -> StringName:
+	var pool: Array[StringName] = []
+	for id in MONKEY_PATHS.keys():
+		if not PREMIUM_MONKEYS.has(id):
+			pool.append(id)
+	if pool.is_empty():
+		return &"gibbon"
+	return pool[randi() % pool.size()]
+
+
 func hat_ids() -> Array[StringName]:
 	var ids: Array[StringName] = []
 	for key in HATS.keys():

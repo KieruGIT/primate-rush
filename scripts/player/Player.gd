@@ -42,6 +42,9 @@ const ATTACK_FLAVORS: Array[StringName] = [&"slap", &"punch", &"kick"]
 @export var local_control: bool = true
 ## Cosmetic only. Never touches stats, and never will.
 @export var hat_id: StringName = &"none"
+## Driven by a BotBrain instead of a device. Changes nothing about how the
+## monkey moves, only who is sending the input.
+@export var is_bot: bool = false
 
 @export_group("Ground and air")
 @export var ground_accel: float = 2800.0
@@ -236,7 +239,7 @@ func _apply_appearance() -> void:
 		shape.shape = rect
 
 	if name_label != null:
-		name_label.text = stats.display_name
+		name_label.text = display_label()
 		name_label.position.y = -size.y * 0.5 - 28.0
 
 	# The anchor moves with the body rather than the hat carrying a per-monkey
@@ -246,6 +249,10 @@ func _apply_appearance() -> void:
 	if headwear != null:
 		var hat: Dictionary = GameConfig.get_hat(hat_id)
 		headwear.apply(hat["style"], hat["color"], size.x)
+
+
+func display_label() -> String:
+	return "%s (bot)" % stats.display_name if is_bot else stats.display_name
 
 
 func set_hat(id: StringName) -> void:

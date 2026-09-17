@@ -63,5 +63,5 @@ func _name_for(player_id: int) -> String:
 			var player := table.get(player_id) as Player
 			if player != null:
 				var suffix := "  (you)" if player_id == Net.local_id() else ""
-				return "%s%s" % [player.stats.display_name, suffix]
+				return "%s%s" % [player.display_label(), suffix]
 	return "Player %d" % player_id
