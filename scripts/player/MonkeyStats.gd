@@ -64,10 +64,6 @@ func knockback_taken(incoming: float) -> float:
 	return incoming / maxf(weight, 0.2)
 
 
-func stun_taken() -> float:
-	return GameConfig.BASE_STUN_TIME / maxf(weight, 0.2)
-
-
 ## 0.0 means a swing bleeds speed fast, 1.0 means it keeps almost everything.
 func swing_retention() -> float:
 	return clampf(0.985 + (swing - 1.0) * 0.012, 0.95, 0.999)

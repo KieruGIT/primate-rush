@@ -1,24 +1,53 @@
-name: project check
+name: check
 
-# The engine is not available in CI, so this runs the same static checks a
-# developer runs before committing: node paths, resource paths, autoloads,
-# and GDScript formatting. It catches the class of typo that otherwise shows
-# up halfway through a two-phone LAN test.
+# Runs the actual engine rather than approximating it. A previous version of
+# this workflow ran two bespoke Python parsers; Godot does that job properly
+# and for free, so the only Python left is the one check the engine does not
+# do (silently ignored scene properties).
 
 on:
   push:
     branches: ["**"]
   pull_request:
 
+env:
+  GODOT_VERSION: 4.7.2
+
 jobs:
   check:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+
+      - name: Cache Godot
+        id: cache-godot
+        uses: actions/cache@v4
         with:
-          python-version: "3.12"
-      - name: Scene and resource wiring
-        run: python3 tools/check_project.py
-      - name: GDScript calls and signatures
-        run: python3 tools/check_gdscript.py
+          path: ~/godot
+          key: godot-${{ env.GODOT_VERSION }}
+
+      - name: Download Godot
+        if: steps.cache-godot.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p ~/godot && cd ~/godot
+          curl -sSLo godot.zip "https://github.com/godotengine/godot-builds/releases/download/${GODOT_VERSION}-stable/Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip"
+          unzip -oq godot.zip
+          mv Godot_v${GODOT_VERSION}-stable_linux.x86_64 godot
+          chmod +x godot
+
+      - name: Import project and fail on any parse error
+        run: |
+          ~/godot/godot --headless --editor --quit 2>&1 | tee import.log
+          if grep -q "SCRIPT ERROR\|Failed to load script" import.log; then
+            echo "::error::Scripts failed to compile"
+            exit 1
+          fi
+
+      - name: Smoke test every scene, map and mode
+        run: ~/godot/godot --headless --fixed-fps 60 res://tools/Smoke.tscn
+
+      - name: Netcode replay
+        run: ~/godot/godot --headless --fixed-fps 60 res://tools/NetReplay.tscn
+
+      - name: Scene properties the engine ignores silently
+        run: python3 tools/check_scene_properties.py

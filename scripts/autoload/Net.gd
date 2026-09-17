@@ -190,6 +190,14 @@ func _push_local_choice() -> void:
 
 
 func _broadcast_roster() -> void:
+	_sync_roster.rpc(roster_wire())
+	roster_changed.emit()
+
+
+## The roster as it travels: string keys, plain types, no StringNames. Split
+## out from the RPC so it can be exercised without a socket, which is the
+## only way any of this gets tested on a machine with no second machine.
+func roster_wire() -> Dictionary:
 	var wire: Dictionary = {}
 	for id in roster.keys():
 		wire[str(id)] = {
@@ -198,12 +206,10 @@ func _broadcast_roster() -> void:
 			"slot": int(roster[id]["slot"]),
 			"bot": bool(roster[id].get("bot", false)),
 		}
-	_sync_roster.rpc(wire)
-	roster_changed.emit()
+	return wire
 
 
-@rpc("authority", "reliable")
-func _sync_roster(wire: Dictionary) -> void:
+func apply_roster_wire(wire: Dictionary) -> void:
 	roster.clear()
 	for key in wire.keys():
 		roster[int(key)] = {
@@ -213,6 +219,11 @@ func _sync_roster(wire: Dictionary) -> void:
 			"bot": bool(wire[key].get("bot", false)),
 		}
 	roster_changed.emit()
+
+
+@rpc("authority", "reliable")
+func _sync_roster(wire: Dictionary) -> void:
+	apply_roster_wire(wire)
 
 
 func set_match_config(new_map: StringName, new_mode: int) -> void:
@@ -290,7 +301,7 @@ func _start_match() -> void:
 
 func end_match() -> void:
 	if not is_online():
-		match_ended.emit()
+		_end_match()
 		return
 	if not is_host():
 		return

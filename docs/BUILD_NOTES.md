@@ -9,34 +9,26 @@ a store launch.
 
 ## Verification status
 
-**This code has not been run in Godot.** It was written in an environment with
-no engine binary available, so treat the first editor launch as the real first
-test. What *was* checked, by `python3 tools/check_project.py`:
+This code **is** run now. A headless Godot 4.7.2 (the same build as the
+editor) imports the project and executes it:
 
-- every `$NodePath` and `%UniqueName` a script uses exists in the scene the
-  script is attached to
-- every `ext_resource` path in every `.tscn` and `.tres` resolves
-- every `preload()` target exists
-- every autoload in `project.godot` exists
-- every property a scene sets on a scripted node is an `@export` on that
-  script, which is aimed at the generated map scenes: Godot silently ignores
-  a mistyped property at load, so the level just plays slightly wrong forever
+```
+godot --headless --editor --quit          # import; any parse error prints here
+godot --headless res://tools/Smoke.tscn   # every scene, both maps, all modes
+godot --headless res://tools/NetReplay.tscn
+python3 tools/check_scene_properties.py
+```
 
-and by `python3 tools/check_gdscript.py`:
+The smoke test instances every scene under `scenes/`, then runs the real
+arena on both maps in all three modes with bots, and fails on any engine
+error or if nothing moved. The replay test drives the netcode handlers with
+exactly the data the RPCs carry - roster wire, snapshots, replayed hits -
+without needing a socket, since ENet needs an IPv6-capable kernel even for
+IPv4 loopback and CI does not have one.
 
-- every bare call resolves to a function on the class or a project ancestor
-- argument counts match the definition, defaults accounted for
-- `GameConfig.X`, `Player.State.X` and autoload members exist
-- any method name that exactly one class defines is called with the right
-  number of arguments, which is what catches a signature that changed
-  without its call sites
-
-Both are verified against deliberately broken files rather than trusted: a
-checker that silently passes is worse than no checker.
-
-Together they cover the typo class that otherwise surfaces halfway through a
-two-phone LAN test. They do not catch a type error, a physics layer mistake,
-or bad tuning. Run both before every commit; they take under a second.
+What is still unverified: real sockets between two machines, touch input,
+the RevenueCat purchase, and anything about how the game *feels*. Those need
+hardware.
 
 ## First run checklist
 

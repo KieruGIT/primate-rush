@@ -27,11 +27,46 @@ var _notes: Array[String] = []
 
 
 func _ready() -> void:
+	# Keep ticking even if a scene under test pauses the tree, which Pause
+	# does by design.
+	process_mode = Node.PROCESS_MODE_ALWAYS
+	await _instance_every_scene()
 	for map_id in GameConfig.map_ids():
 		for mode in [GameConfig.Mode.FREE_PLAY, GameConfig.Mode.RACE, GameConfig.Mode.HOARD]:
 			_cases.append({"map": map_id, "mode": mode})
 	print("smoke: %d cases, %d ticks each" % [_cases.size(), TICKS_PER_CASE])
 	_next_case()
+
+
+## Instancing every scene once is how a broken node path or a missing unique
+## name gets caught: those only fail when the scene actually readies, and the
+## mode cases below never open the lobby, the pause menu or the results.
+func _instance_every_scene() -> void:
+	var skipped := ["Main.tscn"]
+	for path in _scene_paths("res://scenes"):
+		if path.get_file() in skipped:
+			continue
+		var scene: PackedScene = load(path)
+		if scene == null:
+			_failures.append("%s failed to load" % path)
+			continue
+		var node := scene.instantiate()
+		add_child(node)
+		await get_tree().process_frame
+		node.queue_free()
+		await get_tree().process_frame
+		get_tree().paused = false
+	_notes.append("instanced every scene under res://scenes")
+
+
+func _scene_paths(root: String) -> PackedStringArray:
+	var out: PackedStringArray = []
+	for name in DirAccess.get_files_at(root):
+		if name.ends_with(".tscn"):
+			out.append(root.path_join(name))
+	for dir_name in DirAccess.get_directories_at(root):
+		out.append_array(_scene_paths(root.path_join(dir_name)))
+	return out
 
 
 func _physics_process(_delta: float) -> void:
