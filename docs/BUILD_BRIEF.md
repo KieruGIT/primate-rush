@@ -1,7 +1,7 @@
-# Monkey - Claude Code Build Brief
+# Monkey - Build Brief
 
-Hand this file to Claude Code at the start of the session. It contains every
-decision already made so you do not re-litigate scope or rediscover blockers.
+Every decision already made, so scope does not get re-litigated and blockers
+do not get rediscovered.
 
 ---
 

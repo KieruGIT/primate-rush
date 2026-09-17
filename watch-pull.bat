@@ -1,5 +1,5 @@
 @echo off
-REM Leave this window open while Claude is working: it pulls every 30s, so
+REM Leave this window open during a working session: it pulls every 30s, so
 REM new commits land in Godot without you doing anything. Ctrl+C to stop.
 cd /d "%~dp0"
 :loop
