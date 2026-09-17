@@ -42,11 +42,20 @@ func _process(delta: float) -> void:
 
 
 func _info_parts() -> PackedStringArray:
-	var parts: PackedStringArray = [_mode_text(), _state_text(_player.state), "%d px/s" % int(_player.velocity.length())]
+	var parts: PackedStringArray = [_mode_text(), _state_text(_player.state), "%d px/s" % int(_player.velocity.length()), _skill_text()]
 	if _race != null and _race.is_running():
 		parts.append("%.1fs" % _race.elapsed)
 		parts.append("place %d of %d" % [_live_place(), _field_size()])
 	return parts
+
+
+func _skill_text() -> String:
+	if _player.stats.skill_id == &"":
+		return "no skill"
+	var label := String(_player.stats.skill_id).replace("_", " ")
+	if _player.skill_timer > 0.0:
+		return "%s %.1fs" % [label, _player.skill_timer]
+	return "%s ready" % label
 
 
 func _bind() -> void:

@@ -23,9 +23,12 @@ signal state_changed(new_state: int)
 signal attacked(flavor: StringName)
 signal hit_landed(target_id: int)
 signal hit_taken(attacker_id: int, knockback: Vector2)
+signal skill_used(skill_id: StringName)
 signal fell_out_of_world
 
-enum State { GROUND, AIR, CLIMB, SWING, STUN }
+# DASH is appended rather than inserted: the state enum travels over the
+# wire as an int, and renumbering it would desync mid-update.
+enum State { GROUND, AIR, CLIMB, SWING, STUN, DASH }
 
 const ATTACK_FLAVORS: Array[StringName] = [&"slap", &"punch", &"kick"]
 
@@ -84,6 +87,22 @@ const ATTACK_FLAVORS: Array[StringName] = [&"slap", &"punch", &"kick"]
 ## the floor and reads as nothing happening.
 @export var knockback_lift: float = 0.55
 
+@export_group("Skills")
+## Gorilla. Short forward grapple: terrain pulls you to it, a player gets
+## yanked to you instead.
+@export var grapple_range: float = 420.0
+@export var grapple_pull_speed: float = 1500.0
+@export var grapple_yank_speed: float = 900.0
+## Gibbon. One launch per landing, in the aimed direction.
+@export var air_launch_speed: float = 1150.0
+## Macaque. Short roll that ignores knockback and punishes whoever swung.
+@export var roll_speed: float = 900.0
+@export var roll_time: float = 0.26
+## Safety valve so a grapple that never arrives cannot strand you in DASH.
+@export var dash_timeout: float = 0.7
+## Whiffing still costs something, or the grapple is a free scan every frame.
+@export var skill_whiff_cooldown: float = 0.6
+
 @export_group("Networking")
 ## Position error past which a predicting client stops arguing and snaps.
 @export var reconcile_snap_distance: float = 64.0
@@ -101,6 +120,13 @@ var _attack_timer: float = 0.0
 var _attack_cooldown_timer: float = 0.0
 var _hitbox_open: bool = false
 var _already_hit: Array[int] = []
+
+var skill_timer: float = 0.0
+var invuln_timer: float = 0.0
+var _dash_time: float = 0.0
+var _dash_kind: StringName = &""
+var _dash_target: Vector2 = Vector2.ZERO
+var _air_launch_ready: bool = true
 
 var _climb_lock: float = 0.0
 var _swing_lock: float = 0.0
@@ -181,6 +207,8 @@ func _physics_process(delta: float) -> void:
 		match state:
 			State.STUN:
 				_process_stun(delta)
+			State.DASH:
+				_process_dash(delta)
 			State.CLIMB:
 				_process_climb(delta)
 			State.SWING:
@@ -225,10 +253,16 @@ func _tick_timers(delta: float) -> void:
 	_swing_lock = maxf(_swing_lock - delta, 0.0)
 	_attack_cooldown_timer = maxf(_attack_cooldown_timer - delta, 0.0)
 	_buffer_timer = maxf(_buffer_timer - delta, 0.0)
+	skill_timer = maxf(skill_timer - delta, 0.0)
+	invuln_timer = maxf(invuln_timer - delta, 0.0)
+	if is_on_floor():
+		_air_launch_ready = true
 	if _input.consume(InputFrame.Button.JUMP):
 		_buffer_timer = jump_buffer_time
 	if _input.consume(InputFrame.Button.ATTACK):
 		_try_attack()
+	if _input.consume(InputFrame.Button.SKILL):
+		_try_skill()
 
 
 # --- Ground and air ------------------------------------------------
@@ -302,6 +336,7 @@ func _try_enter_climb() -> bool:
 		return false
 	_set_state(State.CLIMB)
 	velocity = Vector2.ZERO
+	_air_launch_ready = true
 	return true
 
 
@@ -358,6 +393,7 @@ func _try_enter_swing() -> bool:
 	# rocket straight outward off a vine.
 	var tangent := Vector2(-sin(_swing_angle), cos(_swing_angle))
 	_swing_ang_vel = velocity.dot(tangent) / _swing_length
+	_air_launch_ready = true
 	_set_state(State.SWING)
 	return true
 
@@ -502,6 +538,9 @@ func _resolve_hit(area: Area2D) -> void:
 ## client: knockback that disagrees between machines is the single most
 ## broken-feeling desync in this game.
 func take_hit(attacker_id: int, force: Vector2, base_stun: float) -> void:
+	if invuln_timer > 0.0:
+		_counter_attacker(attacker_id)
+		return
 	var applied := force.normalized() * stats.knockback_taken(force.length())
 	velocity = applied
 	stun_timer = base_stun / maxf(stats.weight, 0.2)
@@ -530,12 +569,152 @@ func _process_stun(delta: float) -> void:
 		_set_state(State.GROUND if is_on_floor() else State.AIR)
 
 
+# --- Skills --------------------------------------------------------
+#
+# One skill per monkey, dispatched by the stat resource rather than by a
+# subclass per monkey. A monkey is data plus a skill id, so adding the
+# capuchin later is a .tres and one branch, not a new script.
+
+func _try_skill() -> void:
+	if skill_timer > 0.0 or state == State.STUN or stats.skill_id == &"":
+		return
+	var fired := false
+	match stats.skill_id:
+		&"grapple_dash":
+			fired = _skill_grapple_dash()
+		&"air_launch":
+			fired = _skill_air_launch()
+		&"counter_roll":
+			fired = _skill_counter_roll()
+	skill_timer = stats.skill_cooldown if fired else skill_whiff_cooldown
+	if fired:
+		skill_used.emit(stats.skill_id)
+
+
+func _aim_direction() -> Vector2:
+	if _input.move.length() > 0.35:
+		return _input.move.normalized()
+	return Vector2(float(facing), -0.2).normalized()
+
+
+func _skill_grapple_dash() -> bool:
+	var aim := Vector2(float(facing), 0.0)
+	if absf(_input.move.y) > 0.3:
+		aim = Vector2(float(facing), _input.move.y).normalized()
+
+	var space := get_world_2d().direct_space_state
+	var query := PhysicsRayQueryParameters2D.create(
+		global_position,
+		global_position + aim * grapple_range,
+		GameConfig.LAYER_WORLD | GameConfig.LAYER_PLAYER,
+		[get_rid()]
+	)
+	var hit := space.intersect_ray(query)
+	if hit.is_empty():
+		return false
+
+	var collider: Object = hit.get("collider")
+	var target := collider as Player
+	if target != null:
+		# Yanking another monkey is a hit, so it resolves where every other
+		# hit resolves. A client pulling someone on its own screen only would
+		# be the most visible desync in the game.
+		if not _is_authority():
+			return true
+		var pull := (global_position - target.global_position).normalized() * grapple_yank_speed
+		target.take_hit(player_id, pull, GameConfig.BASE_STUN_TIME * 0.6)
+		if Net.is_online():
+			Net.broadcast_hit(target.player_id, pull, GameConfig.BASE_STUN_TIME * 0.6, player_id)
+		return true
+
+	_dash_kind = &"grapple"
+	_dash_target = hit.get("position", global_position)
+	_dash_time = dash_timeout
+	_swing_node = null
+	_set_state(State.DASH)
+	return true
+
+
+func _skill_air_launch() -> bool:
+	if is_on_floor() or not _air_launch_ready:
+		return false
+	velocity = _aim_direction() * air_launch_speed
+	_air_launch_ready = false
+	# Clearing the regrab lock is what lets a launch chain straight into a
+	# vine, which is the gibbon's whole identity.
+	_swing_lock = 0.0
+	_swing_node = null
+	_set_state(State.AIR)
+	return true
+
+
+func _skill_counter_roll() -> bool:
+	_dash_kind = &"roll"
+	_dash_time = roll_time
+	invuln_timer = roll_time
+	_swing_node = null
+	_set_state(State.DASH)
+	return true
+
+
+func _process_dash(delta: float) -> void:
+	_dash_time -= delta
+	if _dash_kind == &"grapple":
+		var to_target := _dash_target - global_position
+		if _dash_time <= 0.0 or to_target.length() < 28.0:
+			# Arriving keeps some speed rather than stopping dead, so a
+			# grapple into a ledge flows into a jump instead of parking you.
+			velocity = to_target.normalized() * grapple_pull_speed * 0.25
+			_end_dash()
+			return
+		velocity = to_target.normalized() * grapple_pull_speed
+	else:
+		velocity.x = float(facing) * roll_speed
+		_apply_gravity(delta)
+		if _dash_time <= 0.0:
+			_end_dash()
+			return
+
+	move_and_slide()
+	if _dash_kind == &"grapple" and get_slide_collision_count() > 0:
+		_end_dash()
+
+
+func _end_dash() -> void:
+	_dash_kind = &""
+	_dash_time = 0.0
+	_set_state(State.GROUND if is_on_floor() else State.AIR)
+
+
+## The macaque's counter. Rolling through an attack stuns the attacker
+## instead, which is what makes careless swinging cost something.
+func _counter_attacker(attacker_id: int) -> void:
+	if not _is_authority():
+		return
+	var arena: Node = get_tree().get_first_node_in_group(&"arena")
+	if arena == null:
+		return
+	var table: Variant = arena.get(&"players")
+	if not (table is Dictionary):
+		return
+	var attacker := table.get(attacker_id) as Player
+	if attacker == null:
+		return
+	var push := (attacker.global_position - global_position).normalized() * stats.knockback_dealt() * 0.7
+	attacker.take_hit(player_id, push, GameConfig.BASE_STUN_TIME)
+	if Net.is_online():
+		Net.broadcast_hit(attacker_id, push, GameConfig.BASE_STUN_TIME, player_id)
+
+
 # --- Respawn -------------------------------------------------------
 
 func respawn_at(point: Vector2) -> void:
 	global_position = point
 	velocity = Vector2.ZERO
 	stun_timer = 0.0
+	invuln_timer = 0.0
+	_dash_kind = &""
+	_air_launch_ready = true
 	is_attacking = false
 	_swing_node = null
 	_set_hitbox_open(false)
@@ -609,6 +788,8 @@ func _update_visual() -> void:
 			body.color = base.lerp(Color(0.4, 1.0, 0.5), 0.35)
 		State.SWING:
 			body.color = base.lerp(Color(0.5, 0.75, 1.0), 0.35)
+		State.DASH:
+			body.color = base.lerp(Color(1.0, 0.95, 0.6), 0.55)
 		State.AIR:
 			body.color = base.lightened(0.18)
 		_:
