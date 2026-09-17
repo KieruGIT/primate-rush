@@ -30,6 +30,8 @@ var _checkpoints: Dictionary = {}      # player_id -> Vector2
 var _respawning: Dictionary = {}       # player_id -> bool
 var _local_id: int = 1
 var _idle_frame: InputFrame = InputFrame.new()
+## Latch so one fall counts once, rather than once per frame spent below.
+var _local_below_kill: bool = false
 
 @onready var _map_slot: Node2D = $MapSlot
 @onready var _player_root: Node2D = $Players
@@ -90,10 +92,28 @@ func _start_mode() -> void:
 
 
 func _on_match_over(results: Array) -> void:
+	_record_career(results)
 	var overlay := RESULTS_SCENE.instantiate()
 	add_child(overlay)
 	if overlay.has_method(&"show_results"):
 		overlay.call(&"show_results", results)
+
+
+func _record_career(results: Array) -> void:
+	for index in results.size():
+		var entry: Variant = results[index]
+		if not (entry is Dictionary) or int((entry as Dictionary).get("id", -1)) != _local_id:
+			continue
+		var row: Dictionary = entry
+		var place := index + 1
+		if Net.mode == GameConfig.Mode.HOARD:
+			Profile.record_hoard(place, results.size(), int(row.get("score", 0)))
+		elif Net.mode == GameConfig.Mode.RACE:
+			Profile.record_race(
+				Net.map_id, place, results.size(),
+				float(row.get("time", 0.0)), bool(row.get("finished", false))
+			)
+		return
 
 
 # --- Spawning ------------------------------------------------------
@@ -116,6 +136,11 @@ func _spawn_player(id: int, monkey_id: StringName, slot: int, hat_id: StringName
 	player.position = _spawn_position(slot)
 	_player_root.add_child(player)
 	players[id] = player
+	if id == _local_id:
+		# Career stats track this machine's player only. Each client writes
+		# its own file and none of it is authoritative for anything.
+		player.hit_landed.connect(func(_target_id: int) -> void: Profile.bump("hits_landed"))
+		player.hit_taken.connect(func(_attacker_id: int, _force: Vector2) -> void: Profile.bump("hits_taken"))
 	_checkpoints[id] = player.position
 	_respawning[id] = false
 	return player
@@ -140,6 +165,7 @@ func despawn_player(id: int) -> void:
 
 func _physics_process(_delta: float) -> void:
 	_route_input()
+	_track_local_fall()
 	if _is_authority():
 		_check_falls()
 
@@ -174,6 +200,20 @@ func _route_input() -> void:
 			if _input_locked():
 				frame = _idle_frame
 			players[id].feed_input(frame)
+
+
+## Counted locally rather than in _begin_respawn, which only runs on the
+## host. A client falling into a pit should see its own fall counted.
+func _track_local_fall() -> void:
+	var player := players.get(_local_id) as Player
+	if player == null:
+		return
+	var limit := map.kill_depth if map != null else 1400.0
+	if not _local_below_kill and player.global_position.y > limit:
+		_local_below_kill = true
+		Profile.bump("falls")
+	elif _local_below_kill and player.global_position.y < limit - 200.0:
+		_local_below_kill = false
 
 
 func _input_locked() -> bool:
@@ -241,6 +281,10 @@ func apply_remote_hit(target_id: int, force: Vector2, stun: float, attacker_id: 
 	var player := players.get(target_id) as Player
 	if player != null:
 		player.take_hit(attacker_id, force, stun)
+	# A client resolves no hits of its own, so its landed hits are only
+	# knowable from the host's broadcast.
+	if attacker_id == _local_id:
+		Profile.bump("hits_landed")
 
 
 func apply_remote_ability(target_id: int, ability_id: StringName, duration: float) -> void:

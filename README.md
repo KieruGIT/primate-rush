@@ -50,6 +50,8 @@ button, which keeps the phone layout down to a stick and two buttons.
 | LAN multiplayer, host authoritative, up to 4 | done |
 | LAN host discovery by UDP broadcast, with IP entry as fallback | done |
 | Rematch from the results screen | done |
+| Headwear attachment point, five hats, two of them premium | done |
+| Local career stats: races, wins, bananas, hits, falls, best times | done |
 | Touch controls | done |
 | Character select, map and mode select, lobby, results | done |
 | Race mode: countdown, checkpoints, placement, results | done |
@@ -57,7 +59,7 @@ button, which keeps the phone layout down to a stick and two buttons.
 | One skill per monkey, all five | done |
 | RevenueCat purchase unlocking a monkey | wired, needs a key and a device |
 | Banana Hoard: timer, scoring, drop on hit, lucky boxes | done |
-| Art, audio, ranked, cosmetics | not yet, by design |
+| Art, audio, ranked backend | not yet, by design |
 
 ## Repository layout
 
@@ -67,8 +69,10 @@ scenes/      Boot, Lobby, Main (arena shell), Player, Vine, Climbable, Checkpoin
 scenes/maps/ MapA (horizontal run), MapB (vertical ascent)
 scripts/
   autoload/  GameConfig (constants, roster), GameInput (devices), Net (LAN),
-             Discovery (UDP host beacons), Purchases (RevenueCat)
-  player/    Player.gd (movement, climb, swing, combat), MonkeyStats, InputFrame
+             Discovery (UDP host beacons), Purchases (RevenueCat),
+             Profile (local career stats)
+  player/    Player.gd (movement, climb, swing, combat), MonkeyStats, InputFrame,
+             Headwear (cosmetic attachment point)
   world/     Main.gd (arena, respawn, snapshots), RaceDirector, HoardDirector,
              MapData, Vine, Climbable, Checkpoint, FinishLine, Pickup, BananaSpawn
   ui/        Boot router, Lobby, Hud, TouchControls
