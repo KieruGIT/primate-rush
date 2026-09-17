@@ -14,7 +14,7 @@ extends RefCounted
 # one physics tick still produce two actions.
 # ============================================================
 
-enum Button { JUMP, ATTACK, SKILL }
+enum Action { JUMP, ATTACK, SKILL }
 
 var move: Vector2 = Vector2.ZERO
 var jump_held: bool = false
@@ -66,6 +66,6 @@ func button_counts() -> Dictionary:
 func apply_button_counts(counts: Dictionary) -> void:
 	for button in counts.keys():
 		var id := int(button)
-		if id < 0 or id > InputFrame.Button.SKILL:
+		if id < 0 or id > InputFrame.Action.SKILL:
 			continue
 		_pending[id] = int(_pending.get(id, 0)) + clampi(int(counts[button]), 0, 8)

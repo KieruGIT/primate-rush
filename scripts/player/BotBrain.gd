@@ -47,7 +47,7 @@ func think(player: Player, arena: Node, delta: float) -> InputFrame:
 	frame.jump_held = _jump_hold > 0.0
 
 	if _should_jump(player, to_target):
-		frame.press(InputFrame.Button.JUMP)
+		frame.press(InputFrame.Action.JUMP)
 		# Held for a moment afterwards, because the jump cut in Player means
 		# a tapped jump is a short hop and bots need the full arc to clear
 		# the gaps the level designer built for a full arc.
@@ -58,11 +58,11 @@ func think(player: Player, arena: Node, delta: float) -> InputFrame:
 	if victim != null and _attack_cooldown <= 0.0:
 		var offset := victim.global_position - player.global_position
 		if offset.length() < ATTACK_RANGE and signf(offset.x) == signf(float(player.facing)):
-			frame.press(InputFrame.Button.ATTACK)
+			frame.press(InputFrame.Action.ATTACK)
 			_attack_cooldown = 0.55 / maxf(skill_level, 0.3)
 
 	if _should_use_skill(player, victim):
-		frame.press(InputFrame.Button.SKILL)
+		frame.press(InputFrame.Action.SKILL)
 		_skill_cooldown = 2.5 / maxf(skill_level, 0.3)
 
 	return frame

@@ -74,11 +74,13 @@ func setup(arena: Node, map: MapData, container: Node2D) -> void:
 	_anchors.clear()
 	if map == null:
 		return
-	# Group lookup rather than a type filter: BananaSpawn adds itself on
-	# _ready, and add_child readies the whole map subtree before this runs.
+	# Group lookup finds every spawn in the tree, including the previous
+	# match's map while it is still queued for deletion, so anchors are
+	# filtered to this map. Without that, a rematch spawns bananas onto
+	# freed nodes and every lookup after it throws.
 	for node in get_tree().get_nodes_in_group(&"banana_spawn"):
 		var anchor := node as BananaSpawn
-		if anchor != null:
+		if anchor != null and map.is_ancestor_of(anchor):
 			_anchors.append(anchor)
 	if _anchors.is_empty():
 		push_warning("Hoard on a map with no banana spawns: %s" % map.display_name)

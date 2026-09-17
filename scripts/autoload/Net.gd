@@ -24,11 +24,13 @@ signal config_changed
 signal connection_failed
 signal server_disconnected
 
-enum Mode { OFFLINE, HOST, CLIENT }
+## Connection state. Named `link` rather than `mode` because `mode` is the
+## match mode everywhere else in the project, and one of the two had to go.
+enum Link { OFFLINE, HOST, CLIENT }
 
 const SNAPSHOT_HZ: float = 30.0
 
-var mode: int = Mode.OFFLINE
+var link: int = Link.OFFLINE
 var roster: Dictionary = {}          # peer_id -> {"monkey": StringName, "hat": StringName, "slot": int}
 var local_monkey: StringName = &"gorilla"
 var local_hat: StringName = &"none"
@@ -55,11 +57,11 @@ func _ready() -> void:
 
 
 func is_online() -> bool:
-	return mode != Mode.OFFLINE
+	return link != Link.OFFLINE
 
 
 func is_host() -> bool:
-	return mode == Mode.HOST
+	return link == Link.HOST
 
 
 func local_id() -> int:
@@ -76,7 +78,7 @@ func host_game(port: int = GameConfig.NET_DEFAULT_PORT) -> String:
 		_peer = null
 		return "Could not host on port %d (error %d)" % [port, err]
 	multiplayer.multiplayer_peer = _peer
-	mode = Mode.HOST
+	link = Link.HOST
 	roster.clear()
 	roster[1] = {"monkey": local_monkey, "hat": local_hat, "slot": 0}
 	roster_changed.emit()
@@ -91,7 +93,7 @@ func join_game(address: String, port: int = GameConfig.NET_DEFAULT_PORT) -> Stri
 		_peer = null
 		return "Could not reach %s:%d (error %d)" % [address, port, err]
 	multiplayer.multiplayer_peer = _peer
-	mode = Mode.CLIENT
+	link = Link.CLIENT
 	return ""
 
 
@@ -100,7 +102,7 @@ func leave() -> void:
 		_peer.close()
 	_peer = null
 	multiplayer.multiplayer_peer = null
-	mode = Mode.OFFLINE
+	link = Link.OFFLINE
 	roster.clear()
 	_remote_inputs.clear()
 	arena = null
@@ -179,11 +181,11 @@ func set_local_hat(id: StringName) -> void:
 
 
 func _push_local_choice() -> void:
-	if mode == Mode.HOST:
+	if link == Link.HOST:
 		roster[1]["monkey"] = local_monkey
 		roster[1]["hat"] = local_hat
 		_broadcast_roster()
-	elif mode == Mode.CLIENT and multiplayer.has_multiplayer_peer():
+	elif link == Link.CLIENT and multiplayer.has_multiplayer_peer():
 		_register_player.rpc_id(1, String(local_monkey), String(local_hat))
 
 
@@ -317,7 +319,7 @@ func _end_match() -> void:
 
 ## Called by a client every physics tick with its own intent.
 func send_local_input(frame: InputFrame) -> void:
-	if mode != Mode.CLIENT:
+	if link != Link.CLIENT:
 		return
 	_push_axes.rpc_id(1, frame.move, frame.jump_held)
 	var buttons := frame.button_counts()
