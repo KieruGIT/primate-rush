@@ -1,0 +1,36 @@
+{
+  "_comment": "Engine and GDScript names this project calls bare or on a class. Listed explicitly rather than guessed, so an unknown call in check_gdscript.py is a real finding instead of noise. Add a name here the first time you use it.",
+  "globals": [
+    "abs", "absf", "absi", "bool", "ceil", "ceili", "clamp", "clampf", "clampi",
+    "cos", "deg_to_rad", "float", "floor", "floori", "int", "inverse_lerp",
+    "is_equal_approx", "is_instance_valid", "is_zero_approx", "len", "lerp",
+    "lerpf", "load", "max", "maxf", "maxi", "min", "minf", "mini", "move_toward",
+    "posmod", "pow", "preload", "print", "print_rich", "printerr", "push_error",
+    "push_warning", "rad_to_deg", "randf", "randf_range", "randi", "randi_range",
+    "round", "roundi", "sign", "signf", "signi", "sin", "snapped", "sqrt", "str",
+    "tan", "type_string", "typeof", "wrapf", "wrapi"
+  ],
+  "methods": [
+    "add_child", "add_to_group", "append", "append_array", "bind", "call",
+    "callv", "clear", "close", "connect", "create", "create_client",
+    "create_server", "create_timer", "direct_space_state", "disconnect",
+    "draw_arc", "draw_circle", "draw_colored_polygon", "draw_line",
+    "draw_polyline", "draw_rect", "draw_string", "duplicate", "emit", "erase",
+    "find_children", "get", "get_available_packet_count", "get_children",
+    "get_first_node_in_group", "get_local_addresses", "get_meta",
+    "get_nodes_in_group", "get_packet", "get_packet_ip", "get_parent",
+    "get_physics_process_delta_time", "get_remote_sender_id", "get_rid",
+    "get_section_keys", "get_slide_collision_count", "get_ticks_msec",
+    "get_tree", "get_unique_id", "get_value", "get_viewport",
+    "get_visible_rect", "get_world_2d", "has", "has_method",
+    "has_multiplayer_peer", "has_overlapping_areas", "has_overlapping_bodies",
+    "has_section", "has_signal", "instantiate", "intersect_ray", "is_class",
+    "is_empty", "is_in_group", "is_inside_tree", "is_instance_valid",
+    "is_node_ready", "is_on_floor", "is_on_wall", "keys", "limit_length",
+    "make_current", "move_and_slide", "new", "put_packet", "queue_free",
+    "queue_redraw", "remove_child", "rpc", "rpc_id", "set", "set_broadcast_enabled",
+    "set_dest_address", "set_meta", "size", "sort_custom", "stringify",
+    "to_utf8_buffer", "values"
+  ],
+  "object_members": ["new", "resource_path", "script"]
+}

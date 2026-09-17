@@ -19,9 +19,21 @@ test. What *was* checked, by `python3 tools/check_project.py`:
 - every `preload()` target exists
 - every autoload in `project.godot` exists
 
-That covers the class of typo that otherwise surfaces halfway through a
-two-phone LAN test. It does not catch a GDScript type error, a physics layer
-mistake, or bad tuning. Run the checker before every commit; it is fast.
+and by `python3 tools/check_gdscript.py`:
+
+- every bare call resolves to a function on the class or a project ancestor
+- argument counts match the definition, defaults accounted for
+- `GameConfig.X`, `Player.State.X` and autoload members exist
+- any method name that exactly one class defines is called with the right
+  number of arguments, which is what catches a signature that changed
+  without its call sites
+
+Both are verified against deliberately broken files rather than trusted: a
+checker that silently passes is worse than no checker.
+
+Together they cover the typo class that otherwise surfaces halfway through a
+two-phone LAN test. They do not catch a type error, a physics layer mistake,
+or bad tuning. Run both before every commit; they take under a second.
 
 ## First run checklist
 
