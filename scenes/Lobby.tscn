@@ -178,6 +178,18 @@ custom_minimum_size = Vector2(120, 52)
 layout_mode = 2
 text = "Leave"
 
+[node name="InternetButton" type="Button" parent="Scroll/Margin/Columns/Right"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 48)
+layout_mode = 2
+text = "Open this game to the internet (UPnP)"
+
+[node name="PublicAddress" type="Label" parent="Scroll/Margin/Columns/Right"]
+unique_name_in_owner = true
+layout_mode = 2
+autowrap_mode = 3
+text = ""
+
 [node name="RosterList" type="Label" parent="Scroll/Margin/Columns/Right"]
 unique_name_in_owner = true
 layout_mode = 2

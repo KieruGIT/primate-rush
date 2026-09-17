@@ -21,6 +21,7 @@ GameConfig="*res://scripts/autoload/GameConfig.gd"
 GameInput="*res://scripts/autoload/GameInput.gd"
 Net="*res://scripts/autoload/Net.gd"
 Discovery="*res://scripts/autoload/Discovery.gd"
+PortMap="*res://scripts/autoload/PortMap.gd"
 Purchases="*res://scripts/autoload/Purchases.gd"
 Profile="*res://scripts/autoload/Profile.gd"
 

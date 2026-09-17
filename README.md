@@ -49,6 +49,7 @@ button, which keeps the phone layout down to a stick and two buttons.
 | Five monkeys: gorilla, gibbon, macaque, orangutan, capuchin | done |
 | LAN multiplayer, host authoritative, up to 4 | done |
 | LAN host discovery by UDP broadcast, with IP entry as fallback | done |
+| Internet hosting via UPnP port mapping, with the reason shown on failure | done |
 | Rematch from the results screen | done |
 | Headwear attachment point, five hats, two of them premium | done |
 | Local career stats: races, wins, bananas, hits, falls, best times | done |
@@ -143,7 +144,9 @@ Written without an engine available to run it: the first Godot launch is the
 real first test. `python3 tools/check_project.py` covers node paths, resource
 paths and autoloads; `python3 tools/check_gdscript.py` covers bare calls,
 argument counts and cross-class member references. See [docs/BUILD_NOTES.md](docs/BUILD_NOTES.md) for the
-first-run checklist, the LAN test, Android export, and the known gaps.
+first-run checklist, the LAN test, Android export, and the known gaps, and
+[docs/MULTIPLAYER.md](docs/MULTIPLAYER.md) for how far multiplayer can go
+beyond the same wifi and what each step actually costs.
 
 ## License
 

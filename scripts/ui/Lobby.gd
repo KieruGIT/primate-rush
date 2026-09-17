@@ -27,6 +27,8 @@ extends Control
 @onready var _restore_button: Button = %RestoreButton
 @onready var _blurb: Label = %Blurb
 @onready var _career: Label = %Career
+@onready var _internet_button: Button = %InternetButton
+@onready var _public_address: Label = %PublicAddress
 
 var _selected: StringName = &"gorilla"
 var _monkey_buttons: Dictionary = {}
@@ -52,6 +54,8 @@ func _ready() -> void:
 	Net.connection_failed.connect(func() -> void: _set_status("Could not reach that host. Same wifi?"))
 	Net.server_disconnected.connect(func() -> void: _set_status("Host closed the game."))
 	Profile.stats_changed.connect(_refresh_career)
+	_internet_button.pressed.connect(_on_open_to_internet)
+	PortMap.finished.connect(_on_port_mapped)
 	Purchases.entitlement_changed.connect(_on_entitlement_changed)
 	Purchases.purchase_finished.connect(_on_purchase_finished)
 
@@ -238,6 +242,7 @@ func _refresh() -> void:
 	_join_button.disabled = online
 	_solo_button.disabled = online
 	_ip_field.editable = not online
+	_internet_button.disabled = not Net.is_host() or PortMap.busy
 	_refresh_config()
 	_refresh_hosts()
 
@@ -253,6 +258,26 @@ func _refresh() -> void:
 
 
 # --- Buttons -------------------------------------------------------
+
+## Optional and host only. The LAN path never needs it, and it fails on
+## plenty of networks by design, so the lobby says what happened instead of
+## pretending it worked.
+func _on_open_to_internet() -> void:
+	if not Net.is_host():
+		_set_status("Host a game first, then open it to the internet.")
+		return
+	_public_address.text = "Asking the router..."
+	PortMap.try_open(GameConfig.NET_DEFAULT_PORT)
+
+
+func _on_port_mapped(address: String, error: String) -> void:
+	if error.is_empty():
+		_public_address.text = "Open. Others outside your network join at %s" % address
+		_set_status("Router opened UDP %d. Share that address." % GameConfig.NET_DEFAULT_PORT)
+	else:
+		_public_address.text = error
+		_set_status("Could not open the port automatically. See docs/MULTIPLAYER.md for the fallbacks.")
+
 
 func _on_host() -> void:
 	var error := Net.host_game()
@@ -311,6 +336,8 @@ func _on_start() -> void:
 
 func _on_leave() -> void:
 	Net.leave()
+	PortMap.close()
+	_public_address.text = ""
 	Discovery.stop_advertising()
 	Discovery.start_listening()
 	_set_status("Left the game.")
