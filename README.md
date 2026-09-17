@@ -10,6 +10,14 @@ Engine: **Godot 4.7**, Compatibility (OpenGL 3) renderer, GDScript only.
 
 ---
 
+## Getting updates
+
+`pull.bat` fetches the latest commits into this checkout; double-click it and
+click back into Godot, which rescans and reloads changed scripts by itself.
+`watch-pull.bat` does the same every 30 seconds if you would rather leave it
+running. Stop a running game before pulling: a live game does not hot-swap
+its code.
+
 ## Running it
 
 1. Open the project folder in Godot 4.7.
