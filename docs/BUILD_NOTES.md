@@ -18,6 +18,9 @@ test. What *was* checked, by `python3 tools/check_project.py`:
 - every `ext_resource` path in every `.tscn` and `.tres` resolves
 - every `preload()` target exists
 - every autoload in `project.godot` exists
+- every property a scene sets on a scripted node is an `@export` on that
+  script, which is aimed at the generated map scenes: Godot silently ignores
+  a mistyped property at load, so the level just plays slightly wrong forever
 
 and by `python3 tools/check_gdscript.py`:
 
@@ -53,6 +56,10 @@ or bad tuning. Run both before every commit; they take under a second.
    crossing the finish gives a placement and a results screen.
 5. Switch to Banana Hoard. Confirm bananas spawn, collecting scores, and
    hitting a player scatters a share of theirs.
+6. Press Escape. The pause overlay should appear and the game should stop;
+   the volume slider should audibly change the synthesised effects.
+7. Set bots to 3 and run a race. See the bot notes below for what a failure
+   there actually means.
 
 ## Testing with bots
 
