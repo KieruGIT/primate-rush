@@ -27,7 +27,6 @@ const ATTACK_RANGE: float = 78.0
 ## an easy bot is slow to react, not visibly crippled.
 var skill_level: float = 1.0
 
-var _frame: InputFrame = InputFrame.new()
 var _jump_hold: float = 0.0
 var _attack_cooldown: float = 0.0
 var _skill_cooldown: float = 0.0
@@ -66,7 +65,6 @@ func think(player: Player, arena: Node, delta: float) -> InputFrame:
 		frame.press(InputFrame.Button.SKILL)
 		_skill_cooldown = 2.5 / maxf(skill_level, 0.3)
 
-	_frame = frame
 	return frame
 
 
