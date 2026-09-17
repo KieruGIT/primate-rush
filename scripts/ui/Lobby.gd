@@ -25,6 +25,7 @@ extends Control
 @onready var _store_button: Button = %StoreButton
 @onready var _restore_button: Button = %RestoreButton
 @onready var _blurb: Label = %Blurb
+@onready var _career: Label = %Career
 
 var _selected: StringName = &"gorilla"
 var _monkey_buttons: Dictionary = {}
@@ -48,6 +49,7 @@ func _ready() -> void:
 	Net.config_changed.connect(_refresh_config)
 	Net.connection_failed.connect(func() -> void: _set_status("Could not reach that host. Same wifi?"))
 	Net.server_disconnected.connect(func() -> void: _set_status("Host closed the game."))
+	Profile.stats_changed.connect(_refresh_career)
 	Purchases.entitlement_changed.connect(_on_entitlement_changed)
 	Purchases.purchase_finished.connect(_on_purchase_finished)
 
@@ -60,6 +62,7 @@ func _ready() -> void:
 	_refresh_locks()
 	_select_monkey(_selected)
 	_refresh_config()
+	_refresh_career()
 	_refresh()
 	_set_status("Pick a monkey. Host, join, or play solo.")
 
@@ -301,6 +304,10 @@ func _on_entitlement_changed(_unlocked: bool) -> void:
 func _on_purchase_finished(success: bool, message: String) -> void:
 	_set_status("Purchase succeeded. Premium monkey unlocked." if success else "Purchase did not complete: %s" % message)
 	_refresh_locks()
+
+
+func _refresh_career() -> void:
+	_career.text = Profile.summary_line()
 
 
 func _set_status(text: String) -> void:

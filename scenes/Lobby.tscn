@@ -154,6 +154,11 @@ unique_name_in_owner = true
 layout_mode = 2
 text = ""
 
+[node name="Career" type="Label" parent="Margin/Column"]
+unique_name_in_owner = true
+layout_mode = 2
+text = ""
+
 [node name="Help" type="Label" parent="Margin/Column"]
 layout_mode = 2
 text = "Keyboard: A/D move, W/S climb and rope, Space jump, J hit, K skill, Esc leave."
