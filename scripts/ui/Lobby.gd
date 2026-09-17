@@ -17,11 +17,11 @@ extends Control
 @onready var _solo_button: Button = %SoloButton
 @onready var _start_button: Button = %StartButton
 @onready var _leave_button: Button = %LeaveButton
-@onready var _hosts_list: VBoxContainer = %HostsList
-@onready var _monkey_row: HBoxContainer = %MonkeyRow
-@onready var _hat_row: HBoxContainer = %HatRow
-@onready var _map_row: HBoxContainer = %MapRow
-@onready var _mode_row: HBoxContainer = %ModeRow
+@onready var _hosts_list: Container = %HostsList
+@onready var _monkey_row: Container = %MonkeyRow
+@onready var _hat_row: Container = %HatRow
+@onready var _map_row: Container = %MapRow
+@onready var _mode_row: Container = %ModeRow
 @onready var _store_button: Button = %StoreButton
 @onready var _restore_button: Button = %RestoreButton
 @onready var _blurb: Label = %Blurb
@@ -170,7 +170,7 @@ func _select_monkey(id: StringName) -> void:
 	_selected = id
 	Net.set_local_monkey(id)
 	var stats := GameConfig.get_monkey(id)
-	_blurb.text = "%s\nSpeed %s  Weight %s  Power %s  Climb %s  Swing %s" % [
+	_blurb.text = "%s\nSpeed %s  Weight %s  Power %s\nClimb %s  Swing %s" % [
 		stats.blurb,
 		_bar(stats.speed), _bar(stats.weight), _bar(stats.power),
 		_bar(stats.climb), _bar(stats.swing),

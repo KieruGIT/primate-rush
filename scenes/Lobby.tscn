@@ -19,146 +19,181 @@ grow_vertical = 2
 color = Color(0.09, 0.11, 0.13, 1)
 mouse_filter = 2
 
-[node name="Margin" type="MarginContainer" parent="."]
+[node name="Scroll" type="ScrollContainer" parent="."]
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-theme_override_constants/margin_left = 40
-theme_override_constants/margin_top = 28
-theme_override_constants/margin_right = 40
-theme_override_constants/margin_bottom = 28
 
-[node name="Column" type="VBoxContainer" parent="Margin"]
+[node name="Margin" type="MarginContainer" parent="Scroll"]
 layout_mode = 2
-theme_override_constants/separation = 14
+size_flags_horizontal = 3
+size_flags_vertical = 3
+theme_override_constants/margin_left = 32
+theme_override_constants/margin_top = 22
+theme_override_constants/margin_right = 32
+theme_override_constants/margin_bottom = 22
 
-[node name="Title" type="Label" parent="Margin/Column"]
+[node name="Columns" type="HBoxContainer" parent="Scroll/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 36
+
+[node name="Left" type="VBoxContainer" parent="Scroll/Margin/Columns"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 10
+
+[node name="Title" type="Label" parent="Scroll/Margin/Columns/Left"]
 layout_mode = 2
 text = "MONKEY"
 
-[node name="Subtitle" type="Label" parent="Margin/Column"]
+[node name="Subtitle" type="Label" parent="Scroll/Margin/Columns/Left"]
 layout_mode = 2
+autowrap_mode = 3
 text = "Nobody dies. You just get knocked around."
 
-[node name="MonkeyRow" type="HBoxContainer" parent="Margin/Column"]
-unique_name_in_owner = true
+[node name="MonkeyLabel" type="Label" parent="Scroll/Margin/Columns/Left"]
 layout_mode = 2
-theme_override_constants/separation = 12
+text = "Monkey"
 
-[node name="Blurb" type="Label" parent="Margin/Column"]
+[node name="MonkeyRow" type="GridContainer" parent="Scroll/Margin/Columns/Left"]
 unique_name_in_owner = true
 layout_mode = 2
+theme_override_constants/h_separation = 10
+theme_override_constants/v_separation = 10
+columns = 3
+
+[node name="Blurb" type="Label" parent="Scroll/Margin/Columns/Left"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 64)
+layout_mode = 2
+autowrap_mode = 3
 text = ""
 
-[node name="HatLabel" type="Label" parent="Margin/Column"]
+[node name="HatLabel" type="Label" parent="Scroll/Margin/Columns/Left"]
 layout_mode = 2
 text = "Headwear"
 
-[node name="HatRow" type="HBoxContainer" parent="Margin/Column"]
+[node name="HatRow" type="GridContainer" parent="Scroll/Margin/Columns/Left"]
 unique_name_in_owner = true
 layout_mode = 2
+theme_override_constants/h_separation = 10
+theme_override_constants/v_separation = 10
+columns = 3
+
+[node name="CareerLabel" type="Label" parent="Scroll/Margin/Columns/Left"]
+layout_mode = 2
+text = "Career"
+
+[node name="Career" type="Label" parent="Scroll/Margin/Columns/Left"]
+unique_name_in_owner = true
+layout_mode = 2
+autowrap_mode = 3
+text = ""
+
+[node name="Help" type="Label" parent="Scroll/Margin/Columns/Left"]
+layout_mode = 2
+autowrap_mode = 3
+text = "Keyboard: A/D move, W/S climb and rope, Space jump, J hit, K skill, Esc leave."
+
+[node name="Right" type="VBoxContainer" parent="Scroll/Margin/Columns"]
+layout_mode = 2
+size_flags_horizontal = 3
 theme_override_constants/separation = 10
 
-[node name="MapLabel" type="Label" parent="Margin/Column"]
+[node name="MapLabel" type="Label" parent="Scroll/Margin/Columns/Right"]
 layout_mode = 2
 text = "Map and mode (host decides)"
 
-[node name="MapRow" type="HBoxContainer" parent="Margin/Column"]
+[node name="MapRow" type="HBoxContainer" parent="Scroll/Margin/Columns/Right"]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_constants/separation = 10
 
-[node name="ModeRow" type="HBoxContainer" parent="Margin/Column"]
+[node name="ModeRow" type="HBoxContainer" parent="Scroll/Margin/Columns/Right"]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_constants/separation = 10
 
-[node name="NetRow" type="HBoxContainer" parent="Margin/Column"]
-layout_mode = 2
-theme_override_constants/separation = 10
-
-[node name="HostButton" type="Button" parent="Margin/Column/NetRow"]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(130, 52)
-layout_mode = 2
-text = "Host"
-
-[node name="IpField" type="LineEdit" parent="Margin/Column/NetRow"]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(260, 52)
-layout_mode = 2
-placeholder_text = "host IP, e.g. 192.168.1.20"
-
-[node name="JoinButton" type="Button" parent="Margin/Column/NetRow"]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(130, 52)
-layout_mode = 2
-text = "Join"
-
-[node name="SoloButton" type="Button" parent="Margin/Column/NetRow"]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(150, 52)
-layout_mode = 2
-text = "Play solo"
-
-[node name="HostsLabel" type="Label" parent="Margin/Column"]
+[node name="HostsLabel" type="Label" parent="Scroll/Margin/Columns/Right"]
 layout_mode = 2
 text = "Hosts on this network"
 
-[node name="HostsList" type="VBoxContainer" parent="Margin/Column"]
+[node name="HostsList" type="VBoxContainer" parent="Scroll/Margin/Columns/Right"]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_constants/separation = 6
 
-[node name="MatchRow" type="HBoxContainer" parent="Margin/Column"]
+[node name="NetRow" type="HBoxContainer" parent="Scroll/Margin/Columns/Right"]
 layout_mode = 2
 theme_override_constants/separation = 10
 
-[node name="StartButton" type="Button" parent="Margin/Column/MatchRow"]
+[node name="HostButton" type="Button" parent="Scroll/Margin/Columns/Right/NetRow"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(170, 52)
+custom_minimum_size = Vector2(120, 52)
+layout_mode = 2
+text = "Host"
+
+[node name="IpField" type="LineEdit" parent="Scroll/Margin/Columns/Right/NetRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(240, 52)
+layout_mode = 2
+placeholder_text = "host IP, e.g. 192.168.1.20"
+
+[node name="JoinButton" type="Button" parent="Scroll/Margin/Columns/Right/NetRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(120, 52)
+layout_mode = 2
+text = "Join"
+
+[node name="MatchRow" type="HBoxContainer" parent="Scroll/Margin/Columns/Right"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="SoloButton" type="Button" parent="Scroll/Margin/Columns/Right/MatchRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(140, 52)
+layout_mode = 2
+text = "Play solo"
+
+[node name="StartButton" type="Button" parent="Scroll/Margin/Columns/Right/MatchRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(160, 52)
 layout_mode = 2
 text = "Start match"
 
-[node name="LeaveButton" type="Button" parent="Margin/Column/MatchRow"]
+[node name="LeaveButton" type="Button" parent="Scroll/Margin/Columns/Right/MatchRow"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(130, 52)
+custom_minimum_size = Vector2(120, 52)
 layout_mode = 2
 text = "Leave"
 
-[node name="RosterList" type="Label" parent="Margin/Column"]
+[node name="RosterList" type="Label" parent="Scroll/Margin/Columns/Right"]
 unique_name_in_owner = true
 layout_mode = 2
+autowrap_mode = 3
 text = "Not connected."
 
-[node name="StoreRow" type="HBoxContainer" parent="Margin/Column"]
+[node name="StoreRow" type="HBoxContainer" parent="Scroll/Margin/Columns/Right"]
 layout_mode = 2
 theme_override_constants/separation = 10
 
-[node name="StoreButton" type="Button" parent="Margin/Column/StoreRow"]
+[node name="StoreButton" type="Button" parent="Scroll/Margin/Columns/Right/StoreRow"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(280, 52)
+custom_minimum_size = Vector2(260, 52)
 layout_mode = 2
 text = "Unlock premium monkey"
 
-[node name="RestoreButton" type="Button" parent="Margin/Column/StoreRow"]
+[node name="RestoreButton" type="Button" parent="Scroll/Margin/Columns/Right/StoreRow"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(180, 52)
+custom_minimum_size = Vector2(160, 52)
 layout_mode = 2
 text = "Restore"
 
-[node name="Status" type="Label" parent="Margin/Column"]
+[node name="Status" type="Label" parent="Scroll/Margin/Columns/Right"]
 unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 48)
 layout_mode = 2
+autowrap_mode = 3
 text = ""
-
-[node name="Career" type="Label" parent="Margin/Column"]
-unique_name_in_owner = true
-layout_mode = 2
-text = ""
-
-[node name="Help" type="Label" parent="Margin/Column"]
-layout_mode = 2
-text = "Keyboard: A/D move, W/S climb and rope, Space jump, J hit, K skill, Esc leave."
