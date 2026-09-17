@@ -55,6 +55,9 @@ button, which keeps the phone layout down to a stick and two buttons.
 | Local career stats: races, wins, bananas, hits, falls, best times | done |
 | Bots filling empty seats, driven by the same input struct players use | done |
 | Live standings, hit feedback and camera kick | done |
+| Pause overlay with volume, on Esc, a touch button and Android back | done |
+| Sound effects, synthesised at startup, no audio files | done |
+| Visible rope, grapple line and attack telegraph | done |
 | Touch controls | done |
 | Character select, map and mode select, lobby, results | done |
 | Race mode: countdown, checkpoints, placement, results | done |
@@ -62,7 +65,7 @@ button, which keeps the phone layout down to a stick and two buttons.
 | One skill per monkey, all five | done |
 | RevenueCat purchase unlocking a monkey | wired, needs a key and a device |
 | Banana Hoard: timer, scoring, drop on hit, lucky boxes | done |
-| Art, audio, ranked backend | not yet, by design |
+| Art, music, ranked backend | not yet, by design |
 
 ## Repository layout
 
@@ -72,8 +75,8 @@ scenes/      Boot, Lobby, Main (arena shell), Player, Vine, Climbable, Checkpoin
 scenes/maps/ MapA (horizontal run), MapB (vertical ascent)
 scripts/
   autoload/  GameConfig (constants, roster), GameInput (devices), Net (LAN),
-             Discovery (UDP host beacons), Purchases (RevenueCat),
-             Profile (local career stats)
+             Discovery (UDP host beacons), PortMap (UPnP), Purchases
+             (RevenueCat), Profile (local career stats), Sfx (synthesised audio)
   player/    Player.gd (movement, climb, swing, combat), MonkeyStats, InputFrame,
              BotBrain (AI that emits input frames), Headwear (cosmetic anchor)
   world/     Main.gd (arena, respawn, snapshots), RaceDirector, HoardDirector,

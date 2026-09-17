@@ -166,11 +166,13 @@ func _field_size() -> int:
 func _on_countdown(value: int) -> void:
 	_center.text = str(value) if value > 0 else "GO"
 	_center_timer = GO_FLASH_SECONDS if value <= 0 else 2.0
+	Sfx.play(&"beep" if value > 0 else &"go")
 
 
 func _on_race_began() -> void:
 	_center.text = "GO"
 	_center_timer = GO_FLASH_SECONDS
+	Sfx.play(&"go")
 
 
 func _on_player_finished(player_id: int, place: int, seconds: float) -> void:
@@ -178,6 +180,7 @@ func _on_player_finished(player_id: int, place: int, seconds: float) -> void:
 		return
 	_center.text = "FINISHED  %d%s  -  %.2fs" % [place, _ordinal_suffix(place), seconds]
 	_center_timer = 3.0
+	Sfx.play(&"finish")
 
 
 func _ordinal_suffix(place: int) -> String:

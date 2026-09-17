@@ -321,6 +321,7 @@ func _net_spawn(id: int, kind: int, point: Vector2, value: int) -> void:
 func _net_collect(id: int) -> void:
 	var pickup := _pickups.get(id) as Pickup
 	if pickup != null:
+		Sfx.play(&"lucky" if pickup.kind == Pickup.Kind.LUCKY_BOX else &"pickup")
 		pickup.queue_free()
 	_pickups.erase(id)
 

@@ -24,6 +24,7 @@ Discovery="*res://scripts/autoload/Discovery.gd"
 PortMap="*res://scripts/autoload/PortMap.gd"
 Purchases="*res://scripts/autoload/Purchases.gd"
 Profile="*res://scripts/autoload/Profile.gd"
+Sfx="*res://scripts/autoload/Sfx.gd"
 
 [display]
 
