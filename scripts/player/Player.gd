@@ -426,6 +426,7 @@ func _try_jump() -> void:
 		velocity.y = stats.jump_velocity()
 		_buffer_timer = 0.0
 		_coyote_timer = 0.0
+		Sfx.play(&"jump", _voice_pitch())
 
 
 func _apply_jump_cut() -> void:
@@ -457,6 +458,7 @@ func _process_climb(delta: float) -> void:
 		_buffer_timer = 0.0
 		_climb_lock = climb_regrab_delay
 		velocity = Vector2(-facing * climb_jump_push, stats.jump_velocity() * 0.92)
+		Sfx.play(&"jump", _voice_pitch())
 		_set_state(State.AIR)
 		return
 
@@ -502,6 +504,7 @@ func _try_enter_swing() -> bool:
 	var tangent := Vector2(-sin(_swing_angle), cos(_swing_angle))
 	_swing_ang_vel = velocity.dot(tangent) / _swing_length
 	_air_launch_ready = true
+	Sfx.play(&"grab", _voice_pitch())
 	_set_state(State.SWING)
 	return true
 
@@ -551,6 +554,8 @@ func _release_swing(boosted: bool) -> void:
 		velocity.y = minf(velocity.y, stats.jump_velocity() * 0.35)
 	_swing_node = null
 	_swing_lock = swing_regrab_delay
+	if boosted:
+		Sfx.play(&"swing", _voice_pitch())
 	_set_state(State.AIR)
 
 
@@ -583,6 +588,7 @@ func _try_attack() -> void:
 	# The three flavors are cosmetic and must stay mechanically identical.
 	# The moment a kick outranges a slap, players fish for an animation they
 	# cannot choose, and a variety system becomes a frustration system.
+	Sfx.play(&"attack", _voice_pitch())
 	attacked.emit(ATTACK_FLAVORS[randi() % ATTACK_FLAVORS.size()])
 
 
@@ -674,6 +680,9 @@ func take_hit(attacker_id: int, force: Vector2, base_stun: float, double_drop: b
 	if state == State.CLIMB:
 		_climb_lock = climb_regrab_delay
 	_set_state(State.STUN)
+	# Pitched by the weight of whoever got hit, so a gorilla taking one reads
+	# differently from a capuchin without any extra audio.
+	Sfx.play(&"hit", _voice_pitch())
 	if local_control:
 		kick_camera(shake_on_hit, 0.28)
 	_squash = 0.5
@@ -992,6 +1001,42 @@ func _process(delta: float) -> void:
 	_tick_landing()
 	_tick_shake(delta)
 	_tick_squash(delta)
+	if is_attacking or state == State.SWING or _dash_kind == &"grapple":
+		queue_redraw()
+
+
+## The rope, the swing arc and the grapple line are the only way to read
+## what a monkey is doing while everything is still coloured rectangles.
+## None of it is decoration: a vine you cannot see is a vine you cannot aim
+## at, and an attack with no telegraph is an attack nobody can respect.
+func _draw() -> void:
+	if state == State.SWING and _swing_node != null and is_instance_valid(_swing_node):
+		var anchor := to_local(_swing_anchor)
+		draw_line(Vector2.ZERO, anchor, Color(0.45, 0.65, 0.35), 4.0)
+		draw_circle(anchor, 6.0, Color(0.55, 0.75, 0.45))
+
+	if _dash_kind == &"grapple":
+		var target := to_local(_dash_target)
+		draw_line(Vector2.ZERO, target, Color(0.85, 0.75, 0.45), 3.0)
+		draw_circle(target, 7.0, Color(0.95, 0.85, 0.5))
+
+	if is_attacking:
+		_draw_attack_arc()
+
+
+func _draw_attack_arc() -> void:
+	var radius: float = absf(hitbox.position.x) + 8.0
+	var facing_angle: float = 0.0 if facing > 0 else PI
+	var windup_done: bool = _attack_timer >= attack_windup
+	var spread: float = 0.75 if windup_done else 0.35
+	var color := Color(1.0, 0.95, 0.6, 0.9) if windup_done else Color(1.0, 1.0, 1.0, 0.35)
+	var width: float = 7.0 if windup_done else 3.0
+	draw_arc(Vector2(0.0, -4.0), radius, facing_angle - spread, facing_angle + spread, 16, color, width)
+
+
+## Heavier monkeys sound lower. One number, and the roster reads by ear.
+func _voice_pitch() -> float:
+	return clampf(1.25 - stats.weight * 0.28, 0.55, 1.6)
 
 
 func kick_camera(power: float, duration: float) -> void:
@@ -1004,6 +1049,7 @@ func kick_camera(power: float, duration: float) -> void:
 func _tick_landing() -> void:
 	var grounded := is_on_floor()
 	if grounded and not _was_on_floor and _fall_speed > heavy_land_speed:
+		Sfx.play(&"land", _voice_pitch())
 		if local_control:
 			kick_camera(shake_on_land, 0.12)
 		_squash = clampf(_fall_speed / max_fall_speed, 0.2, 0.6)

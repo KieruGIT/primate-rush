@@ -16,6 +16,8 @@ extends CanvasLayer
 @onready var _resume: Button = %ResumeButton
 @onready var _leave: Button = %LeaveButton
 @onready var _note: Label = %Note
+@onready var _volume: HSlider = %Volume
+@onready var _volume_label: Label = %VolumeLabel
 
 
 func _ready() -> void:
@@ -23,6 +25,9 @@ func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	_resume.pressed.connect(resume)
 	_leave.pressed.connect(_on_leave)
+	_volume.value = Sfx.get_volume()
+	_volume.value_changed.connect(_on_volume_changed)
+	_update_volume_label(_volume.value)
 	if not Net.is_online():
 		get_tree().paused = true
 	_note.text = "The match is still running." if Net.is_online() else "Paused."
@@ -31,6 +36,18 @@ func _ready() -> void:
 func resume() -> void:
 	get_tree().paused = false
 	queue_free()
+
+
+## Saved as it moves rather than on close, so a player who alt-tabs out of a
+## match keeps the setting they just picked.
+func _on_volume_changed(value: float) -> void:
+	Sfx.set_volume(value)
+	Profile.set_stat("volume", value)
+	_update_volume_label(value)
+
+
+func _update_volume_label(value: float) -> void:
+	_volume_label.text = "Volume  %d%%" % int(round(value * 100.0))
 
 
 func _on_leave() -> void:

@@ -30,6 +30,11 @@ func get_stat(key: String, fallback: Variant = 0) -> Variant:
 	return data.get(key, fallback)
 
 
+func set_stat(key: String, value: Variant) -> void:
+	data[key] = value
+	_save()
+
+
 func bump(key: String, amount: int = 1) -> void:
 	data[key] = int(data.get(key, 0)) + amount
 	_save()
