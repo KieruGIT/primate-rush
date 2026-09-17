@@ -80,6 +80,18 @@ const MONKEY_PATHS: Dictionary = {
 # gate as data means the purchase unlocks content without touching code.
 const PREMIUM_MONKEYS: Array[StringName] = [&"macaque"]
 
+# --- Cosmetics ---
+# Recolors and simple shapes first, because they are near free to produce.
+# The value here is not the hats, it is that the attachment point, the
+# roster field and the network sync all exist before there is any art.
+const HATS: Dictionary = {
+	&"none": {"name": "Bare head", "style": &"none", "color": Color(1, 1, 1), "premium": false},
+	&"cap": {"name": "Cap", "style": &"cap", "color": Color(0.85, 0.30, 0.25), "premium": false},
+	&"band": {"name": "Headband", "style": &"band", "color": Color(0.30, 0.65, 0.85), "premium": false},
+	&"crown": {"name": "Crown", "style": &"crown", "color": Color(0.95, 0.80, 0.25), "premium": true},
+	&"tophat": {"name": "Top hat", "style": &"tophat", "color": Color(0.15, 0.15, 0.20), "premium": true},
+}
+
 var _cache: Dictionary = {}
 
 
@@ -108,6 +120,21 @@ func is_unlocked(id: StringName) -> bool:
 	if not PREMIUM_MONKEYS.has(id):
 		return true
 	return Purchases.has_premium()
+
+
+func hat_ids() -> Array[StringName]:
+	var ids: Array[StringName] = []
+	for key in HATS.keys():
+		ids.append(key)
+	return ids
+
+
+func get_hat(id: StringName) -> Dictionary:
+	return HATS.get(id, HATS[&"none"])
+
+
+func is_hat_unlocked(id: StringName) -> bool:
+	return not bool(get_hat(id).get("premium", false)) or Purchases.has_premium()
 
 
 func map_ids() -> Array[StringName]:

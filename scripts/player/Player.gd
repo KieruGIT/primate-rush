@@ -40,6 +40,8 @@ const ATTACK_FLAVORS: Array[StringName] = [&"slap", &"punch", &"kick"]
 @export var player_id: int = 1
 ## True on the machine whose player this is. Drives camera and prediction.
 @export var local_control: bool = true
+## Cosmetic only. Never touches stats, and never will.
+@export var hat_id: StringName = &"none"
 
 @export_group("Ground and air")
 @export var ground_accel: float = 2800.0
@@ -176,6 +178,8 @@ var _has_net_target: bool = false
 @onready var hitbox: Area2D = $Hitbox
 @onready var hitbox_shape: CollisionShape2D = $Hitbox/Shape
 @onready var hurtbox: Area2D = $Hurtbox
+@onready var head_anchor: Marker2D = $HeadAnchor
+@onready var headwear: Headwear = $HeadAnchor/Headwear
 @onready var camera: Camera2D = $Camera2D
 @onready var name_label: Label = $NameLabel
 
@@ -190,10 +194,11 @@ func _ready() -> void:
 
 
 ## Call right after instancing, before the monkey is added to the tree.
-func setup(monkey: MonkeyStats, id: int, is_local: bool, tint: Color = Color(0, 0, 0, 0)) -> void:
+func setup(monkey: MonkeyStats, id: int, is_local: bool, tint: Color = Color(0, 0, 0, 0), hat: StringName = &"none") -> void:
 	stats = monkey
 	player_id = id
 	local_control = is_local
+	hat_id = hat
 	if tint.a > 0.0:
 		set_meta(&"tint", tint)
 	if is_node_ready():
@@ -218,6 +223,20 @@ func _apply_appearance() -> void:
 	if name_label != null:
 		name_label.text = stats.display_name
 		name_label.position.y = -size.y * 0.5 - 28.0
+
+	# The anchor moves with the body rather than the hat carrying a per-monkey
+	# offset, so one hat sits correctly on a capuchin and on a gorilla.
+	if head_anchor != null:
+		head_anchor.position = Vector2(0.0, -size.y * 0.5)
+	if headwear != null:
+		var hat: Dictionary = GameConfig.get_hat(hat_id)
+		headwear.apply(hat["style"], hat["color"], size.x)
+
+
+func set_hat(id: StringName) -> void:
+	hat_id = id
+	if is_node_ready():
+		_apply_appearance()
 
 
 func _set_camera_active(active: bool) -> void:
