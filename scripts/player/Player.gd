@@ -128,6 +128,15 @@ const ATTACK_FLAVORS: Array[StringName] = [&"slap", &"punch", &"kick"]
 ## without a drop, players farm separate corners and the mode has no tension.
 @export_range(0.0, 1.0, 0.05) var drop_fraction: float = 0.4
 
+@export_group("Feel")
+## Camera kick when this monkey gets hit. Local camera only: shaking a
+## screen for something that happened to someone else is just noise.
+@export var shake_on_hit: float = 14.0
+@export var shake_on_land: float = 5.0
+## Impact speed a landing needs before it registers as heavy.
+@export var heavy_land_speed: float = 900.0
+@export var squash_recovery: float = 6.0
+
 @export_group("Networking")
 ## Position error past which a predicting client stops arguing and snaps.
 @export var reconcile_snap_distance: float = 64.0
@@ -167,6 +176,12 @@ var _swing_node: Node2D = null
 var _swing_length: float = 0.0
 var _swing_angle: float = 0.0
 var _swing_ang_vel: float = 0.0
+
+var _shake_time: float = 0.0
+var _shake_power: float = 0.0
+var _squash: float = 0.0
+var _was_on_floor: bool = true
+var _fall_speed: float = 0.0
 
 var _net_target: Vector2 = Vector2.ZERO
 var _has_net_target: bool = false
@@ -652,6 +667,9 @@ func take_hit(attacker_id: int, force: Vector2, base_stun: float, double_drop: b
 	if state == State.CLIMB:
 		_climb_lock = climb_regrab_delay
 	_set_state(State.STUN)
+	if local_control:
+		kick_camera(shake_on_hit, 0.28)
+	_squash = 0.5
 	hit_taken.emit(attacker_id, applied)
 
 
@@ -958,6 +976,55 @@ func _set_state(next: int) -> void:
 		return
 	state = next
 	state_changed.emit(next)
+
+
+## Screen shake and squash run on _process, not _physics_process: they are
+## presentation, and tying them to the physics tick makes them stutter on a
+## machine whose render rate and tick rate disagree.
+func _process(delta: float) -> void:
+	_tick_landing()
+	_tick_shake(delta)
+	_tick_squash(delta)
+
+
+func kick_camera(power: float, duration: float) -> void:
+	# Strongest kick wins rather than accumulating, so two hits in quick
+	# succession do not turn the screen into a blender.
+	_shake_power = maxf(_shake_power, power)
+	_shake_time = maxf(_shake_time, duration)
+
+
+func _tick_landing() -> void:
+	var grounded := is_on_floor()
+	if grounded and not _was_on_floor and _fall_speed > heavy_land_speed:
+		if local_control:
+			kick_camera(shake_on_land, 0.12)
+		_squash = clampf(_fall_speed / max_fall_speed, 0.2, 0.6)
+	_was_on_floor = grounded
+	_fall_speed = velocity.y
+
+
+func _tick_shake(delta: float) -> void:
+	if camera == null:
+		return
+	if _shake_time <= 0.0:
+		camera.offset = Vector2.ZERO
+		return
+	_shake_time -= delta
+	var falloff := clampf(_shake_time * 4.0, 0.0, 1.0)
+	camera.offset = Vector2(randf_range(-1.0, 1.0), randf_range(-1.0, 1.0)) * _shake_power * falloff
+	if _shake_time <= 0.0:
+		_shake_power = 0.0
+		camera.offset = Vector2.ZERO
+
+
+func _tick_squash(delta: float) -> void:
+	if body == null:
+		return
+	_squash = maxf(_squash - delta * squash_recovery, 0.0)
+	# Wider and shorter on impact. Cheap, readable, and the only animation
+	# in the game until there is art.
+	body.scale = Vector2(1.0 + _squash * 0.35, 1.0 - _squash * 0.35)
 
 
 func _update_visual() -> void:

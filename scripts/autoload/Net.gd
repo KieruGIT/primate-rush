@@ -17,6 +17,7 @@ extends Node
 # ============================================================
 
 signal roster_changed
+signal peer_joined(peer_id: int)
 signal match_started
 signal match_ended
 signal config_changed
@@ -125,6 +126,7 @@ func _on_peer_connected(id: int) -> void:
 	roster[id] = {"monkey": &"gibbon", "hat": &"none", "slot": roster.size()}
 	_remote_inputs[id] = InputFrame.new()
 	_broadcast_roster()
+	peer_joined.emit(id)
 
 
 func _on_peer_disconnected(id: int) -> void:

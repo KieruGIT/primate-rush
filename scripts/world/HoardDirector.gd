@@ -53,6 +53,19 @@ var _time_broadcast: float = 0.0
 
 func _ready() -> void:
 	add_to_group(&"hoard_director")
+	Net.peer_joined.connect(_on_peer_joined)
+
+
+## A player who joins mid-round would otherwise see an empty map and a blank
+## scoreboard, then collect bananas nobody else can see.
+func _on_peer_joined(peer_id: int) -> void:
+	if not _is_authority() or phase == Phase.IDLE:
+		return
+	for id in _pickups.keys():
+		var pickup := _pickups[id] as Pickup
+		if pickup != null:
+			_net_spawn.rpc_id(peer_id, int(id), pickup.kind, pickup.global_position, pickup.value)
+	_net_scores.rpc_id(peer_id, scores.duplicate())
 
 
 func setup(arena: Node, map: MapData, container: Node2D) -> void:

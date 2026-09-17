@@ -32,6 +32,21 @@ unique_name_in_owner = true
 layout_mode = 2
 text = "local"
 
+[node name="Board" type="Label" parent="Root"]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -300.0
+offset_top = 18.0
+offset_right = -24.0
+offset_bottom = 180.0
+grow_horizontal = 0
+horizontal_alignment = 2
+text = ""
+mouse_filter = 2
+
 [node name="Center" type="Label" parent="Root"]
 unique_name_in_owner = true
 layout_mode = 1

@@ -13,6 +13,7 @@ const GO_FLASH_SECONDS: float = 0.9
 @onready var _title: Label = %Title
 @onready var _info: Label = %Info
 @onready var _center: Label = %Center
+@onready var _board: Label = %Board
 
 var _player: Player = null
 var _race: RaceDirector = null
@@ -32,6 +33,8 @@ func _process(delta: float) -> void:
 		_center_timer -= delta
 		if _center_timer <= 0.0:
 			_center.text = ""
+
+	_update_board()
 
 	if _player == null or not is_instance_valid(_player):
 		_title.text = "Monkey"
@@ -53,6 +56,49 @@ func _info_parts() -> PackedStringArray:
 		if _player.ability != &"":
 			parts.append("%s %.1fs" % [String(_player.ability).replace("_", " "), _player.ability_timer])
 	return parts
+
+
+## Live standings. Sorted every frame rather than cached, because both
+## orders change constantly: that is what hitting people is for.
+func _update_board() -> void:
+	var rows := _board_rows()
+	if rows.is_empty():
+		_board.text = ""
+		return
+	rows.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return a["sort"] > b["sort"])
+	var lines: PackedStringArray = []
+	for index in rows.size():
+		var row: Dictionary = rows[index]
+		lines.append("%d. %s  %s" % [index + 1, row["name"], row["detail"]])
+	_board.text = "\n".join(lines)
+
+
+func _board_rows() -> Array:
+	var arena: Node = get_tree().get_first_node_in_group(&"arena")
+	if arena == null:
+		return []
+	var table: Variant = arena.get(&"players")
+	if not (table is Dictionary):
+		return []
+	var hoard_running := _hoard != null and _hoard.is_running()
+	var race_running := _race != null and _race.is_running()
+	if not hoard_running and not race_running:
+		return []
+
+	var rows: Array = []
+	for id in (table as Dictionary).keys():
+		var player := (table as Dictionary)[id] as Player
+		if player == null:
+			continue
+		var label: String = player.stats.display_name
+		if int(id) == Net.local_id():
+			label += " (you)"
+		if hoard_running:
+			rows.append({"name": label, "sort": float(player.bananas), "detail": "%d" % player.bananas})
+		else:
+			var progress := _race.progress_of(int(id))
+			rows.append({"name": label, "sort": progress, "detail": ""})
+	return rows
 
 
 func _skill_text() -> String:
