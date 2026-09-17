@@ -25,11 +25,11 @@ func _ready() -> void:
 
 
 func _show_lobby() -> void:
-	var lobby := _swap(LOBBY_SCENE)
-	if lobby.has_signal(&"play_requested"):
-		lobby.connect(&"play_requested", _show_arena)
+	_swap(LOBBY_SCENE)
 
 
+## Swapped fresh every time, so a rematch is a clean arena rather than a
+## pile of state left over from the round that just ended.
 func _show_arena() -> void:
 	_swap(ARENA_SCENE)
 

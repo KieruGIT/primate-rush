@@ -38,6 +38,12 @@ unique_name_in_owner = true
 layout_mode = 2
 theme_override_constants/separation = 6
 
+[node name="AgainButton" type="Button" parent="Panel"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 52)
+layout_mode = 2
+text = "Play again"
+
 [node name="BackButton" type="Button" parent="Panel"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(0, 52)

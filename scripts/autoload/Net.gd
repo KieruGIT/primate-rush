@@ -204,7 +204,12 @@ func _sync_config(wire_map: String, wire_mode: int) -> void:
 	config_changed.emit()
 
 
+## Works offline too, so solo play and a hosted match take the same path
+## instead of the lobby having two ways to start the same thing.
 func start_match() -> void:
+	if not is_online():
+		_start_match()
+		return
 	if not is_host():
 		return
 	# Config first and reliably, so a client cannot start loading a match

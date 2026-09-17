@@ -9,8 +9,6 @@ extends Control
 # starting point.
 # ============================================================
 
-signal play_requested
-
 @onready var _status: Label = %Status
 @onready var _roster_list: Label = %RosterList
 @onready var _ip_field: LineEdit = %IpField
@@ -19,6 +17,7 @@ signal play_requested
 @onready var _solo_button: Button = %SoloButton
 @onready var _start_button: Button = %StartButton
 @onready var _leave_button: Button = %LeaveButton
+@onready var _hosts_list: VBoxContainer = %HostsList
 @onready var _monkey_row: HBoxContainer = %MonkeyRow
 @onready var _map_row: HBoxContainer = %MapRow
 @onready var _mode_row: HBoxContainer = %ModeRow
@@ -42,6 +41,8 @@ func _ready() -> void:
 	_restore_button.pressed.connect(func() -> void: Purchases.restore())
 
 	Net.roster_changed.connect(_refresh)
+	Discovery.hosts_changed.connect(_refresh_hosts)
+	Discovery.start_listening()
 	Net.config_changed.connect(_refresh_config)
 	Net.connection_failed.connect(func() -> void: _set_status("Could not reach that host. Same wifi?"))
 	Net.server_disconnected.connect(func() -> void: _set_status("Host closed the game."))
@@ -50,6 +51,7 @@ func _ready() -> void:
 
 	_build_monkey_row()
 	_build_match_rows()
+	_refresh_hosts()
 	_select_monkey(_selected)
 	_refresh_config()
 	_refresh()
@@ -170,6 +172,7 @@ func _refresh() -> void:
 	_solo_button.disabled = online
 	_ip_field.editable = not online
 	_refresh_config()
+	_refresh_hosts()
 
 	if not online:
 		_roster_list.text = "Not connected."
@@ -187,6 +190,7 @@ func _refresh() -> void:
 func _on_host() -> void:
 	var error := Net.host_game()
 	if error.is_empty():
+		Discovery.start_advertising()
 		_set_status("Hosting on %s port %d. Start when everyone is in." % [Net.local_ip_hint(), GameConfig.NET_DEFAULT_PORT])
 	else:
 		_set_status(error)
@@ -196,17 +200,42 @@ func _on_host() -> void:
 func _on_join() -> void:
 	var address := _ip_field.text.strip_edges()
 	if address.is_empty():
-		_set_status("Type the host's IP first. It is printed on the host's screen.")
+		_set_status("Type the host's IP, or pick one from the list if it found any.")
 		return
-	var error := Net.join_game(address)
+	_join_address(address, GameConfig.NET_DEFAULT_PORT)
+
+
+func _join_address(address: String, port: int) -> void:
+	var error := Net.join_game(address, port)
 	_set_status("Connecting to %s..." % address if error.is_empty() else error)
 	_refresh()
+
+
+## Hosts found by UDP broadcast. The typed field stays: broadcast is blocked
+## on plenty of networks, and a list is a shortcut, not the only door in.
+func _refresh_hosts() -> void:
+	for child in _hosts_list.get_children():
+		child.queue_free()
+	if Net.is_online():
+		return
+	if Discovery.hosts.is_empty():
+		var empty := Label.new()
+		empty.text = "No hosts found yet. Type an IP if the list stays empty."
+		_hosts_list.add_child(empty)
+		return
+	for ip in Discovery.hosts.keys():
+		var entry: Dictionary = Discovery.hosts[ip]
+		var button := Button.new()
+		button.custom_minimum_size = Vector2(0.0, 48.0)
+		button.text = "%s   %d in lobby   %s on %s" % [ip, int(entry["players"]), entry["mode"], entry["map"]]
+		button.pressed.connect(_join_address.bind(String(ip), int(entry["port"])))
+		_hosts_list.add_child(button)
 
 
 func _on_solo() -> void:
 	Net.leave()
 	Net.local_monkey = _selected
-	play_requested.emit()
+	Net.start_match()
 
 
 func _on_start() -> void:
@@ -215,8 +244,16 @@ func _on_start() -> void:
 
 func _on_leave() -> void:
 	Net.leave()
+	Discovery.stop_advertising()
+	Discovery.start_listening()
 	_set_status("Left the game.")
 	_refresh()
+
+
+func _exit_tree() -> void:
+	# Stop listening on the way into a match, but keep the host's beacon
+	# alive: a host mid-match is still a host worth finding.
+	Discovery.stop_listening()
 
 
 func _on_entitlement_changed(_unlocked: bool) -> void:
