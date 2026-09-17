@@ -143,10 +143,12 @@ produces real entitlements and dashboard rows.
 
 ## Status
 
-Written without an engine available to run it: the first Godot launch is the
-real first test. `python3 tools/check_project.py` covers node paths, resource
-paths and autoloads; `python3 tools/check_gdscript.py` covers bare calls,
-argument counts and cross-class member references. See [docs/BUILD_NOTES.md](docs/BUILD_NOTES.md) for the
+The project runs headlessly in CI on the same Godot build as the editor: the
+import step fails on any parse error, `tools/Smoke.tscn` instances every
+scene and plays both maps in all three modes with bots, and
+`tools/NetReplay.tscn` drives the netcode handlers without a socket. Still
+unverified by machine: real sockets between two devices, touch input, the
+purchase flow, and how any of it feels. See [docs/BUILD_NOTES.md](docs/BUILD_NOTES.md) for the
 first-run checklist, the LAN test, Android export, and the known gaps, and
 [docs/MULTIPLAYER.md](docs/MULTIPLAYER.md) for how far multiplayer can go
 beyond the same wifi and what each step actually costs.

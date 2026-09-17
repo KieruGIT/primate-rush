@@ -26,7 +26,6 @@ signal hit_taken(attacker_id: int, knockback: Vector2)
 signal skill_used(skill_id: StringName)
 signal bananas_changed(count: int)
 signal ability_changed(ability_id: StringName)
-signal fell_out_of_world
 
 # DASH is appended rather than inserted: the state enum travels over the
 # wire as an int, and renumbering it would desync mid-update.
@@ -253,12 +252,6 @@ func _apply_appearance() -> void:
 
 func display_label() -> String:
 	return "%s (bot)" % stats.display_name if is_bot else stats.display_name
-
-
-func set_hat(id: StringName) -> void:
-	hat_id = id
-	if is_node_ready():
-		_apply_appearance()
 
 
 func _set_camera_active(active: bool) -> void:
@@ -958,10 +951,6 @@ func respawn_at(point: Vector2) -> void:
 	_set_hitbox_open(false)
 	_set_state(State.AIR)
 	_has_net_target = false
-
-
-func report_fell() -> void:
-	fell_out_of_world.emit()
 
 
 # --- Networking ----------------------------------------------------

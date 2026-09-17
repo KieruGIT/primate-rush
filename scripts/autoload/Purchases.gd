@@ -70,16 +70,8 @@ func _connect_signals() -> void:
 			push_warning("RevenueCat plugin has no signal '%s'." % signal_name)
 
 
-func is_available() -> bool:
-	return _rc != null
-
-
 func has_premium() -> bool:
 	return _unlocked
-
-
-func is_purchase_pending() -> bool:
-	return _pending
 
 
 func buy_premium() -> void:

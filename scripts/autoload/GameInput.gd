@@ -19,7 +19,6 @@ var touch_jump_held: bool = false
 # trigger on contact, which keeps the touch layout down to a stick and two
 # buttons on a phone screen that is mostly thumb.
 var _frame: InputFrame = InputFrame.new()
-var _keyboard_enabled: bool = true
 
 
 func _ready() -> void:
@@ -62,22 +61,15 @@ func take_local_frame() -> InputFrame:
 	return out
 
 
-func set_keyboard_enabled(enabled: bool) -> void:
-	_keyboard_enabled = enabled
-
-
 func _resolve_move() -> Vector2:
 	var move := touch_move
-	if _keyboard_enabled:
-		var keys := Input.get_vector(&"move_left", &"move_right", &"move_up", &"move_down")
-		# Whichever device is pushed harder wins, so plugging in a keyboard
-		# mid-session never fights a resting virtual stick.
-		if keys.length() > move.length():
-			move = keys
+	var keys := Input.get_vector(&"move_left", &"move_right", &"move_up", &"move_down")
+	# Whichever device is pushed harder wins, so plugging in a keyboard
+	# mid-session never fights a resting virtual stick.
+	if keys.length() > move.length():
+		move = keys
 	return move.limit_length(1.0)
 
 
 func _resolve_jump_held() -> bool:
-	if touch_jump_held:
-		return true
-	return _keyboard_enabled and Input.is_action_pressed(&"jump")
+	return touch_jump_held or Input.is_action_pressed(&"jump")

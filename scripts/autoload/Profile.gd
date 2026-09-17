@@ -88,12 +88,6 @@ func summary_line() -> String:
 	return "   ".join(parts)
 
 
-func reset() -> void:
-	data.clear()
-	_save()
-	stats_changed.emit()
-
-
 func _load() -> void:
 	var cfg := ConfigFile.new()
 	if cfg.load(PATH) != OK:

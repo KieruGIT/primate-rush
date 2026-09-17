@@ -35,13 +35,6 @@ func consume(button: int) -> bool:
 	return true
 
 
-func has_pending() -> bool:
-	for count in _pending.values():
-		if int(count) > 0:
-			return true
-	return false
-
-
 func clear_buttons() -> void:
 	_pending.clear()
 
