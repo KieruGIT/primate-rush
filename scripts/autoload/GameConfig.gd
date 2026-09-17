@@ -29,6 +29,29 @@ const BASE_GRAVITY: float = 1900.0
 const BASE_KNOCKBACK: float = 640.0
 const BASE_STUN_TIME: float = 0.45
 
+## Match types. Free play is the movement sandbox: no timer, no placement,
+## just the level. It is the mode every tuning session actually happens in.
+enum Mode { FREE_PLAY, RACE }
+
+const MODE_NAMES: Dictionary = {
+	Mode.FREE_PLAY: "Free play",
+	Mode.RACE: "Race",
+}
+
+const MAP_PATHS: Dictionary = {
+	&"map_a": "res://scenes/maps/MapA.tscn",
+	&"map_b": "res://scenes/maps/MapB.tscn",
+}
+
+const MAP_NAMES: Dictionary = {
+	&"map_a": "Horizontal Run",
+	&"map_b": "Vertical Ascent",
+}
+
+## Falling costs time, never a life. Short enough to sting without making
+## someone put the phone down.
+const RESPAWN_DELAY: float = 0.7
+
 const NET_DEFAULT_PORT: int = 27015
 const NET_MAX_PLAYERS: int = 4
 
@@ -82,6 +105,19 @@ func is_unlocked(id: StringName) -> bool:
 	if not PREMIUM_MONKEYS.has(id):
 		return true
 	return Purchases.has_premium()
+
+
+func map_ids() -> Array[StringName]:
+	var ids: Array[StringName] = []
+	for key in MAP_PATHS.keys():
+		ids.append(key)
+	return ids
+
+
+func load_map(id: StringName) -> PackedScene:
+	var path: String = MAP_PATHS.get(id, MAP_PATHS[&"map_a"])
+	var scene: Resource = load(path)
+	return scene as PackedScene
 
 
 func tint_for_index(index: int) -> Color:

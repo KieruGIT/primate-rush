@@ -18,6 +18,8 @@ extends Node
 
 signal roster_changed
 signal match_started
+signal match_ended
+signal config_changed
 signal connection_failed
 signal server_disconnected
 
@@ -28,6 +30,10 @@ const SNAPSHOT_HZ: float = 30.0
 var mode: int = Mode.OFFLINE
 var roster: Dictionary = {}          # peer_id -> {"monkey": StringName, "slot": int}
 var local_monkey: StringName = &"gorilla"
+## Match setup. Host owns it; clients receive it and never edit it, so two
+## people cannot load two different maps into the same match.
+var map_id: StringName = &"map_a"
+var mode: int = GameConfig.Mode.RACE
 var arena: Node = null
 
 var _peer: ENetMultiplayerPeer = null
@@ -183,9 +189,27 @@ func _sync_roster(wire: Dictionary) -> void:
 	roster_changed.emit()
 
 
+func set_match_config(new_map: StringName, new_mode: int) -> void:
+	map_id = new_map
+	mode = new_mode
+	config_changed.emit()
+	if is_host():
+		_sync_config.rpc(String(new_map), new_mode)
+
+
+@rpc("authority", "reliable")
+func _sync_config(wire_map: String, wire_mode: int) -> void:
+	map_id = StringName(wire_map)
+	mode = wire_mode
+	config_changed.emit()
+
+
 func start_match() -> void:
 	if not is_host():
 		return
+	# Config first and reliably, so a client cannot start loading a match
+	# before it knows which map the match is on.
+	_sync_config.rpc(String(map_id), mode)
 	_start_match.rpc()
 	_start_match()
 
@@ -193,6 +217,21 @@ func start_match() -> void:
 @rpc("authority", "reliable")
 func _start_match() -> void:
 	match_started.emit()
+
+
+func end_match() -> void:
+	if not is_online():
+		match_ended.emit()
+		return
+	if not is_host():
+		return
+	_end_match.rpc()
+	_end_match()
+
+
+@rpc("authority", "reliable")
+func _end_match() -> void:
+	match_ended.emit()
 
 
 # --- Input relay ---------------------------------------------------

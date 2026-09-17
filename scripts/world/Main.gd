@@ -1,11 +1,14 @@
 extends Node2D
 
 # ============================================================
-# ARENA - owns the monkeys, the respawn rule, and the snapshot wire.
+# ARENA - owns the monkeys, the map, the respawn rule, and the snapshot wire.
 #
 # One arena script serves offline, host, and client. The difference is only
 # who simulates: offline and host spawn and simulate everyone, a client
 # spawns the same bodies but drives only its own and replays the rest.
+#
+# The map is swapped into MapSlot rather than the arena being rebuilt per
+# level, so a new level is one scene file and nothing else.
 #
 # No death and no health, per the design spine. Falling out of the world
 # costs you a short delay and sends you back to your last checkpoint. The
@@ -15,29 +18,32 @@ extends Node2D
 const PLAYER_SCENE := preload("res://scenes/Player.tscn")
 const TOUCH_CONTROLS_SCENE := preload("res://scenes/TouchControls.tscn")
 const HUD_SCENE := preload("res://scenes/Hud.tscn")
+const RESULTS_SCENE := preload("res://scenes/Results.tscn")
 
-@export var spawn_point: Vector2 = Vector2(160.0, 380.0)
-## Spread so four monkeys do not spawn inside each other.
-@export var spawn_stride: Vector2 = Vector2(72.0, 0.0)
-@export var kill_depth: float = 1400.0
-@export var respawn_delay: float = 0.7
 ## Forces the on-screen stick and buttons on desktop, for layout work.
 @export var force_touch_controls: bool = false
 
-var players: Dictionary = {}          # player_id -> Player
+var players: Dictionary = {}           # player_id -> Player
+var map: MapData = null
+
 var _checkpoints: Dictionary = {}      # player_id -> Vector2
 var _respawning: Dictionary = {}       # player_id -> bool
 var _local_id: int = 1
+var _idle_frame: InputFrame = InputFrame.new()
 
+@onready var _map_slot: Node2D = $MapSlot
 @onready var _player_root: Node2D = $Players
+@onready var race: RaceDirector = $RaceDirector
 
 
 func _ready() -> void:
 	add_to_group(&"arena")
 	_local_id = Net.local_id()
 	Net.arena = self
+	_load_map()
 	_spawn_ui()
 	_spawn_all_players()
+	_start_mode()
 
 
 func _exit_tree() -> void:
@@ -45,12 +51,42 @@ func _exit_tree() -> void:
 		Net.arena = null
 
 
+func _load_map() -> void:
+	var scene := GameConfig.load_map(Net.map_id)
+	if scene == null:
+		push_error("Map %s failed to load." % Net.map_id)
+		return
+	map = scene.instantiate() as MapData
+	_map_slot.add_child(map)
+
+
 func _spawn_ui() -> void:
-	var hud := HUD_SCENE.instantiate()
-	add_child(hud)
+	add_child(HUD_SCENE.instantiate())
 	if force_touch_controls or OS.has_feature("mobile"):
 		add_child(TOUCH_CONTROLS_SCENE.instantiate())
 
+
+func _start_mode() -> void:
+	race.setup(self, map)
+	if map == null:
+		return
+	race.race_over.connect(_on_race_over)
+	if Net.mode != GameConfig.Mode.RACE:
+		return
+	# Only the host counts down. Clients follow the broadcast, otherwise four
+	# machines each start their own race a few frames apart.
+	if not Net.is_online() or Net.is_host():
+		race.begin()
+
+
+func _on_race_over(results: Array) -> void:
+	var overlay := RESULTS_SCENE.instantiate()
+	add_child(overlay)
+	if overlay.has_method(&"show_results"):
+		overlay.call(&"show_results", results)
+
+
+# --- Spawning ------------------------------------------------------
 
 func _spawn_all_players() -> void:
 	if not Net.is_online():
@@ -67,12 +103,18 @@ func _spawn_player(id: int, monkey_id: StringName, slot: int) -> Player:
 	var player := PLAYER_SCENE.instantiate() as Player
 	player.name = "Player_%d" % id
 	player.setup(GameConfig.get_monkey(monkey_id), id, id == _local_id, GameConfig.tint_for_index(slot))
-	player.position = spawn_point + spawn_stride * float(slot)
+	player.position = _spawn_position(slot)
 	_player_root.add_child(player)
 	players[id] = player
 	_checkpoints[id] = player.position
 	_respawning[id] = false
 	return player
+
+
+func _spawn_position(slot: int) -> Vector2:
+	if map == null:
+		return Vector2(160.0, 400.0) + Vector2(72.0, 0.0) * float(slot)
+	return map.spawn_point + map.spawn_stride * float(slot)
 
 
 func despawn_player(id: int) -> void:
@@ -98,6 +140,10 @@ func _is_authority() -> bool:
 
 func _route_input() -> void:
 	var local_frame := GameInput.take_local_frame()
+	if race.is_input_locked():
+		# Intent is dropped rather than buffered during the countdown, so a
+		# player mashing jump on "3" does not launch on "GO".
+		local_frame = _idle_frame
 
 	# The local monkey always gets its intent directly, even on a client.
 	# Waiting for the host to echo your own jump back is exactly the lag
@@ -114,15 +160,19 @@ func _route_input() -> void:
 		for id in players.keys():
 			if int(id) == _local_id:
 				continue
-			players[id].feed_input(Net.take_remote_input(int(id)))
+			var frame := Net.take_remote_input(int(id))
+			if race.is_input_locked():
+				frame = _idle_frame
+			players[id].feed_input(frame)
 
 
 func _check_falls() -> void:
+	var limit := map.kill_depth if map != null else 1400.0
 	for id in players.keys():
 		if bool(_respawning.get(id, false)):
 			continue
 		var player := players[id] as Player
-		if player.global_position.y > kill_depth:
+		if player.global_position.y > limit:
 			_begin_respawn(int(id))
 
 
@@ -133,22 +183,14 @@ func _begin_respawn(id: int) -> void:
 		return
 	# Parked far below rather than freed: freeing and reinstancing a body
 	# mid-match invalidates every reference the netcode is holding.
+	var limit := map.kill_depth if map != null else 1400.0
 	player.velocity = Vector2.ZERO
-	player.global_position = Vector2(0.0, kill_depth + 4000.0)
-	if Net.is_host():
-		_net_respawn_notice.rpc(id)
-	await get_tree().create_timer(respawn_delay).timeout
+	player.global_position = Vector2(0.0, limit + 4000.0)
+	await get_tree().create_timer(GameConfig.RESPAWN_DELAY).timeout
 	if not is_instance_valid(player):
 		return
-	player.respawn_at(_checkpoints.get(id, spawn_point))
+	player.respawn_at(_checkpoints.get(id, _spawn_position(0)))
 	_respawning[id] = false
-
-
-@rpc("authority", "reliable")
-func _net_respawn_notice(id: int) -> void:
-	var player := players.get(id) as Player
-	if player != null:
-		player.velocity = Vector2.ZERO
 
 
 ## Called by Checkpoint areas. Host authoritative: a client claiming a

@@ -20,12 +20,16 @@ signal play_requested
 @onready var _start_button: Button = %StartButton
 @onready var _leave_button: Button = %LeaveButton
 @onready var _monkey_row: HBoxContainer = %MonkeyRow
+@onready var _map_row: HBoxContainer = %MapRow
+@onready var _mode_row: HBoxContainer = %ModeRow
 @onready var _store_button: Button = %StoreButton
 @onready var _restore_button: Button = %RestoreButton
 @onready var _blurb: Label = %Blurb
 
 var _selected: StringName = &"gorilla"
 var _monkey_buttons: Dictionary = {}
+var _map_buttons: Dictionary = {}
+var _mode_buttons: Dictionary = {}
 
 
 func _ready() -> void:
@@ -38,13 +42,16 @@ func _ready() -> void:
 	_restore_button.pressed.connect(func() -> void: Purchases.restore())
 
 	Net.roster_changed.connect(_refresh)
+	Net.config_changed.connect(_refresh_config)
 	Net.connection_failed.connect(func() -> void: _set_status("Could not reach that host. Same wifi?"))
 	Net.server_disconnected.connect(func() -> void: _set_status("Host closed the game."))
 	Purchases.entitlement_changed.connect(_on_entitlement_changed)
 	Purchases.purchase_finished.connect(_on_purchase_finished)
 
 	_build_monkey_row()
+	_build_match_rows()
 	_select_monkey(_selected)
+	_refresh_config()
 	_refresh()
 	_set_status("Pick a monkey. Host, join, or play solo.")
 
@@ -60,6 +67,59 @@ func _build_monkey_row() -> void:
 		_monkey_row.add_child(button)
 		_monkey_buttons[id] = button
 	_refresh_locks()
+
+
+func _build_match_rows() -> void:
+	for id in GameConfig.map_ids():
+		var button := Button.new()
+		button.toggle_mode = true
+		button.custom_minimum_size = Vector2(190.0, 48.0)
+		button.text = GameConfig.MAP_NAMES.get(id, String(id))
+		button.pressed.connect(_on_map_pressed.bind(id))
+		_map_row.add_child(button)
+		_map_buttons[id] = button
+
+	for mode in [GameConfig.Mode.FREE_PLAY, GameConfig.Mode.RACE]:
+		var button := Button.new()
+		button.toggle_mode = true
+		button.custom_minimum_size = Vector2(150.0, 48.0)
+		button.text = GameConfig.MODE_NAMES[mode]
+		button.pressed.connect(_on_mode_pressed.bind(mode))
+		_mode_row.add_child(button)
+		_mode_buttons[mode] = button
+
+
+## Only the host picks the map and the mode. A client that could would load
+## a different level into the same match and desync on the first frame.
+func _can_configure() -> bool:
+	return not Net.is_online() or Net.is_host()
+
+
+func _on_map_pressed(id: StringName) -> void:
+	if not _can_configure():
+		_set_status("Only the host picks the map.")
+		_refresh_config()
+		return
+	Net.set_match_config(id, Net.mode)
+
+
+func _on_mode_pressed(mode: int) -> void:
+	if not _can_configure():
+		_set_status("Only the host picks the mode.")
+		_refresh_config()
+		return
+	Net.set_match_config(Net.map_id, mode)
+
+
+func _refresh_config() -> void:
+	for id in _map_buttons.keys():
+		var button := _map_buttons[id] as Button
+		button.button_pressed = id == Net.map_id
+		button.disabled = not _can_configure()
+	for mode in _mode_buttons.keys():
+		var button := _mode_buttons[mode] as Button
+		button.button_pressed = int(mode) == Net.mode
+		button.disabled = not _can_configure()
 
 
 func _on_monkey_pressed(id: StringName) -> void:
@@ -109,6 +169,7 @@ func _refresh() -> void:
 	_join_button.disabled = online
 	_solo_button.disabled = online
 	_ip_field.editable = not online
+	_refresh_config()
 
 	if not online:
 		_roster_list.text = "Not connected."
