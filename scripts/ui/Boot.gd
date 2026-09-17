@@ -20,7 +20,6 @@ func _ready() -> void:
 	Net.match_started.connect(_show_arena)
 	Net.match_ended.connect(_show_lobby)
 	Net.server_disconnected.connect(_show_lobby)
-	GameInput.pause_requested.connect(_on_pause_requested)
 	_show_lobby()
 
 
@@ -32,14 +31,6 @@ func _show_lobby() -> void:
 ## pile of state left over from the round that just ended.
 func _show_arena() -> void:
 	_swap(ARENA_SCENE)
-
-
-func _on_pause_requested() -> void:
-	# Escape leaves the match rather than opening a menu. A pause menu is not
-	# worth building for a demo where the round is the whole session.
-	if _current != null and _current.is_in_group(&"arena"):
-		Net.leave()
-		_show_lobby()
 
 
 func _swap(scene: PackedScene) -> Node:

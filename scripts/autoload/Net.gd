@@ -296,6 +296,16 @@ func end_match() -> void:
 	_end_match()
 
 
+## The host leaving ends the match for everyone, because a host that walks
+## out is not a match any more. A client leaving is just that client.
+func leave_match() -> void:
+	if is_host():
+		end_match()
+		return
+	leave()
+	match_ended.emit()
+
+
 @rpc("authority", "reliable")
 func _end_match() -> void:
 	# Bots are reassigned per match, so they never pile up across rematches.
