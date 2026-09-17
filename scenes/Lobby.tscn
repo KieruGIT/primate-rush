@@ -138,4 +138,4 @@ text = ""
 
 [node name="Help" type="Label" parent="Margin/Column"]
 layout_mode = 2
-text = "Keyboard: A/D move, W/S climb and rope, Space jump, J hit, Esc leave."
+text = "Keyboard: A/D move, W/S climb and rope, Space jump, J hit, K skill, Esc leave."

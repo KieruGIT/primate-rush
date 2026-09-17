@@ -32,6 +32,8 @@ func _unhandled_input(event: InputEvent) -> void:
 		_frame.press(InputFrame.Button.JUMP)
 	elif event.is_action_pressed(&"attack"):
 		_frame.press(InputFrame.Button.ATTACK)
+	elif event.is_action_pressed(&"skill"):
+		_frame.press(InputFrame.Button.SKILL)
 	elif event.is_action_pressed(&"ui_cancel"):
 		pause_requested.emit()
 

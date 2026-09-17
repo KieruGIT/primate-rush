@@ -25,6 +25,7 @@ Engine: **Godot 4.7**, Compatibility (OpenGL 3) renderer, GDScript only.
 | Climb, rope up/down | W / S or up/down | left-hand stick |
 | Jump, release vine, wall jump | Space | JUMP |
 | Attack | J | HIT |
+| Skill | K | SKILL |
 | Leave match | Esc | — |
 
 Climb and swing are **contextual**: touch a climbable surface while pushing
@@ -48,21 +49,29 @@ button, which keeps the phone layout down to a stick and two buttons.
 | Three monkeys (gorilla, gibbon, macaque) | done |
 | LAN multiplayer, host authoritative, up to 4 | done |
 | Touch controls | done |
-| Character select and lobby | done |
+| Character select, map and mode select, lobby | done |
+| Race mode: countdown, checkpoints, placement, results | done |
+| Map A horizontal run and Map B vertical ascent | done |
+| One skill per monkey | done |
 | RevenueCat purchase unlocking a monkey | wired, needs a key and a device |
-| Race mode placement, second map, per-monkey skills | not yet |
+| Banana Hoard mode and lucky boxes | not yet |
+| Art, audio, ranked, cosmetics | not yet, by design |
 
 ## Repository layout
 
 ```
-scenes/      Boot, Lobby, Main (arena), Player, Vine, Climbable, Checkpoint, Hud, TouchControls
+scenes/      Boot, Lobby, Main (arena shell), Player, Vine, Climbable, Checkpoint,
+             FinishLine, Hud, Results, TouchControls
+scenes/maps/ MapA (horizontal run), MapB (vertical ascent)
 scripts/
   autoload/  GameConfig (constants, roster), GameInput (devices), Net (LAN), Purchases (RevenueCat)
   player/    Player.gd (movement, climb, swing, combat), MonkeyStats, InputFrame
-  world/     Main.gd (arena, respawn, snapshots), Vine, Climbable, Checkpoint
+  world/     Main.gd (arena, respawn, snapshots), RaceDirector, MapData,
+             Vine, Climbable, Checkpoint, FinishLine
   ui/        Boot router, Lobby, Hud, TouchControls
 resources/monkeys/   one .tres per monkey, balancing without code changes
 docs/        design document and build brief
+tools/       check_project.py, static checks the engine only does at runtime
 ```
 
 ## Design notes worth knowing before editing
@@ -85,6 +94,10 @@ be reviewed in a diff. Spawning and snapshots are explicit in `Net.gd` and
 **Attack flavors are cosmetic and must stay that way.** Slap, punch, and kick
 share range, knockback, stun, and cooldown. The moment a kick outranges a
 slap, players fish for an animation they cannot choose.
+
+**Skills dispatch on a stat id, not a subclass.** A monkey is a `.tres` plus
+one branch in `_try_skill`. Adding the capuchin is data entry and one case,
+not a new script that re-implements movement.
 
 **Stats are data.** Balancing is editing a `.tres` in the inspector. A stat of
 1.0 means "the base value in `GameConfig`", which makes the macaque the
