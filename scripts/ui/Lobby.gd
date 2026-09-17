@@ -79,7 +79,7 @@ func _build_match_rows() -> void:
 		_map_row.add_child(button)
 		_map_buttons[id] = button
 
-	for mode in [GameConfig.Mode.FREE_PLAY, GameConfig.Mode.RACE]:
+	for mode in [GameConfig.Mode.FREE_PLAY, GameConfig.Mode.RACE, GameConfig.Mode.HOARD]:
 		var button := Button.new()
 		button.toggle_mode = true
 		button.custom_minimum_size = Vector2(150.0, 48.0)

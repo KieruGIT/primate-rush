@@ -31,11 +31,12 @@ const BASE_STUN_TIME: float = 0.45
 
 ## Match types. Free play is the movement sandbox: no timer, no placement,
 ## just the level. It is the mode every tuning session actually happens in.
-enum Mode { FREE_PLAY, RACE }
+enum Mode { FREE_PLAY, RACE, HOARD }
 
 const MODE_NAMES: Dictionary = {
 	Mode.FREE_PLAY: "Free play",
 	Mode.RACE: "Race",
+	Mode.HOARD: "Banana Hoard",
 }
 
 const MAP_PATHS: Dictionary = {

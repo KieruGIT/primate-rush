@@ -33,7 +33,9 @@ var _idle_frame: InputFrame = InputFrame.new()
 
 @onready var _map_slot: Node2D = $MapSlot
 @onready var _player_root: Node2D = $Players
+@onready var _pickup_root: Node2D = $Pickups
 @onready var race: RaceDirector = $RaceDirector
+@onready var hoard: HoardDirector = $HoardDirector
 
 
 func _ready() -> void:
@@ -68,18 +70,26 @@ func _spawn_ui() -> void:
 
 func _start_mode() -> void:
 	race.setup(self, map)
+	hoard.setup(self, map, _pickup_root)
 	if map == null:
 		return
-	race.race_over.connect(_on_race_over)
-	if Net.mode != GameConfig.Mode.RACE:
-		return
+	race.race_over.connect(_on_match_over)
+	hoard.hoard_over.connect(_on_match_over)
+
 	# Only the host counts down. Clients follow the broadcast, otherwise four
-	# machines each start their own race a few frames apart.
-	if not Net.is_online() or Net.is_host():
-		race.begin()
+	# machines each start their own round a few frames apart.
+	if Net.is_online() and not Net.is_host():
+		return
+	match Net.mode:
+		GameConfig.Mode.RACE:
+			race.begin()
+		GameConfig.Mode.HOARD:
+			hoard.begin()
+		_:
+			pass
 
 
-func _on_race_over(results: Array) -> void:
+func _on_match_over(results: Array) -> void:
 	var overlay := RESULTS_SCENE.instantiate()
 	add_child(overlay)
 	if overlay.has_method(&"show_results"):
@@ -140,7 +150,7 @@ func _is_authority() -> bool:
 
 func _route_input() -> void:
 	var local_frame := GameInput.take_local_frame()
-	if race.is_input_locked():
+	if _input_locked():
 		# Intent is dropped rather than buffered during the countdown, so a
 		# player mashing jump on "3" does not launch on "GO".
 		local_frame = _idle_frame
@@ -161,9 +171,13 @@ func _route_input() -> void:
 			if int(id) == _local_id:
 				continue
 			var frame := Net.take_remote_input(int(id))
-			if race.is_input_locked():
+			if _input_locked():
 				frame = _idle_frame
 			players[id].feed_input(frame)
+
+
+func _input_locked() -> bool:
+	return race.is_input_locked() or hoard.is_input_locked()
 
 
 func _check_falls() -> void:
