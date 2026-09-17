@@ -1,0 +1,31 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/ui/Hud.gd" id="1_hud"]
+
+[node name="Hud" type="CanvasLayer"]
+layer = 5
+script = ExtResource("1_hud")
+
+[node name="Root" type="Control" parent="."]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="Top" type="VBoxContainer" parent="Root"]
+layout_mode = 1
+offset_left = 24.0
+offset_top = 18.0
+offset_right = 520.0
+offset_bottom = 90.0
+mouse_filter = 2
+
+[node name="Title" type="Label" parent="Root/Top"]
+layout_mode = 2
+text = "Monkey"
+
+[node name="Info" type="Label" parent="Root/Top"]
+layout_mode = 2
+text = "local"

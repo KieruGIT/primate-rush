@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="MonkeyStats" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/player/MonkeyStats.gd" id="1_stats"]
+
+[resource]
+script = ExtResource("1_stats")
+id = &"gorilla"
+display_name = "Gorilla"
+blurb = "The Bruiser. Bad at the movement game, good at ruining yours."
+body_color = Color(0.32, 0.29, 0.31, 1)
+body_size = Vector2(44, 76)
+speed = 0.75
+weight = 1.9
+power = 1.9
+climb = 0.7
+swing = 0.6
+skill_id = &"grapple_dash"
+skill_cooldown = 4.0

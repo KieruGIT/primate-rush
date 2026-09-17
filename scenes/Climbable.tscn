@@ -1,0 +1,11 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/world/Climbable.gd" id="1_climb"]
+
+[node name="Climbable" type="Area2D"]
+collision_layer = 16
+collision_mask = 0
+monitoring = false
+script = ExtResource("1_climb")
+
+[node name="Shape" type="CollisionShape2D" parent="."]
