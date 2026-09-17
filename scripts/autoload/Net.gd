@@ -320,6 +320,22 @@ func broadcast_hit(target_id: int, force: Vector2, stun: float, attacker_id: int
 	_push_hit.rpc(target_id, force, stun, attacker_id)
 
 
+## Temporary abilities are host-decided too. A client that granted its own
+## speed boost would simply be faster than everyone else.
+func broadcast_ability(target_id: int, ability_id: StringName, duration: float) -> void:
+	if not is_host():
+		return
+	_push_ability.rpc(target_id, String(ability_id), duration)
+
+
+@rpc("authority", "reliable")
+func _push_ability(target_id: int, ability_id: String, duration: float) -> void:
+	if is_host() or arena == null:
+		return
+	if arena.has_method(&"apply_remote_ability"):
+		arena.call(&"apply_remote_ability", target_id, StringName(ability_id), duration)
+
+
 @rpc("authority", "reliable")
 func _push_hit(target_id: int, force: Vector2, stun: float, attacker_id: int) -> void:
 	if is_host() or arena == null:

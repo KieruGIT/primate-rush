@@ -198,6 +198,21 @@ func knock_bananas_loose(player_id: int, point: Vector2, double_drop: bool, frac
 	_scatter(point, dropped)
 
 
+## Capuchin's Snatch. A transfer, not a drop: the bananas go straight to the
+## thief, which is what makes the capuchin worth playing in this mode and
+## infuriating to play against.
+func steal_bananas(from_id: int, to_id: int, fraction: float) -> void:
+	if not _is_authority() or phase != Phase.RUNNING:
+		return
+	var held := int(scores.get(from_id, 0))
+	if held <= 0:
+		return
+	var taken := clampi(int(ceil(float(held) * fraction)), 1, held)
+	scores[from_id] = held - taken
+	scores[to_id] = int(scores.get(to_id, 0)) + taken
+	_send(&"scores", [scores.duplicate()])
+
+
 func _scatter(point: Vector2, count: int) -> void:
 	var drops := mini(count, 6)
 	var per_drop := maxi(int(round(float(count) / float(drops))), 1)
