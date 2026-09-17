@@ -16,6 +16,7 @@ const GO_FLASH_SECONDS: float = 0.9
 
 var _player: Player = null
 var _race: RaceDirector = null
+var _hoard: HoardDirector = null
 var _center_timer: float = 0.0
 
 
@@ -46,6 +47,11 @@ func _info_parts() -> PackedStringArray:
 	if _race != null and _race.is_running():
 		parts.append("%.1fs" % _race.elapsed)
 		parts.append("place %d of %d" % [_live_place(), _field_size()])
+	if _hoard != null and _hoard.is_running():
+		parts.append("%d bananas" % _player.bananas)
+		parts.append("%d:%02d left" % [int(_hoard.time_left) / 60, int(_hoard.time_left) % 60])
+		if _player.ability != &"":
+			parts.append("%s %.1fs" % [String(_player.ability).replace("_", " "), _player.ability_timer])
 	return parts
 
 
@@ -76,6 +82,12 @@ func _bind() -> void:
 			_race.countdown_changed.connect(_on_countdown)
 			_race.race_began.connect(_on_race_began)
 			_race.player_finished.connect(_on_player_finished)
+
+	if _hoard == null or not is_instance_valid(_hoard):
+		_hoard = arena.get(&"hoard") as HoardDirector
+		if _hoard != null:
+			_hoard.countdown_changed.connect(_on_countdown)
+			_hoard.hoard_began.connect(_on_race_began)
 
 
 ## Live placement is recomputed rather than stored: it changes every time

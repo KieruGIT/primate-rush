@@ -1,10 +1,11 @@
-[gd_scene load_steps=17 format=3]
+[gd_scene load_steps=18 format=3]
 
 [ext_resource type="Script" path="res://scripts/world/MapData.gd" id="1_map"]
 [ext_resource type="PackedScene" path="res://scenes/Vine.tscn" id="2_vine"]
 [ext_resource type="PackedScene" path="res://scenes/Climbable.tscn" id="3_climb"]
 [ext_resource type="PackedScene" path="res://scenes/Checkpoint.tscn" id="4_check"]
 [ext_resource type="PackedScene" path="res://scenes/FinishLine.tscn" id="5_finish"]
+[ext_resource type="PackedScene" path="res://scenes/BananaSpawn.tscn" id="6_banana"]
 
 [sub_resource type="RectangleShape2D" id="Rect_Floor"]
 size = Vector2(1200, 80)
@@ -229,3 +230,50 @@ position = Vector2(-300, -900)
 [node name="FinishLine" parent="." instance=ExtResource("5_finish")]
 position = Vector2(0, -1160)
 size = Vector2(260, 100)
+
+[node name="BananaSpawns" type="Node2D" parent="."]
+
+[node name="Spawn1" parent="BananaSpawns" instance=ExtResource("6_banana")]
+position = Vector2(0, 560)
+value = 1
+lucky_chance = 0.1
+
+[node name="Spawn2" parent="BananaSpawns" instance=ExtResource("6_banana")]
+position = Vector2(-260, 340)
+value = 2
+lucky_chance = 0.12
+
+[node name="Spawn3" parent="BananaSpawns" instance=ExtResource("6_banana")]
+position = Vector2(260, 160)
+value = 2
+lucky_chance = 0.12
+
+[node name="Spawn4" parent="BananaSpawns" instance=ExtResource("6_banana")]
+position = Vector2(-220, -40)
+value = 3
+lucky_chance = 0.15
+
+[node name="Spawn5" parent="BananaSpawns" instance=ExtResource("6_banana")]
+position = Vector2(300, -240)
+value = 3
+lucky_chance = 0.15
+
+[node name="Spawn6" parent="BananaSpawns" instance=ExtResource("6_banana")]
+position = Vector2(-160, -480)
+value = 4
+lucky_chance = 0.2
+
+[node name="Spawn7" parent="BananaSpawns" instance=ExtResource("6_banana")]
+position = Vector2(200, -700)
+value = 4
+lucky_chance = 0.2
+
+[node name="Spawn8" parent="BananaSpawns" instance=ExtResource("6_banana")]
+position = Vector2(-300, -900)
+value = 5
+lucky_chance = 0.25
+
+[node name="Spawn9" parent="BananaSpawns" instance=ExtResource("6_banana")]
+position = Vector2(0, -1120)
+value = 5
+lucky_chance = 0.25

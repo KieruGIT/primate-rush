@@ -24,6 +24,8 @@ signal attacked(flavor: StringName)
 signal hit_landed(target_id: int)
 signal hit_taken(attacker_id: int, knockback: Vector2)
 signal skill_used(skill_id: StringName)
+signal bananas_changed(count: int)
+signal ability_changed(ability_id: StringName)
 signal fell_out_of_world
 
 # DASH is appended rather than inserted: the state enum travels over the
@@ -103,6 +105,16 @@ const ATTACK_FLAVORS: Array[StringName] = [&"slap", &"punch", &"kick"]
 ## Whiffing still costs something, or the grapple is a free scan every frame.
 @export var skill_whiff_cooldown: float = 0.6
 
+@export_group("Hoard")
+## Banana Magnet reach.
+@export var magnet_radius: float = 260.0
+## Super Hit. Massive knockback and a doubled banana drop, once.
+@export var super_hit_multiplier: float = 2.5
+@export var speed_boost_multiplier: float = 1.5
+## Share of a target's bananas knocked loose by a normal hit. Load bearing:
+## without a drop, players farm separate corners and the mode has no tension.
+@export_range(0.0, 1.0, 0.05) var drop_fraction: float = 0.4
+
 @export_group("Networking")
 ## Position error past which a predicting client stops arguing and snaps.
 @export var reconcile_snap_distance: float = 64.0
@@ -127,6 +139,10 @@ var _dash_time: float = 0.0
 var _dash_kind: StringName = &""
 var _dash_target: Vector2 = Vector2.ZERO
 var _air_launch_ready: bool = true
+
+var bananas: int = 0
+var ability: StringName = &""
+var ability_timer: float = 0.0
 
 var _climb_lock: float = 0.0
 var _swing_lock: float = 0.0
@@ -255,6 +271,10 @@ func _tick_timers(delta: float) -> void:
 	_buffer_timer = maxf(_buffer_timer - delta, 0.0)
 	skill_timer = maxf(skill_timer - delta, 0.0)
 	invuln_timer = maxf(invuln_timer - delta, 0.0)
+	if ability_timer > 0.0:
+		ability_timer -= delta
+		if ability_timer <= 0.0:
+			set_ability(&"", 0.0)
 	if is_on_floor():
 		_air_launch_ready = true
 	if _input.consume(InputFrame.Button.JUMP):
@@ -307,9 +327,36 @@ func _apply_horizontal(delta: float) -> void:
 	var friction := ground_friction if grounded else air_friction
 
 	if absf(axis) > 0.1:
-		velocity.x = move_toward(velocity.x, axis * stats.run_speed(), accel * delta)
+		velocity.x = move_toward(velocity.x, axis * stats.run_speed() * _speed_multiplier(), accel * delta)
 	else:
 		velocity.x = move_toward(velocity.x, 0.0, friction * delta)
+
+
+func _speed_multiplier() -> float:
+	return speed_boost_multiplier if ability == &"speed_boost" else 1.0
+
+
+# --- Bananas and lucky box abilities -------------------------------
+
+## Set by the hoard director's scores broadcast. Never set locally, so the
+## number on screen is always the number the host is scoring.
+func set_bananas(count: int) -> void:
+	bananas = maxi(count, 0)
+	bananas_changed.emit(bananas)
+
+
+## Ghost cannot be hit and cannot hit. Both halves matter: an untouchable
+## monkey that could still knock people around would be the only pickup
+## anyone ever wants.
+func set_ability(ability_id: StringName, duration: float) -> void:
+	ability = ability_id
+	ability_timer = duration
+	modulate.a = 0.45 if ability_id == &"ghost" else 1.0
+	ability_changed.emit(ability_id)
+
+
+func is_ghost() -> bool:
+	return ability == &"ghost"
 
 
 func _try_jump() -> void:
@@ -515,6 +562,8 @@ func _resolve_hit(area: Area2D) -> void:
 	var target := area.get_meta(&"player") as Player
 	if target == null or target == self or _already_hit.has(target.player_id):
 		return
+	if is_ghost() or target.is_ghost():
+		return
 	_already_hit.append(target.player_id)
 
 	var dir := Vector2(float(facing), 0.0)
@@ -527,8 +576,13 @@ func _resolve_hit(area: Area2D) -> void:
 	# Magnitude is the attacker's Power against the target's Weight, resolved
 	# on the target so one monkey's stat block is the only thing that decides
 	# how far it flies.
-	var force := dir * stats.knockback_dealt()
-	target.take_hit(player_id, force, GameConfig.BASE_STUN_TIME)
+	var super_hit := ability == &"super_hit"
+	var force := dir * stats.knockback_dealt() * (super_hit_multiplier if super_hit else 1.0)
+	if super_hit:
+		# One shot, spent on contact rather than on the swing, so a whiffed
+		# Super Hit is not the whole pickup wasted.
+		set_ability(&"", 0.0)
+	target.take_hit(player_id, force, GameConfig.BASE_STUN_TIME, super_hit)
 	hit_landed.emit(target.player_id)
 	if Net.is_online():
 		Net.broadcast_hit(target.player_id, force, GameConfig.BASE_STUN_TIME, player_id)
@@ -537,10 +591,14 @@ func _resolve_hit(area: Area2D) -> void:
 ## Applied by the host, replayed on clients. Never called speculatively by a
 ## client: knockback that disagrees between machines is the single most
 ## broken-feeling desync in this game.
-func take_hit(attacker_id: int, force: Vector2, base_stun: float) -> void:
+func take_hit(attacker_id: int, force: Vector2, base_stun: float, double_drop: bool = false) -> void:
 	if invuln_timer > 0.0:
 		_counter_attacker(attacker_id)
 		return
+	if is_ghost():
+		return
+	if _is_authority() and bananas > 0:
+		_knock_bananas_loose(double_drop)
 	var applied := force.normalized() * stats.knockback_taken(force.length())
 	velocity = applied
 	stun_timer = base_stun / maxf(stats.weight, 0.2)
@@ -556,6 +614,16 @@ func take_hit(attacker_id: int, force: Vector2, base_stun: float) -> void:
 		_climb_lock = climb_regrab_delay
 	_set_state(State.STUN)
 	hit_taken.emit(attacker_id, applied)
+
+
+## Hitting someone knocks bananas loose for anyone to grab. The director
+## owns the number and this only asks: the score it broadcasts is the single
+## source of truth, and a monkey deducting its own bananas would be undone
+## by the next scores packet.
+func _knock_bananas_loose(double_drop: bool) -> void:
+	var director: Node = get_tree().get_first_node_in_group(&"hoard_director")
+	if director != null and director.has_method(&"knock_bananas_loose"):
+		director.call(&"knock_bananas_loose", player_id, global_position, double_drop, drop_fraction)
 
 
 func _process_stun(delta: float) -> void:
@@ -715,6 +783,8 @@ func respawn_at(point: Vector2) -> void:
 	invuln_timer = 0.0
 	_dash_kind = &""
 	_air_launch_ready = true
+	# Bananas survive a fall. Falling already costs time, and losing a
+	# hoard to a missed jump punishes the mode's whole risk curve twice.
 	is_attacking = false
 	_swing_node = null
 	_set_hitbox_open(false)

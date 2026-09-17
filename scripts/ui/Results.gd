@@ -37,8 +37,15 @@ func show_results(results: Array) -> void:
 func _make_row(place: int, entry: Dictionary) -> Label:
 	var row := Label.new()
 	var id := int(entry.get("id", 0))
-	var finished := bool(entry.get("finished", false))
-	var detail := "%.2fs" % float(entry.get("time", 0.0)) if finished else "did not finish"
+	# Race rows carry a time, hoard rows carry a score. One overlay serves
+	# both rather than two near-identical scenes drifting apart.
+	var detail := ""
+	if entry.has("score"):
+		detail = "%d bananas" % int(entry["score"])
+	elif bool(entry.get("finished", false)):
+		detail = "%.2fs" % float(entry.get("time", 0.0))
+	else:
+		detail = "did not finish"
 	row.text = "%d.  %s  -  %s" % [place, _name_for(id), detail]
 	if id == Net.local_id():
 		row.modulate = Color(1.0, 0.92, 0.55)
