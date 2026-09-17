@@ -18,5 +18,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Static project check
+      - name: Scene and resource wiring
         run: python3 tools/check_project.py
+      - name: GDScript calls and signatures
+        run: python3 tools/check_gdscript.py

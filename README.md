@@ -141,7 +141,8 @@ produces real entitlements and dashboard rows.
 
 Written without an engine available to run it: the first Godot launch is the
 real first test. `python3 tools/check_project.py` covers node paths, resource
-paths and autoloads. See [docs/BUILD_NOTES.md](docs/BUILD_NOTES.md) for the
+paths and autoloads; `python3 tools/check_gdscript.py` covers bare calls,
+argument counts and cross-class member references. See [docs/BUILD_NOTES.md](docs/BUILD_NOTES.md) for the
 first-run checklist, the LAN test, Android export, and the known gaps.
 
 ## License
