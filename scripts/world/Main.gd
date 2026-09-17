@@ -19,6 +19,7 @@ const PLAYER_SCENE := preload("res://scenes/Player.tscn")
 const TOUCH_CONTROLS_SCENE := preload("res://scenes/TouchControls.tscn")
 const HUD_SCENE := preload("res://scenes/Hud.tscn")
 const RESULTS_SCENE := preload("res://scenes/Results.tscn")
+const PAUSE_SCENE := preload("res://scenes/Pause.tscn")
 
 ## Forces the on-screen stick and buttons on desktop, for layout work.
 @export var force_touch_controls: bool = false
@@ -45,6 +46,7 @@ var _local_below_kill: bool = false
 
 func _ready() -> void:
 	add_to_group(&"arena")
+	GameInput.pause_requested.connect(_toggle_pause)
 	_local_id = Net.local_id()
 	Net.arena = self
 	_load_map()
@@ -54,8 +56,21 @@ func _ready() -> void:
 
 
 func _exit_tree() -> void:
+	# An overlay that paused the tree must not take the pause with it when
+	# the arena is freed, or the lobby comes back frozen.
+	get_tree().paused = false
 	if Net.arena == self:
 		Net.arena = null
+
+
+func _toggle_pause() -> void:
+	var existing := get_node_or_null(^"Pause")
+	if existing != null:
+		existing.call(&"resume")
+		return
+	var overlay := PAUSE_SCENE.instantiate()
+	overlay.name = "Pause"
+	add_child(overlay)
 
 
 func _load_map() -> void:

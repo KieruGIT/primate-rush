@@ -27,6 +27,13 @@ func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 
 
+func _notification(what: int) -> void:
+	# Android's back button. It does not arrive as an action, so without
+	# this the phone build has no way to reach the pause menu at all.
+	if what == NOTIFICATION_WM_GO_BACK_REQUEST:
+		pause_requested.emit()
+
+
 func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed(&"jump"):
 		_frame.press(InputFrame.Button.JUMP)
