@@ -10,18 +10,21 @@ extends CanvasLayer
 
 @onready var _rows: VBoxContainer = %Rows
 @onready var _button: Button = %BackButton
+@onready var _again: Button = %AgainButton
 @onready var _note: Label = %Note
 
 
 func _ready() -> void:
 	layer = 20
 	_button.pressed.connect(func() -> void: Net.end_match())
-	# Only the host can end the match. A client that could would yank three
-	# other people out of a race they were still running.
-	var can_end := not Net.is_online() or Net.is_host()
-	_button.visible = can_end
-	_note.visible = not can_end
-	_note.text = "Waiting for the host to return to the lobby."
+	_again.pressed.connect(func() -> void: Net.start_match())
+	# Only the host decides what happens next. A client that could would
+	# yank three other people out of a screen they were still reading.
+	var can_decide := not Net.is_online() or Net.is_host()
+	_button.visible = can_decide
+	_again.visible = can_decide
+	_note.visible = not can_decide
+	_note.text = "Waiting for the host to pick what happens next."
 
 
 func show_results(results: Array) -> void:

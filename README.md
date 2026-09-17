@@ -48,6 +48,8 @@ button, which keeps the phone layout down to a stick and two buttons.
 | Stat block system driving all five axes | done |
 | Five monkeys: gorilla, gibbon, macaque, orangutan, capuchin | done |
 | LAN multiplayer, host authoritative, up to 4 | done |
+| LAN host discovery by UDP broadcast, with IP entry as fallback | done |
+| Rematch from the results screen | done |
 | Touch controls | done |
 | Character select, map and mode select, lobby, results | done |
 | Race mode: countdown, checkpoints, placement, results | done |
@@ -64,7 +66,8 @@ scenes/      Boot, Lobby, Main (arena shell), Player, Vine, Climbable, Checkpoin
              FinishLine, Hud, Results, TouchControls
 scenes/maps/ MapA (horizontal run), MapB (vertical ascent)
 scripts/
-  autoload/  GameConfig (constants, roster), GameInput (devices), Net (LAN), Purchases (RevenueCat)
+  autoload/  GameConfig (constants, roster), GameInput (devices), Net (LAN),
+             Discovery (UDP host beacons), Purchases (RevenueCat)
   player/    Player.gd (movement, climb, swing, combat), MonkeyStats, InputFrame
   world/     Main.gd (arena, respawn, snapshots), RaceDirector, HoardDirector,
              MapData, Vine, Climbable, Checkpoint, FinishLine, Pickup, BananaSpawn

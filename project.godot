@@ -20,6 +20,7 @@ config/icon="res://icon.svg"
 GameConfig="*res://scripts/autoload/GameConfig.gd"
 GameInput="*res://scripts/autoload/GameInput.gd"
 Net="*res://scripts/autoload/Net.gd"
+Discovery="*res://scripts/autoload/Discovery.gd"
 Purchases="*res://scripts/autoload/Purchases.gd"
 
 [display]

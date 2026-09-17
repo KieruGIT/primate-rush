@@ -94,6 +94,15 @@ custom_minimum_size = Vector2(150, 52)
 layout_mode = 2
 text = "Play solo"
 
+[node name="HostsLabel" type="Label" parent="Margin/Column"]
+layout_mode = 2
+text = "Hosts on this network"
+
+[node name="HostsList" type="VBoxContainer" parent="Margin/Column"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/separation = 6
+
 [node name="MatchRow" type="HBoxContainer" parent="Margin/Column"]
 layout_mode = 2
 theme_override_constants/separation = 10
