@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="MonkeyStats" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/player/MonkeyStats.gd" id="1_stats"]
+
+[resource]
+script = ExtResource("1_stats")
+id = &"capuchin"
+display_name = "Capuchin"
+blurb = "The Thief. Almost useless in a fight, extremely annoying when it is farming you."
+body_color = Color(0.86, 0.66, 0.35, 1)
+body_size = Vector2(24, 52)
+speed = 1.45
+weight = 0.5
+power = 0.45
+climb = 1.4
+swing = 1.4
+skill_id = &"snatch"
+skill_cooldown = 3.5

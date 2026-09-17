@@ -100,6 +100,17 @@ const ATTACK_FLAVORS: Array[StringName] = [&"slap", &"punch", &"kick"]
 ## Macaque. Short roll that ignores knockback and punishes whoever swung.
 @export var roll_speed: float = 900.0
 @export var roll_time: float = 0.26
+## Orangutan. Twice the gorilla's reach, paid for with a visible windup.
+@export var long_arm_range_multiplier: float = 2.0
+@export var long_arm_windup: float = 0.32
+## Capuchin. Dash that steals from whoever it passes through.
+@export var snatch_speed: float = 1150.0
+@export var snatch_time: float = 0.3
+@export var snatch_radius: float = 46.0
+## Share of the victim's bananas a snatch takes.
+@export_range(0.0, 1.0, 0.05) var snatch_fraction: float = 0.3
+## Momentum theft in modes with no bananas: they slow, you speed up.
+@export var snatch_slow_seconds: float = 1.6
 ## Safety valve so a grapple that never arrives cannot strand you in DASH.
 @export var dash_timeout: float = 0.7
 ## Whiffing still costs something, or the grapple is a free scan every frame.
@@ -136,6 +147,9 @@ var _already_hit: Array[int] = []
 var skill_timer: float = 0.0
 var invuln_timer: float = 0.0
 var _dash_time: float = 0.0
+var _windup_timer: float = 0.0
+var _windup_skill: StringName = &""
+var _snatch_hit: Array[int] = []
 var _dash_kind: StringName = &""
 var _dash_target: Vector2 = Vector2.ZERO
 var _air_launch_ready: bool = true
@@ -275,6 +289,7 @@ func _tick_timers(delta: float) -> void:
 		ability_timer -= delta
 		if ability_timer <= 0.0:
 			set_ability(&"", 0.0)
+	_tick_windup(delta)
 	if is_on_floor():
 		_air_launch_ready = true
 	if _input.consume(InputFrame.Button.JUMP):
@@ -333,7 +348,12 @@ func _apply_horizontal(delta: float) -> void:
 
 
 func _speed_multiplier() -> float:
-	return speed_boost_multiplier if ability == &"speed_boost" else 1.0
+	match ability:
+		&"speed_boost":
+			return speed_boost_multiplier
+		&"slowed":
+			return 0.55
+	return 1.0
 
 
 # --- Bananas and lucky box abilities -------------------------------
@@ -649,11 +669,15 @@ func _try_skill() -> void:
 	var fired := false
 	match stats.skill_id:
 		&"grapple_dash":
-			fired = _skill_grapple_dash()
+			fired = _skill_grapple_dash(1.0)
 		&"air_launch":
 			fired = _skill_air_launch()
 		&"counter_roll":
 			fired = _skill_counter_roll()
+		&"long_arm":
+			fired = _skill_long_arm()
+		&"snatch":
+			fired = _skill_snatch()
 	skill_timer = stats.skill_cooldown if fired else skill_whiff_cooldown
 	if fired:
 		skill_used.emit(stats.skill_id)
@@ -665,7 +689,7 @@ func _aim_direction() -> Vector2:
 	return Vector2(float(facing), -0.2).normalized()
 
 
-func _skill_grapple_dash() -> bool:
+func _skill_grapple_dash(range_multiplier: float) -> bool:
 	var aim := Vector2(float(facing), 0.0)
 	if absf(_input.move.y) > 0.3:
 		aim = Vector2(float(facing), _input.move.y).normalized()
@@ -673,7 +697,7 @@ func _skill_grapple_dash() -> bool:
 	var space := get_world_2d().direct_space_state
 	var query := PhysicsRayQueryParameters2D.create(
 		global_position,
-		global_position + aim * grapple_range,
+		global_position + aim * grapple_range * range_multiplier,
 		GameConfig.LAYER_WORLD | GameConfig.LAYER_PLAYER,
 		[get_rid()]
 	)
@@ -725,6 +749,70 @@ func _skill_counter_roll() -> bool:
 	return true
 
 
+## Long Arm is the gorilla's grapple with reach and a windup instead of
+## instant commitment. The windup is the balance lever: a slow telegraph is
+## what stops twice the range from being strictly better.
+func _skill_long_arm() -> bool:
+	if _windup_timer > 0.0:
+		return false
+	_windup_skill = &"long_arm"
+	_windup_timer = long_arm_windup
+	return true
+
+
+func _tick_windup(delta: float) -> void:
+	if _windup_timer <= 0.0:
+		return
+	_windup_timer -= delta
+	if _windup_timer > 0.0:
+		return
+	var skill := _windup_skill
+	_windup_skill = &""
+	if skill == &"long_arm":
+		_skill_grapple_dash(long_arm_range_multiplier)
+
+
+func _skill_snatch() -> bool:
+	_dash_kind = &"snatch"
+	_dash_time = snatch_time
+	_snatch_hit.clear()
+	_swing_node = null
+	_set_state(State.DASH)
+	return true
+
+
+## Passing through someone steals from them: bananas where there are
+## bananas, momentum where there are not. Host only, like every other
+## interaction that moves a number on somebody else's screen.
+func _resolve_snatch() -> void:
+	if not _is_authority():
+		return
+	var arena: Node = get_tree().get_first_node_in_group(&"arena")
+	if arena == null:
+		return
+	var table: Variant = arena.get(&"players")
+	if not (table is Dictionary):
+		return
+	for id in table.keys():
+		var victim := table[id] as Player
+		if victim == null or victim == self or _snatch_hit.has(victim.player_id):
+			continue
+		if victim.is_ghost() or global_position.distance_to(victim.global_position) > snatch_radius + snatch_speed * get_physics_process_delta_time():
+			continue
+		_snatch_hit.append(victim.player_id)
+
+		var director: Node = get_tree().get_first_node_in_group(&"hoard_director")
+		if director != null and director.has_method(&"steal_bananas") and victim.bananas > 0:
+			director.call(&"steal_bananas", victim.player_id, player_id, snatch_fraction)
+			continue
+		# No bananas to take, so take the tempo instead.
+		victim.set_ability(&"slowed", snatch_slow_seconds)
+		set_ability(&"speed_boost", snatch_slow_seconds)
+		if Net.is_online():
+			Net.broadcast_ability(victim.player_id, &"slowed", snatch_slow_seconds)
+			Net.broadcast_ability(player_id, &"speed_boost", snatch_slow_seconds)
+
+
 func _process_dash(delta: float) -> void:
 	_dash_time -= delta
 	if _dash_kind == &"grapple":
@@ -736,6 +824,12 @@ func _process_dash(delta: float) -> void:
 			_end_dash()
 			return
 		velocity = to_target.normalized() * grapple_pull_speed
+	elif _dash_kind == &"snatch":
+		velocity = Vector2(float(facing) * snatch_speed, 0.0)
+		_resolve_snatch()
+		if _dash_time <= 0.0:
+			_end_dash()
+			return
 	else:
 		velocity.x = float(facing) * roll_speed
 		_apply_gravity(delta)
@@ -782,6 +876,8 @@ func respawn_at(point: Vector2) -> void:
 	stun_timer = 0.0
 	invuln_timer = 0.0
 	_dash_kind = &""
+	_windup_timer = 0.0
+	_windup_skill = &""
 	_air_launch_ready = true
 	# Bananas survive a fall. Falling already costs time, and losing a
 	# hoard to a missed jump punishes the mode's whole risk curve twice.

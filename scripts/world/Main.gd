@@ -241,3 +241,9 @@ func apply_remote_hit(target_id: int, force: Vector2, stun: float, attacker_id: 
 	var player := players.get(target_id) as Player
 	if player != null:
 		player.take_hit(attacker_id, force, stun)
+
+
+func apply_remote_ability(target_id: int, ability_id: StringName, duration: float) -> void:
+	var player := players.get(target_id) as Player
+	if player != null:
+		player.set_ability(ability_id, duration)

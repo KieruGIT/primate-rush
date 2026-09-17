@@ -46,13 +46,13 @@ button, which keeps the phone layout down to a stick and two buttons.
 | Stun on hit, drops you off vines and walls | done |
 | Respawn on fall with per-player checkpoints, no death, no health | done |
 | Stat block system driving all five axes | done |
-| Three monkeys (gorilla, gibbon, macaque) | done |
+| Five monkeys: gorilla, gibbon, macaque, orangutan, capuchin | done |
 | LAN multiplayer, host authoritative, up to 4 | done |
 | Touch controls | done |
 | Character select, map and mode select, lobby, results | done |
 | Race mode: countdown, checkpoints, placement, results | done |
 | Map A horizontal run and Map B vertical ascent | done |
-| One skill per monkey | done |
+| One skill per monkey, all five | done |
 | RevenueCat purchase unlocking a monkey | wired, needs a key and a device |
 | Banana Hoard: timer, scoring, drop on hit, lucky boxes | done |
 | Art, audio, ranked, cosmetics | not yet, by design |
@@ -121,6 +121,13 @@ the store. To wire it up on device:
 
 Test Store, not Google Play Billing: it needs no Play Console account and still
 produces real entitlements and dashboard rows.
+
+## Status
+
+Written without an engine available to run it: the first Godot launch is the
+real first test. `python3 tools/check_project.py` covers node paths, resource
+paths and autoloads. See [docs/BUILD_NOTES.md](docs/BUILD_NOTES.md) for the
+first-run checklist, the LAN test, Android export, and the known gaps.
 
 ## License
 

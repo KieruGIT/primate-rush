@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="MonkeyStats" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/player/MonkeyStats.gd" id="1_stats"]
+
+[resource]
+script = ExtResource("1_stats")
+id = &"orangutan"
+display_name = "Orangutan"
+blurb = "The Climber. Dominant on the vertical map, sluggish on the horizontal one."
+body_color = Color(0.78, 0.38, 0.18, 1)
+body_size = Vector2(38, 70)
+speed = 0.75
+weight = 1.5
+power = 1.0
+climb = 1.9
+swing = 1.0
+skill_id = &"long_arm"
+skill_cooldown = 5.0

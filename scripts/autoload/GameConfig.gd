@@ -72,6 +72,8 @@ const MONKEY_PATHS: Dictionary = {
 	&"gorilla": "res://resources/monkeys/gorilla.tres",
 	&"gibbon": "res://resources/monkeys/gibbon.tres",
 	&"macaque": "res://resources/monkeys/macaque.tres",
+	&"orangutan": "res://resources/monkeys/orangutan.tres",
+	&"capuchin": "res://resources/monkeys/capuchin.tres",
 }
 
 # Locked monkeys are gated behind the RevenueCat entitlement. Keeping the
