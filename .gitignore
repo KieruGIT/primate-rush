@@ -22,3 +22,7 @@ Thumbs.db
 *.swp
 .vscode/
 .idea/
+
+# Tiny Swords (Pixel Frog) forbids redistribution, and this repo is public.
+# Nothing references it; it stays out of git.
+assets/freegameassets/

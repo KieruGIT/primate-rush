@@ -78,7 +78,7 @@ button, which keeps the phone layout down to a stick and two buttons.
 ## Repository layout
 
 ```
-scenes/      Boot, Lobby, Main (arena shell), Player, Vine, Climbable, Checkpoint,
+scenes/      Boot, Splash, Menu, MatchLoading, Main (arena shell), Player, Vine, Climbable, Checkpoint,
              FinishLine, Hud, Results, TouchControls
 scenes/maps/ MapA (horizontal run), MapB (vertical ascent)
 scripts/
@@ -89,7 +89,7 @@ scripts/
              BotBrain (AI that emits input frames), Headwear (cosmetic anchor)
   world/     Main.gd (arena, respawn, snapshots), RaceDirector, HoardDirector,
              MapData, Vine, Climbable, Checkpoint, FinishLine, Pickup, BananaSpawn
-  ui/        Boot router, Lobby, Hud, TouchControls
+  ui/        Boot router, Splash, Menu, MatchLoading, Hud, TouchControls
 resources/monkeys/   one .tres per monkey, balancing without code changes
 docs/        design document and build brief
 tools/       check_project.py, static checks the engine only does at runtime

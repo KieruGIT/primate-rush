@@ -31,23 +31,44 @@ const BASE_STUN_TIME: float = 0.45
 
 ## Match types. Free play is the movement sandbox: no timer, no placement,
 ## just the level. It is the mode every tuning session actually happens in.
-enum Mode { FREE_PLAY, RACE, HOARD }
+# SLAP is appended, never inserted: the mode travels over the wire as an int.
+enum Mode { FREE_PLAY, RACE, HOARD, SLAP }
 
 const MODE_NAMES: Dictionary = {
 	Mode.FREE_PLAY: "Free play",
 	Mode.RACE: "Race",
 	Mode.HOARD: "Banana Hoard",
+	Mode.SLAP: "2v2 Slap",
 }
 
 const MAP_PATHS: Dictionary = {
 	&"map_a": "res://scenes/maps/MapA.tscn",
 	&"map_b": "res://scenes/maps/MapB.tscn",
+	&"map_c": "res://scenes/maps/SlapArena.tscn",
 }
 
 const MAP_NAMES: Dictionary = {
-	&"map_a": "Horizontal Run",
-	&"map_b": "Vertical Ascent",
+	&"map_a": "Jungle Run",
+	&"map_b": "Canopy Climb",
+	&"map_c": "Slap Island",
 }
+
+## Which maps a mode can be played on. A race needs a finish line, and a
+## slap fight needs an island small enough that the edge is always close.
+const MODE_MAPS: Dictionary = {
+	Mode.FREE_PLAY: [&"map_a", &"map_b", &"map_c"],
+	Mode.RACE: [&"map_a", &"map_b"],
+	Mode.HOARD: [&"map_a", &"map_b"],
+	Mode.SLAP: [&"map_c"],
+}
+
+# --- 2v2 Slap ---
+## Seats 0 and 1 are one team, 2 and 3 the other. Solo that is you and an
+## AI partner against two AI; in a party the first two people team up.
+const TEAM_NAMES: Array[String] = ["Banana", "Coconut"]
+const TEAM_COLORS: Array[Color] = [Color(1.0, 0.80, 0.10), Color(0.35, 0.70, 0.95)]
+const SLAP_TARGET_KOS: int = 5
+const SLAP_ROUND_SECONDS: float = 150.0
 
 ## Falling costs time, never a life. Short enough to sting without making
 ## someone put the phone down.
@@ -209,6 +230,14 @@ func load_map(id: StringName) -> PackedScene:
 
 func tint_for_index(index: int) -> Color:
 	return PLAYER_TINTS[index % PLAYER_TINTS.size()]
+
+
+func maps_for_mode(mode: int) -> Array:
+	return MODE_MAPS.get(mode, map_ids())
+
+
+func team_of(slot: int) -> int:
+	return clampi(slot / 2, 0, 1)
 
 
 func _fallback_stats() -> MonkeyStats:

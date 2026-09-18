@@ -15,7 +15,9 @@ extends Node
 # any of them holding a reference to it.
 # ============================================================
 
-const LOBBY_SCENE := preload("res://scenes/Lobby.tscn")
+const SPLASH_SCENE := preload("res://scenes/Splash.tscn")
+const MENU_SCENE := preload("res://scenes/Menu.tscn")
+const LOADING_SCENE := preload("res://scenes/MatchLoading.tscn")
 const ARENA_SCENE := preload("res://scenes/Main.tscn")
 
 var _current: Node = null
@@ -23,10 +25,11 @@ var _current: Node = null
 
 func _ready() -> void:
 	_apply_theme()
-	Net.match_started.connect(_show_arena)
-	Net.match_ended.connect(_show_lobby)
-	Net.server_disconnected.connect(_show_lobby)
-	_show_lobby()
+	Net.match_started.connect(_show_loading)
+	Net.match_ended.connect(_show_menu)
+	Net.server_disconnected.connect(_show_menu)
+	var splash := _swap(SPLASH_SCENE)
+	splash.connect(&"finished", _show_menu)
 
 
 func _apply_theme() -> void:
@@ -44,14 +47,33 @@ func _on_node_added(node: Node) -> void:
 	if button == null or button.pressed.is_connected(_on_any_button):
 		return
 	button.pressed.connect(_on_any_button)
+	# Every button squishes when pressed and springs back, the small bit of
+	# give that makes a phone game's buttons feel like buttons.
+	button.button_down.connect(_squish.bind(button, 0.93, 0.06))
+	button.button_up.connect(_squish.bind(button, 1.0, 0.18))
+
+
+func _squish(button: BaseButton, to: float, seconds: float) -> void:
+	if not is_instance_valid(button) or not button.is_inside_tree():
+		return
+	button.pivot_offset = button.size * 0.5
+	var tween := button.create_tween()
+	tween.tween_property(button, "scale", Vector2.ONE * to, seconds).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 
 
 func _on_any_button() -> void:
 	Sfx.play(&"ui_click")
 
 
-func _show_lobby() -> void:
-	_swap(LOBBY_SCENE)
+func _show_menu() -> void:
+	_swap(MENU_SCENE)
+
+
+## Every seat's card fills before the round, on every machine. See
+## MatchLoading for what the bars actually measure.
+func _show_loading() -> void:
+	var loading := _swap(LOADING_SCENE)
+	loading.connect(&"finished", _show_arena)
 
 
 ## Swapped fresh every time, so a rematch is a clean arena rather than a

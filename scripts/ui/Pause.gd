@@ -47,7 +47,7 @@ func _on_volume_changed(value: float) -> void:
 
 
 func _update_volume_label(value: float) -> void:
-	_volume_label.text = "Volume  %d%%" % int(round(value * 100.0))
+	_volume_label.text = "Volume  %d / 10" % int(round(value * 10.0))
 
 
 func _on_leave() -> void:

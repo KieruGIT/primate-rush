@@ -123,6 +123,19 @@ const ATTACK_FLAVORS: Array[StringName] = [&"slap", &"punch", &"kick"]
 ## Whiffing still costs something, or the grapple is a free scan every frame.
 @export var skill_whiff_cooldown: float = 0.6
 
+@export_group("Sprint and dash")
+## Held sprint multiplies run speed, on the ground and in the air, so a
+## sprinting jump carries further. Every monkey has it; the stats still
+## decide how fast "fast" is.
+@export var sprint_multiplier: float = 1.45
+## Dash: a short burst in the aimed direction, any of eight. One in the air
+## per jump, reset by landing, climbing or grabbing a vine.
+@export var dash_speed: float = 1050.0
+@export var dash_time: float = 0.15
+@export var dash_cooldown: float = 0.55
+## Share of dash speed kept when it ends, so a dash flows into the run.
+@export var dash_carry: float = 0.55
+
 @export_group("Hoard")
 ## Banana Magnet reach.
 @export var magnet_radius: float = 260.0
@@ -169,6 +182,33 @@ var _snatch_hit: Array[int] = []
 var _dash_kind: StringName = &""
 var _dash_target: Vector2 = Vector2.ZERO
 var _air_launch_ready: bool = true
+var _air_dash_ready: bool = true
+var _dash_cooldown_timer: float = 0.0
+var _dash_dir: Vector2 = Vector2.RIGHT
+var _trail_timer: float = 0.0
+## A spring launch waiting for the next gravity step. Set by bounce(), used
+## by _apply_gravity, because a monkey standing on a pad is on the floor and
+## the floor would otherwise zero the launch before it ever moved anyone.
+var _pending_bounce: float = 0.0
+## True from a pressed jump until it peaks or is cut. See _apply_jump_cut.
+var _jump_rising: bool = false
+
+## 2v2 Slap. Team is -1 outside that mode. Damage is a percentage that only
+## goes up while you stay on the island, and every point of it makes the
+## next slap throw you further - the reason a long survivor finally flies.
+var team: int = -1
+var slap_damage: float = 0.0
+## Share of extra knockback per percent of damage.
+const SLAP_SCALING: float = 0.022
+## Knockback at 0%, as a share of the normal amount. Low, so the first
+## slaps shove rather than launch and a fight has a middle, not just an end.
+const SLAP_BASE: float = 0.4
+## Invulnerable after coming back, so nobody is slapped off the moment
+## they land. Shown as a blink.
+const SPAWN_SHIELD: float = 1.5
+var _spawn_shield: float = 0.0
+## Damage a slap adds, before the attacker's Power.
+const SLAP_DAMAGE_PER_HIT: float = 11.0
 
 var bananas: int = 0
 var ability: StringName = &""
@@ -191,7 +231,12 @@ var _fall_speed: float = 0.0
 var _net_target: Vector2 = Vector2.ZERO
 var _has_net_target: bool = false
 
+## Gray-box body, kept hidden: it still sizes itself to the collision box,
+## which makes it the quickest way to check the art against the hitbox.
 @onready var body: ColorRect = $Body
+var sprite: MonkeySprite = null
+var _last_position: Vector2 = Vector2.ZERO
+var _moved_speed: float = 0.0
 @onready var shape: CollisionShape2D = $Collision
 @onready var climb_sensor: Area2D = $ClimbSensor
 @onready var vine_sensor: Area2D = $VineSensor
@@ -231,6 +276,17 @@ func _apply_appearance() -> void:
 	body.size = size
 	body.position = -size * 0.5
 	body.color = get_meta(&"tint", stats.body_color)
+	body.visible = false
+
+	if sprite == null:
+		sprite = MonkeySprite.new()
+		sprite.name = "Sprite"
+		add_child(sprite)
+		move_child(sprite, 0)
+	sprite.setup(stats.id)
+	# Feet on the bottom of the collision box, whatever size the monkey is.
+	sprite.position = Vector2(0.0, size.y * 0.5)
+	var head_top := size.y * 0.5 - MonkeySprite.head_height(stats.id)
 
 	var rect := shape.shape as RectangleShape2D
 	if rect != null:
@@ -242,15 +298,51 @@ func _apply_appearance() -> void:
 
 	if name_label != null:
 		name_label.text = display_label()
-		name_label.position.y = -size.y * 0.5 - 28.0
+		name_label.position.y = head_top - 30.0
+		# The slot colour lives on the name now that the body wears the
+		# monkey's own fur. Four orange rectangles told players apart; four
+		# brown monkeys need their names to.
+		name_label.add_theme_color_override(&"font_color", get_meta(&"tint", Color.WHITE))
+		name_label.add_theme_color_override(&"font_outline_color", Color(0.08, 0.06, 0.05))
+		name_label.add_theme_constant_override(&"outline_size", 6)
+		_refresh_name_label()
 
 	# The anchor moves with the body rather than the hat carrying a per-monkey
 	# offset, so one hat sits correctly on a capuchin and on a gorilla.
 	if head_anchor != null:
-		head_anchor.position = Vector2(0.0, -size.y * 0.5)
+		head_anchor.position = Vector2(0.0, head_top + 4.0)
 	if headwear != null:
 		var hat: Dictionary = GameConfig.get_hat(hat_id)
-		headwear.apply(hat["style"], hat["color"], size.x)
+		headwear.apply(hat["style"], hat["color"], 24.0)
+
+
+var _damage_label: Label = null
+
+
+func _refresh_name_label() -> void:
+	if name_label == null:
+		return
+	name_label.text = display_label()
+	if team < 0:
+		return
+	# Team colour on the name in 2v2, so allies read at a glance.
+	name_label.add_theme_color_override(&"font_color", GameConfig.TEAM_COLORS[team])
+	# Damage as its own big number over the head, white going to red as it
+	# climbs: the one number that says how close this monkey is to flying.
+	if _damage_label == null:
+		_damage_label = Label.new()
+		_damage_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		_damage_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_damage_label.add_theme_font_size_override(&"font_size", 22)
+		_damage_label.add_theme_color_override(&"font_outline_color", Color(0.08, 0.06, 0.05))
+		_damage_label.add_theme_constant_override(&"outline_size", 8)
+		add_child(_damage_label)
+	_damage_label.size = Vector2(120, 30)
+	_damage_label.position = name_label.position + Vector2(-60.0 + name_label.size.x * 0.5, -26.0)
+	_damage_label.text = str(int(slap_damage))
+	var heat := clampf(slap_damage / 120.0, 0.0, 1.0)
+	var colour := Color.WHITE.lerp(Color(1.0, 0.85, 0.2), minf(heat * 2.0, 1.0)).lerp(Color(1.0, 0.25, 0.2), maxf(heat * 2.0 - 1.0, 0.0))
+	_damage_label.add_theme_color_override(&"font_color", colour)
 
 
 ## Bots read as a name, people read as a monkey. Four rows of "Gibbon" on a
@@ -311,6 +403,7 @@ func _is_authority() -> bool:
 func feed_input(frame: InputFrame) -> void:
 	_input.move = frame.move
 	_input.jump_held = frame.jump_held
+	_input.sprint_held = frame.sprint_held
 	_input.merge_buttons(frame)
 
 
@@ -331,8 +424,14 @@ func _tick_timers(delta: float) -> void:
 		if ability_timer <= 0.0:
 			set_ability(&"", 0.0)
 	_tick_windup(delta)
+	_dash_cooldown_timer = maxf(_dash_cooldown_timer - delta, 0.0)
+	_spawn_shield = maxf(_spawn_shield - delta, 0.0)
+	if is_on_floor() or state == State.CLIMB or state == State.SWING:
+		_air_dash_ready = true
 	if is_on_floor():
 		_air_launch_ready = true
+	if _input.consume(InputFrame.Action.DASH):
+		_try_dash()
 	if _input.consume(InputFrame.Action.JUMP):
 		_buffer_timer = jump_buffer_time
 	if _input.consume(InputFrame.Action.ATTACK):
@@ -365,6 +464,10 @@ func _process_grounded_or_air(delta: float) -> void:
 
 
 func _apply_gravity(delta: float) -> void:
+	if _pending_bounce > 0.0:
+		velocity.y = -_pending_bounce
+		_pending_bounce = 0.0
+		return
 	if is_on_floor():
 		# A small downward bias instead of zero keeps floor contact across
 		# slopes and moving edges, which is what is_on_floor() actually tests.
@@ -383,7 +486,10 @@ func _apply_horizontal(delta: float) -> void:
 	var friction := ground_friction if grounded else air_friction
 
 	if absf(axis) > 0.1:
-		velocity.x = move_toward(velocity.x, axis * stats.run_speed() * _speed_multiplier(), accel * delta)
+		var top := stats.run_speed() * _speed_multiplier()
+		if _input.sprint_held:
+			top *= sprint_multiplier
+		velocity.x = move_toward(velocity.x, axis * top, accel * delta)
 	else:
 		velocity.x = move_toward(velocity.x, 0.0, friction * delta)
 
@@ -424,14 +530,24 @@ func _try_jump() -> void:
 	var can_jump := is_on_floor() or _coyote_timer > 0.0
 	if can_jump and _buffer_timer > 0.0:
 		velocity.y = stats.jump_velocity()
+		_jump_rising = true
 		_buffer_timer = 0.0
 		_coyote_timer = 0.0
 		Sfx.play(&"jump", _voice_pitch())
 
 
+## Only a jump the player pressed can be cut short. A spring, a dash or a
+## skill launch that rises is not a jump, and cutting it would throw away
+## the height the level was built around.
 func _apply_jump_cut() -> void:
-	if velocity.y < 0.0 and not _input.jump_held:
+	if not _jump_rising:
+		return
+	if velocity.y >= 0.0:
+		_jump_rising = false
+		return
+	if not _input.jump_held:
 		velocity.y *= jump_cut_multiplier
+		_jump_rising = false
 
 
 # --- Climb ---------------------------------------------------------
@@ -439,9 +555,11 @@ func _apply_jump_cut() -> void:
 func _try_enter_climb() -> bool:
 	if _climb_lock > 0.0 or not _touching_climbable():
 		return false
-	# Pressing into the wall or up it. Brushing past a climbable surface
-	# mid-jump should not yank you onto it.
-	if absf(_input.move.y) < 0.35 and absf(_input.move.x) < 0.5:
+	# Pressing into the wall or up it - or holding jump against it, since
+	# jump climbs too. Brushing past a wall mid-jump with nothing held
+	# should not yank you onto it.
+	var holding_jump := _input.jump_held and not is_on_floor()
+	if absf(_input.move.y) < 0.35 and absf(_input.move.x) < 0.5 and not holding_jump:
 		return false
 	_set_state(State.CLIMB)
 	velocity = Vector2.ZERO
@@ -454,23 +572,41 @@ func _process_climb(delta: float) -> void:
 		_set_state(State.AIR)
 		return
 
+	# Jump on a wall is a climb. It becomes a wall jump only when you are
+	# also pushing away from the wall - the one case where leaving is meant.
 	if _buffer_timer > 0.0:
 		_buffer_timer = 0.0
-		_climb_lock = climb_regrab_delay
-		velocity = Vector2(-facing * climb_jump_push, stats.jump_velocity() * 0.92)
-		Sfx.play(&"jump", _voice_pitch())
-		_set_state(State.AIR)
-		return
+		var wall_side := _wall_side()
+		if wall_side != 0.0 and _input.move.x * wall_side < -0.3:
+			_climb_lock = climb_regrab_delay
+			velocity = Vector2(-wall_side * climb_jump_push, stats.jump_velocity() * 0.92)
+			facing = -int(wall_side)
+			_jump_rising = true
+			Sfx.play(&"jump", _voice_pitch())
+			_set_state(State.AIR)
+			return
 
 	var speed := stats.climb_speed()
+	var vertical := _input.move.y
+	if _input.jump_held and vertical > -0.35 and vertical < 0.35:
+		vertical = -1.0
 	velocity = Vector2(
 		_input.move.x * speed * climb_lateral_ratio,
-		_input.move.y * speed
+		vertical * speed
 	)
 	move_and_slide()
 
 	if is_on_floor() and _input.move.y > 0.1:
 		_set_state(State.GROUND)
+
+
+## Which side the wall being climbed is on: -1 left, 1 right, 0 unknown.
+func _wall_side() -> float:
+	for area in climb_sensor.get_overlapping_areas():
+		var offset := (area as Node2D).global_position.x - global_position.x
+		if absf(offset) > 1.0:
+			return signf(offset)
+	return float(facing)
 
 
 func _touching_climbable() -> bool:
@@ -648,6 +784,9 @@ func _resolve_hit(area: Area2D) -> void:
 	var target := area.get_meta(&"player") as Player
 	if target == null or target == self or _already_hit.has(target.player_id):
 		return
+	# No friendly fire: slapping your partner off the island is funny once.
+	if team >= 0 and target.team == team:
+		return
 	if is_ghost() or target.is_ghost():
 		return
 	_already_hit.append(target.player_id)
@@ -664,6 +803,8 @@ func _resolve_hit(area: Area2D) -> void:
 	# how far it flies.
 	var super_hit := ability == &"super_hit"
 	var force := dir * stats.knockback_dealt() * (super_hit_multiplier if super_hit else 1.0)
+	if target.team >= 0:
+		force *= SLAP_BASE * (1.0 + target.slap_damage * SLAP_SCALING)
 	if super_hit:
 		# One shot, spent on contact rather than on the swing, so a whiffed
 		# Super Hit is not the whole pickup wasted.
@@ -678,6 +819,8 @@ func _resolve_hit(area: Area2D) -> void:
 ## client: knockback that disagrees between machines is the single most
 ## broken-feeling desync in this game.
 func take_hit(attacker_id: int, force: Vector2, base_stun: float, double_drop: bool = false) -> void:
+	if _spawn_shield > 0.0:
+		return
 	if invuln_timer > 0.0:
 		_counter_attacker(attacker_id)
 		return
@@ -687,6 +830,11 @@ func take_hit(attacker_id: int, force: Vector2, base_stun: float, double_drop: b
 		_knock_bananas_loose(double_drop)
 	var applied := force.normalized() * stats.knockback_taken(force.length())
 	velocity = applied
+	if team >= 0:
+		# Every machine applies the same hits in the same order, so every
+		# machine arrives at the same percentage without shipping it.
+		slap_damage += SLAP_DAMAGE_PER_HIT
+		_refresh_name_label()
 	stun_timer = base_stun / maxf(stats.weight, 0.2)
 	is_attacking = false
 	_set_hitbox_open(false)
@@ -701,7 +849,8 @@ func take_hit(attacker_id: int, force: Vector2, base_stun: float, double_drop: b
 	_set_state(State.STUN)
 	# Pitched by the weight of whoever got hit, so a gorilla taking one reads
 	# differently from a capuchin without any extra audio.
-	Sfx.play(&"hit", _voice_pitch())
+	# A slap that will send you far gets the heavy sound.
+	Sfx.play(&"slap" if applied.length() > 900.0 else &"hit", _voice_pitch())
 	if local_control:
 		kick_camera(shake_on_hit, 0.28)
 	_squash = 0.5
@@ -896,6 +1045,12 @@ func _process_dash(delta: float) -> void:
 			_end_dash()
 			return
 		velocity = to_target.normalized() * grapple_pull_speed
+	elif _dash_kind == &"dash":
+		velocity = _dash_dir * dash_speed
+		if _dash_time <= 0.0:
+			velocity = _dash_dir * dash_speed * dash_carry
+			_end_dash()
+			return
 	elif _dash_kind == &"snatch":
 		velocity = Vector2(float(facing) * snatch_speed, 0.0)
 		_resolve_snatch()
@@ -912,6 +1067,58 @@ func _process_dash(delta: float) -> void:
 	move_and_slide()
 	if _dash_kind == &"grapple" and get_slide_collision_count() > 0:
 		_end_dash()
+
+
+## Everyone's dash. Separate from the species skill on purpose: movement is
+## the game, and a move only some monkeys have is a move nobody learns.
+func _try_dash() -> void:
+	if _dash_cooldown_timer > 0.0 or state == State.STUN or state == State.DASH:
+		return
+	var grounded := is_on_floor()
+	if not grounded and not _air_dash_ready:
+		return
+	var aim := _input.move
+	if aim.length() < 0.3:
+		aim = Vector2(float(facing), 0.0)
+	# Eight directions, snapped, so a dash goes where the thumb meant and not
+	# two degrees off it.
+	var angle := snappedf(aim.angle(), PI / 4.0)
+	_dash_dir = Vector2.from_angle(angle)
+	if grounded and _dash_dir.y > 0.1:
+		_dash_dir = Vector2(signf(_dash_dir.x) if absf(_dash_dir.x) > 0.1 else float(facing), 0.0)
+	if not grounded:
+		_air_dash_ready = false
+	if state == State.SWING:
+		_swing_node = null
+		_swing_lock = swing_regrab_delay
+	_dash_kind = &"dash"
+	_dash_time = dash_time
+	_dash_cooldown_timer = dash_cooldown
+	if absf(_dash_dir.x) > 0.1:
+		facing = 1 if _dash_dir.x > 0.0 else -1
+	Sfx.play(&"dash", _voice_pitch())
+	_set_state(State.DASH)
+
+
+## Bounce pads. Replaces vertical speed rather than adding to it, so a pad
+## launches the same height whether you walked on or fell on - which is what
+## lets a level designer put a ledge exactly at the top of the arc.
+func bounce(strength: float) -> void:
+	if not _simulates():
+		return
+	if state == State.SWING:
+		_swing_node = null
+		_swing_lock = swing_regrab_delay
+	if state == State.DASH:
+		_dash_kind = &""
+	velocity.y = -strength
+	_pending_bounce = strength
+	_jump_rising = false
+	_coyote_timer = 0.0
+	_air_dash_ready = true
+	_squash = 0.35
+	_set_state(State.AIR)
+	Sfx.play(&"bounce", _voice_pitch())
 
 
 func _end_dash() -> void:
@@ -945,6 +1152,9 @@ func _counter_attacker(attacker_id: int) -> void:
 func respawn_at(point: Vector2) -> void:
 	global_position = point
 	velocity = Vector2.ZERO
+	slap_damage = 0.0
+	_spawn_shield = SPAWN_SHIELD if team >= 0 else 0.0
+	_refresh_name_label()
 	stun_timer = 0.0
 	invuln_timer = 0.0
 	_dash_kind = &""
@@ -1012,7 +1222,11 @@ func _set_state(next: int) -> void:
 ## Screen shake and squash run on _process, not _physics_process: they are
 ## presentation, and tying them to the physics tick makes them stutter on a
 ## machine whose render rate and tick rate disagree.
+var _step_clock: float = 0.0
+
+
 func _process(delta: float) -> void:
+	_tick_steps(delta)
 	_tick_landing()
 	_tick_shake(delta)
 	_tick_squash(delta)
@@ -1059,6 +1273,18 @@ func kick_camera(power: float, duration: float) -> void:
 	_shake_time = maxf(_shake_time, duration)
 
 
+## Footsteps on grass while running, paced by speed. Quiet: they are there
+## to make running feel like running, not to be listened to.
+func _tick_steps(delta: float) -> void:
+	if state != State.GROUND or absf(velocity.x) < 120.0:
+		_step_clock = 0.0
+		return
+	_step_clock -= delta * absf(velocity.x) / 420.0
+	if _step_clock <= 0.0:
+		_step_clock = 0.3
+		Sfx.play(&"step", _voice_pitch())
+
+
 func _tick_landing() -> void:
 	var grounded := is_on_floor()
 	if grounded and not _was_on_floor and _fall_speed > heavy_land_speed:
@@ -1090,27 +1316,56 @@ func _tick_squash(delta: float) -> void:
 	_squash = maxf(_squash - delta * squash_recovery, 0.0)
 	# Wider and shorter on impact. Cheap, readable, and the only animation
 	# in the game until there is art.
-	body.scale = Vector2(1.0 + _squash * 0.35, 1.0 - _squash * 0.35)
+	var squash := Vector2(1.0 + _squash * 0.35, 1.0 - _squash * 0.35)
+	body.scale = squash
+	if sprite != null:
+		sprite.scale = squash * MonkeySprite.PIXEL
 
 
 func _update_visual() -> void:
-	if body == null:
+	if sprite == null:
 		return
-	# Readability cue while there is no art. State is legible at a glance,
-	# which matters more than it sounds when four monkeys share one screen.
-	var base: Color = get_meta(&"tint", stats.body_color)
+	# Measured from position, not velocity: a remote monkey on a client is
+	# replayed from snapshots and its velocity is whatever the last one said.
+	var step := global_position - _last_position
+	_last_position = global_position
+	var tick := get_physics_process_delta_time()
+	_moved_speed = lerpf(_moved_speed, step.length() / maxf(tick, 0.001), 0.35)
+
+	sprite.flip_h = facing < 0
+	sprite.rotation = 0.0
+	sprite.paused = false
+	sprite.speed_scale = 1.0
+	var tint := Color.WHITE
 	match state:
 		State.STUN:
-			body.color = base.lerp(Color(1.0, 0.25, 0.25), 0.65)
+			sprite.play(&"stun")
+			# Flicker, so a stunned monkey reads as hit rather than as posing.
+			tint = Color(1.0, 0.55, 0.55) if int(Time.get_ticks_msec() / 80) % 2 == 0 else Color.WHITE
 		State.CLIMB:
-			body.color = base.lerp(Color(0.4, 1.0, 0.5), 0.35)
+			sprite.play(&"climb")
+			sprite.paused = _moved_speed < 20.0
 		State.SWING:
-			body.color = base.lerp(Color(0.5, 0.75, 1.0), 0.35)
+			sprite.play(&"swing")
+			if _swing_node != null and is_instance_valid(_swing_node):
+				# Hang from the vine: the sprite's up points at the pivot.
+				var to_anchor := _swing_anchor - global_position
+				sprite.rotation = to_anchor.angle() + PI * 0.5
 		State.DASH:
-			body.color = base.lerp(Color(1.0, 0.95, 0.6), 0.55)
+			sprite.play(&"dash")
+			tint = Color(1.0, 0.97, 0.8)
 		State.AIR:
-			body.color = base.lightened(0.18)
+			sprite.play(&"jump" if step.y < 0.0 else &"fall")
 		_:
-			body.color = base
-	if is_attacking and _hitbox_open:
-		body.color = body.color.lightened(0.45)
+			if absf(step.x) / maxf(tick, 0.001) > 40.0:
+				sprite.play(&"run")
+				sprite.speed_scale = clampf(_moved_speed / 320.0, 0.6, 1.8)
+			else:
+				sprite.play(&"idle")
+	if is_attacking and state != State.STUN:
+		sprite.play(&"punch")
+		if _hitbox_open:
+			tint = Color(1.25, 1.2, 1.05)
+	if _spawn_shield > 0.0 and int(Time.get_ticks_msec() / 90) % 2 == 0:
+		tint.a = 0.35
+	sprite.self_modulate = tint

@@ -86,7 +86,10 @@ static func _build_labels(theme: Theme) -> void:
 	_label_variation(theme, &"HudLabel", _font(FONT_UI), 17, INK)
 	_label_variation(theme, &"HudValue", _font(FONT_UI), 22, INK)
 	_label_variation(theme, &"HudBig", _font(FONT_DISPLAY), 64, BANANA)
-	for type in [&"HudLabel", &"HudValue", &"HudBig"]:
+	# Menu text laid straight over the jungle backdrop, not on a card.
+	_label_variation(theme, &"Display", _font(FONT_DISPLAY), 30, INK)
+	_label_variation(theme, &"DisplayBig", _font(FONT_DISPLAY), 64, BANANA)
+	for type in [&"HudLabel", &"HudValue", &"HudBig", &"Display", &"DisplayBig"]:
 		theme.set_color(&"font_outline_color", type, Color(0.0, 0.0, 0.0, 0.85))
 		theme.set_constant(&"outline_size", type, 8)
 
@@ -107,6 +110,23 @@ static func _build_buttons(theme: Theme) -> void:
 	_button_variation(theme, &"PrimaryButton", "Yellow", INK_DARK, 22)
 	_button_variation(theme, &"DangerButton", "Red", INK, 18)
 	_button_variation(theme, &"QuietButton", "Grey", INK_DARK, 16)
+	# The one button a menu is built around. Big enough to find with a thumb
+	# without looking, which on a phone is the only way anyone presses it.
+	_button_variation(theme, &"PlayButton", "Yellow", Color.WHITE, 46)
+	theme.set_font(&"font", &"PlayButton", _font(FONT_DISPLAY))
+	_button_variation(theme, &"NavButton", "Blue", Color.WHITE, 22)
+	_button_variation(theme, &"GoButton", "Green", Color.WHITE, 24)
+	# Game buttons read like game buttons: white type with a thick dark
+	# outline, legible on any colour of button and any background.
+	for type in [&"PlayButton", &"NavButton", &"GoButton", &"DangerButton", &"PrimaryButton"]:
+		theme.set_color(&"font_outline_color", type, Color(0.13, 0.11, 0.10))
+		theme.set_constant(&"outline_size", type, 10 if type == &"PlayButton" else 7)
+	theme.set_color(&"font_color", &"PrimaryButton", Color.WHITE)
+	theme.set_color(&"font_hover_color", &"PrimaryButton", Color.WHITE)
+	theme.set_color(&"font_pressed_color", &"PrimaryButton", Color.WHITE)
+	theme.set_color(&"font_hover_pressed_color", &"PrimaryButton", Color.WHITE)
+	theme.set_color(&"font_focus_color", &"PrimaryButton", Color.WHITE)
+	_build_tiles(theme)
 
 	# A choice sits unselected in neutral grey and selected in leaf green.
 	# A toggle button draws its pressed box whenever it is on, so "selected"
@@ -115,6 +135,26 @@ static func _build_buttons(theme: Theme) -> void:
 	theme.set_type_variation(&"ChoiceButton", &"Button")
 	_button_set(theme, &"ChoiceButton", "Grey", INK_DARK, INK, "Green")
 	theme.set_font_size(&"font_size", &"ChoiceButton", 16)
+
+
+## Big picture cards for choosing a mode, a map, a difficulty. Dark glass at
+## rest so white text reads on them; a thick banana border when chosen.
+static func _build_tiles(theme: Theme) -> void:
+	theme.add_type(&"TileButton")
+	theme.set_type_variation(&"TileButton", &"Button")
+	var rest := _flat(Color(0.04, 0.08, 0.07, 0.78), Color(1, 1, 1, 0.16), 18)
+	var hover := _flat(Color(0.07, 0.12, 0.10, 0.85), Color(1, 1, 1, 0.3), 18)
+	var chosen := _flat(PANEL_HI, BANANA, 18)
+	chosen.set_border_width_all(5)
+	var off := _flat(Color(0.04, 0.06, 0.05, 0.45), Color(1, 1, 1, 0.08), 18)
+	theme.set_stylebox(&"normal", &"TileButton", rest)
+	theme.set_stylebox(&"hover", &"TileButton", hover)
+	theme.set_stylebox(&"pressed", &"TileButton", chosen)
+	theme.set_stylebox(&"hover_pressed", &"TileButton", chosen)
+	theme.set_stylebox(&"disabled", &"TileButton", off)
+	theme.set_stylebox(&"focus", &"TileButton", _focus_box())
+	for key in [&"font_color", &"font_hover_color", &"font_pressed_color", &"font_hover_pressed_color", &"font_focus_color"]:
+		theme.set_color(key, &"TileButton", INK)
 
 
 static func _button_variation(theme: Theme, type: StringName, color: String, ink: Color, size: int) -> void:
@@ -201,6 +241,12 @@ static func _build_panels(theme: Theme) -> void:
 	var lit := _flat(PANEL_HI, BANANA, 18)
 	lit.set_border_width_all(3)
 	theme.set_stylebox(&"panel", &"CardHighlight", lit)
+
+	# Glass: a card that lets the backdrop show through, for menus laid over
+	# the jungle rather than over a flat colour.
+	theme.add_type(&"Glass")
+	theme.set_type_variation(&"Glass", &"PanelContainer")
+	theme.set_stylebox(&"panel", &"Glass", _flat(Color(0.03, 0.06, 0.05, 0.62), Color(1, 1, 1, 0.12), 16))
 
 	# Overlays sit on top of the running game, so they need a background dark
 	# enough to read against a bright level and no border to fight with it.

@@ -31,8 +31,8 @@ func _ready() -> void:
 	# does by design.
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	await _instance_every_scene()
-	for map_id in GameConfig.map_ids():
-		for mode in [GameConfig.Mode.FREE_PLAY, GameConfig.Mode.RACE, GameConfig.Mode.HOARD]:
+	for mode in [GameConfig.Mode.FREE_PLAY, GameConfig.Mode.RACE, GameConfig.Mode.HOARD, GameConfig.Mode.SLAP]:
+		for map_id in GameConfig.maps_for_mode(mode):
 			_cases.append({"map": map_id, "mode": mode})
 	print("smoke: %d cases, %d ticks each" % [_cases.size(), TICKS_PER_CASE])
 	_next_case()
