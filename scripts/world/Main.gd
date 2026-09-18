@@ -145,12 +145,19 @@ func _spawn_all_players() -> void:
 	for peer_id in Net.roster.keys():
 		var entry: Dictionary = Net.roster[peer_id]
 		var is_bot := bool(entry.get("bot", false))
-		_spawn_player(int(peer_id), entry["monkey"], int(entry["slot"]), entry.get("hat", &"none"), is_bot)
+		_spawn_player(
+			int(peer_id), entry["monkey"], int(entry["slot"]),
+			entry.get("hat", &"none"), is_bot, String(entry.get("name", ""))
+		)
 		if is_bot and _is_authority():
-			bots[int(peer_id)] = BotBrain.new()
+			# Difficulty is host-side only, because the brain itself is: a
+			# client never runs one and has nothing to disagree with.
+			var brain := BotBrain.new()
+			brain.skill_level = GameConfig.bot_skill_level(Net.bot_skill)
+			bots[int(peer_id)] = brain
 
 
-func _spawn_player(id: int, monkey_id: StringName, slot: int, hat_id: StringName = &"none", is_bot: bool = false) -> Player:
+func _spawn_player(id: int, monkey_id: StringName, slot: int, hat_id: StringName = &"none", is_bot: bool = false, bot_name: String = "") -> Player:
 	if players.has(id):
 		return players[id]
 	var player := PLAYER_SCENE.instantiate() as Player
@@ -158,6 +165,7 @@ func _spawn_player(id: int, monkey_id: StringName, slot: int, hat_id: StringName
 	# Set before the tree readies it, so the name label is right the first
 	# time rather than being corrected a frame later.
 	player.is_bot = is_bot
+	player.bot_name = bot_name
 	player.setup(GameConfig.get_monkey(monkey_id), id, id == _local_id, GameConfig.tint_for_index(slot), hat_id)
 	player.position = _spawn_position(slot)
 	_player_root.add_child(player)

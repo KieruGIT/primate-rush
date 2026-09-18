@@ -44,6 +44,9 @@ const ATTACK_FLAVORS: Array[StringName] = [&"slap", &"punch", &"kick"]
 ## Driven by a BotBrain instead of a device. Changes nothing about how the
 ## monkey moves, only who is sending the input.
 @export var is_bot: bool = false
+## What a bot is called on the name tag and the scoreboard. Empty for people,
+## who are named after the monkey they picked.
+@export var bot_name: String = ""
 
 @export_group("Ground and air")
 @export var ground_accel: float = 2800.0
@@ -250,8 +253,12 @@ func _apply_appearance() -> void:
 		headwear.apply(hat["style"], hat["color"], size.x)
 
 
+## Bots read as a name, people read as a monkey. Four rows of "Gibbon" on a
+## scoreboard tells you nothing; "Mango" tells you who just took your lead.
 func display_label() -> String:
-	return "%s (bot)" % stats.display_name if is_bot else stats.display_name
+	if not is_bot:
+		return stats.display_name
+	return bot_name if not bot_name.is_empty() else "%s (bot)" % stats.display_name
 
 
 func _set_camera_active(active: bool) -> void:
@@ -1019,9 +1026,7 @@ func _process(delta: float) -> void:
 ## at, and an attack with no telegraph is an attack nobody can respect.
 func _draw() -> void:
 	if state == State.SWING and _swing_node != null and is_instance_valid(_swing_node):
-		var anchor := to_local(_swing_anchor)
-		draw_line(Vector2.ZERO, anchor, Color(0.45, 0.65, 0.35), 4.0)
-		draw_circle(anchor, 6.0, Color(0.55, 0.75, 0.45))
+		Vine.draw_vine(self, to_local(_swing_anchor), Vector2(0.0, -12.0), Color(0.35, 0.55, 0.28))
 
 	if _dash_kind == &"grapple":
 		var target := to_local(_dash_target)

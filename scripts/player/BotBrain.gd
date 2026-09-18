@@ -24,8 +24,17 @@ const AGGRO_RANGE: float = 320.0
 const ATTACK_RANGE: float = 78.0
 
 ## Lower is sloppier. Scales reaction delays rather than movement speed, so
-## an easy bot is slow to react, not visibly crippled.
+## an easy bot is slow to react, not visibly crippled. A bot that ran slower
+## would just look broken; one that notices you late looks beatable.
 var skill_level: float = 1.0
+
+## Where the bot currently believes it is going, refreshed on its own clock
+## rather than every tick. This is the whole difficulty knob: a relaxed bot
+## steers toward where the banana was a third of a second ago, and overshoots
+## it exactly the way a distracted person does.
+var _target: Vector2 = Vector2.ZERO
+var _has_target: bool = false
+var _think_timer: float = 0.0
 
 var _jump_hold: float = 0.0
 var _attack_cooldown: float = 0.0
@@ -39,8 +48,7 @@ func think(player: Player, arena: Node, delta: float) -> InputFrame:
 	_tick_cooldowns(delta)
 	_update_stuck(player, delta)
 
-	var target := _pick_target(player, arena)
-	var to_target := target - player.global_position
+	var to_target := _aim(player, arena, delta) - player.global_position
 
 	var frame := InputFrame.new()
 	frame.move = _steer(player, to_target)
@@ -66,6 +74,18 @@ func think(player: Player, arena: Node, delta: float) -> InputFrame:
 		_skill_cooldown = 2.5 / maxf(skill_level, 0.3)
 
 	return frame
+
+
+## Refreshed on a timer scaled by skill, and held in between. Re-picking
+## every tick is what makes a bot feel like a homing missile instead of an
+## opponent.
+func _aim(player: Player, arena: Node, delta: float) -> Vector2:
+	_think_timer -= delta
+	if _think_timer <= 0.0 or not _has_target:
+		_target = _pick_target(player, arena)
+		_has_target = true
+		_think_timer = clampf(0.18 / maxf(skill_level, 0.25), 0.04, 0.9)
+	return _target
 
 
 func _tick_cooldowns(delta: float) -> void:

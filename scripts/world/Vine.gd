@@ -53,6 +53,32 @@ func _rebuild() -> void:
 
 
 func _draw() -> void:
-	draw_line(Vector2.ZERO, Vector2(0.0, length), rope_color, 5.0)
-	draw_circle(Vector2.ZERO, 8.0, rope_color.darkened(0.25))
-	draw_circle(Vector2(0.0, length), 10.0, rope_color.lightened(0.15))
+	draw_vine(self, Vector2.ZERO, Vector2(0.0, length), rope_color)
+
+
+## Shared with the swing rope a monkey draws, so the vine it holds looks like
+## the vine it grabbed. Stem, a leaf pair every so often, a knot at the top.
+static func draw_vine(canvas: CanvasItem, from: Vector2, to: Vector2, color: Color) -> void:
+	var outline := Color8(28, 44, 30)
+	var leaf := color.lightened(0.35)
+	var leaf_dark := color.darkened(0.15)
+	var span := to - from
+	var length := span.length()
+	if length < 1.0:
+		return
+	var dir := span / length
+	var side := Vector2(-dir.y, dir.x)
+	canvas.draw_line(from, to, outline, 6.0)
+	canvas.draw_line(from, to, color, 3.0)
+	var steps := int(length / 16.0)
+	for i in range(1, steps):
+		var at := from + dir * (i * 16.0)
+		var flip := 1.0 if i % 2 == 0 else -1.0
+		var tip := at + side * flip * 9.0 + dir * 4.0
+		canvas.draw_colored_polygon(PackedVector2Array([at, tip + side * flip * -2.0 - dir * 3.0, tip, tip + dir * 4.0]), outline)
+		canvas.draw_colored_polygon(PackedVector2Array([at + dir, tip - dir * 2.0, tip - side * flip * 1.0 + dir * 2.0]), leaf if i % 3 else leaf_dark)
+	canvas.draw_circle(from, 9.0, outline)
+	canvas.draw_circle(from, 7.0, leaf_dark)
+	canvas.draw_circle(from + Vector2(-3.0, -2.0), 3.0, leaf)
+	canvas.draw_circle(to, 6.0, outline)
+	canvas.draw_circle(to, 4.0, leaf)

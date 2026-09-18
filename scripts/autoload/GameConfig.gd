@@ -56,6 +56,36 @@ const RESPAWN_DELAY: float = 0.7
 const NET_DEFAULT_PORT: int = 27015
 const NET_MAX_PLAYERS: int = 4
 
+# --- Bots ---
+## How many AI opponents a fresh lobby asks for. Three, not zero: the first
+## thing anyone does is press the big button, and a party game that answers
+## that with an empty level has failed at the only moment it had.
+const DEFAULT_BOTS: int = NET_MAX_PLAYERS - 1
+
+## Bot difficulty. The value is the skill level handed to BotBrain, which
+## scales reaction delay and aim rather than movement speed - an easy bot is
+## slow to notice you, not visibly crippled.
+enum BotSkill { RELAXED, NORMAL, FIERCE }
+
+const BOT_SKILL_NAMES: Dictionary = {
+	BotSkill.RELAXED: "Relaxed",
+	BotSkill.NORMAL: "Normal",
+	BotSkill.FIERCE: "Fierce",
+}
+
+const BOT_SKILL_LEVELS: Dictionary = {
+	BotSkill.RELAXED: 0.55,
+	BotSkill.NORMAL: 1.0,
+	BotSkill.FIERCE: 1.6,
+}
+
+## Bots get names because "Gibbon (bot)" three times over is unreadable the
+## moment two of them pick the same monkey, and a scoreboard you cannot read
+## is a scoreboard nobody looks at.
+const BOT_NAMES: Array[String] = [
+	"Bongo", "Kiki", "Mango", "Tito", "Nacho", "Pepper", "Zuzu", "Bandit",
+]
+
 # Player colors by join order, so four monkeys on one screen stay readable
 # before there is any art.
 const PLAYER_TINTS: Array[Color] = [
@@ -132,6 +162,21 @@ func random_bot_monkey() -> StringName:
 	if pool.is_empty():
 		return &"gibbon"
 	return pool[randi() % pool.size()]
+
+
+func bot_skill_level(skill: int) -> float:
+	return float(BOT_SKILL_LEVELS.get(skill, 1.0))
+
+
+## Distinct per match rather than random per bot: two monkeys called Mango in
+## the same race is exactly the confusion the names exist to prevent.
+func bot_names(count: int) -> Array[String]:
+	var pool := BOT_NAMES.duplicate()
+	pool.shuffle()
+	var picked: Array[String] = []
+	for index in count:
+		picked.append(pool[index % pool.size()])
+	return picked
 
 
 func hat_ids() -> Array[StringName]:
