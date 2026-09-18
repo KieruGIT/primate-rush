@@ -17,11 +17,17 @@ extends Node
 
 const RATE: int = 22050
 const UI_SOUND_DIR := "res://assets/kenney_ui-pack/Sounds"
+## Kenney Interface Sounds and Impact Sounds, both CC0. Real recordings for
+## everything a synth does badly: taps, impacts, footsteps.
+const SOUND_DIR := "res://assets/kenney_sounds"
 ## Enough voices that a four-monkey pile-up does not cut itself off, few
 ## enough that nothing is ever queued.
 const VOICES: int = 10
 
-var _sounds: Dictionary = {}
+var _sounds: Dictionary = {}           # id -> AudioStream or Array of variants
+## Per-sound level in dB. A UI tap heard fifty times a session sits well
+## under a slap heard five times a round.
+var _gain: Dictionary = {}
 var _pool: Array[AudioStreamPlayer] = []
 var _next: int = 0
 
@@ -48,9 +54,18 @@ func _exit_tree() -> void:
 
 
 func play(id: StringName, pitch: float = 1.0, volume_db: float = 0.0) -> void:
-	var stream: AudioStream = _sounds.get(id)
-	if stream == null or _pool.is_empty():
+	var entry: Variant = _sounds.get(id)
+	if entry == null or _pool.is_empty():
 		return
+	var stream: AudioStream = null
+	if entry is Array:
+		# A different take each time, slightly repitched: the same slap five
+		# times in a row is what makes game audio sound cheap.
+		stream = (entry as Array)[randi() % (entry as Array).size()]
+		pitch *= randf_range(0.93, 1.07)
+	else:
+		stream = entry
+	volume_db += float(_gain.get(id, 0.0))
 	# Round robin rather than "find a free one": the oldest voice is the
 	# right one to steal, and searching every frame for a free player is
 	# work for no benefit at this scale.
@@ -79,20 +94,48 @@ func get_volume() -> float:
 # and stays readable as a table.
 
 func _build_sounds() -> void:
-	_sounds[&"jump"] = _sweep(330.0, 540.0, 0.11, 0.0, 6.0)
-	_sounds[&"land"] = _sweep(150.0, 90.0, 0.10, 0.55, 14.0)
-	_sounds[&"swing"] = _sweep(240.0, 180.0, 0.18, 0.15, 5.0)
-	_sounds[&"grab"] = _sweep(420.0, 660.0, 0.09, 0.0, 9.0)
-	_sounds[&"attack"] = _sweep(700.0, 300.0, 0.08, 0.35, 16.0)
-	_sounds[&"hit"] = _sweep(190.0, 70.0, 0.22, 0.7, 9.0)
-	_sounds[&"pickup"] = _sweep(700.0, 1040.0, 0.10, 0.0, 10.0)
+	# Synthesised: short tonal cues a sweep does well. Softer than before -
+	# less noise, lower level - because they play constantly.
+	_sounds[&"jump"] = _sweep(300.0, 460.0, 0.10, 0.0, 7.0)
+	_sounds[&"swing"] = _sweep(240.0, 180.0, 0.16, 0.08, 6.0)
+	_sounds[&"grab"] = _sweep(420.0, 620.0, 0.07, 0.0, 10.0)
+	_sounds[&"bounce"] = _sweep(220.0, 760.0, 0.20, 0.0, 6.0)
+	_sounds[&"dash"] = _sweep(700.0, 260.0, 0.11, 0.25, 12.0)
+	_sounds[&"pickup"] = _sweep(700.0, 1040.0, 0.09, 0.0, 11.0)
 	_sounds[&"lucky"] = _sweep(520.0, 1300.0, 0.20, 0.0, 5.0)
 	_sounds[&"beep"] = _sweep(620.0, 620.0, 0.10, 0.0, 7.0)
 	_sounds[&"go"] = _sweep(880.0, 1180.0, 0.28, 0.0, 3.5)
-	_sounds[&"finish"] = _sweep(660.0, 1320.0, 0.45, 0.0, 2.5)
-	_sounds[&"ui_click"] = _file("click-a.ogg", _sweep(900.0, 620.0, 0.05, 0.25, 22.0))
-	_sounds[&"ui_select"] = _file("switch-a.ogg", _sweep(520.0, 780.0, 0.07, 0.1, 16.0))
-	_sounds[&"ui_deny"] = _file("tap-b.ogg", _sweep(300.0, 170.0, 0.14, 0.3, 12.0))
+	_gain.merge({&"jump": -7.0, &"swing": -6.0, &"grab": -6.0, &"dash": -7.0, &"pickup": -4.0, &"beep": -4.0})
+
+	# Recorded: impacts, feet and the interface.
+	_sounds[&"hit"] = _files(["impactPunch_medium_000", "impactPunch_medium_001", "impactPunch_medium_002", "impactPunch_medium_003"], _sweep(190.0, 70.0, 0.2, 0.6, 9.0))
+	_sounds[&"slap"] = _files(["impactPunch_heavy_000", "impactPunch_heavy_001"], _sweep(1400.0, 400.0, 0.07, 0.9, 20.0))
+	_sounds[&"attack"] = _files(["impactGeneric_light_000", "impactGeneric_light_001"], _sweep(700.0, 300.0, 0.08, 0.35, 16.0))
+	_sounds[&"land"] = _files(["impactSoft_medium_000", "impactSoft_medium_001", "impactSoft_medium_002"], _sweep(150.0, 90.0, 0.10, 0.55, 14.0))
+	_sounds[&"step"] = _files(["footstep_grass_000", "footstep_grass_001", "footstep_grass_002", "footstep_grass_003"], null)
+	_sounds[&"finish"] = _files(["ui_confirmation_002"], _sweep(660.0, 1320.0, 0.45, 0.0, 2.5))
+	_sounds[&"ui_click"] = _files(["ui_click_002"], _file("click-a.ogg", _sweep(900.0, 620.0, 0.05, 0.25, 22.0)))
+	_sounds[&"ui_select"] = _files(["ui_select_002"], _file("switch-a.ogg", _sweep(520.0, 780.0, 0.07, 0.1, 16.0)))
+	_sounds[&"ui_deny"] = _files(["ui_error_004"], _file("tap-b.ogg", _sweep(300.0, 170.0, 0.14, 0.3, 12.0)))
+	_sounds[&"ui_back"] = _files(["ui_back_002"], null)
+	_gain.merge({&"ui_click": -14.0, &"ui_select": -9.0, &"ui_deny": -8.0, &"ui_back": -10.0,
+		&"attack": -10.0, &"land": -9.0, &"step": -20.0, &"finish": -6.0, &"hit": -1.0})
+
+
+## Loads recorded variants from SOUND_DIR. Missing files are skipped, and
+## with none found the fallback plays instead, so a stripped build still
+## has sound.
+func _files(names: Array, fallback: AudioStream) -> Variant:
+	var found: Array = []
+	for name in names:
+		var path := "%s/%s.ogg" % [SOUND_DIR, name]
+		if ResourceLoader.exists(path):
+			var stream := load(path) as AudioStream
+			if stream != null:
+				found.append(stream)
+	if found.is_empty():
+		return fallback
+	return found if found.size() > 1 else found[0]
 
 
 func _file(name: String, fallback: AudioStream) -> AudioStream:

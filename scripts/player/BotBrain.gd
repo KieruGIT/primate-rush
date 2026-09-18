@@ -41,18 +41,41 @@ var _attack_cooldown: float = 0.0
 var _skill_cooldown: float = 0.0
 var _stuck_time: float = 0.0
 var _unstick_dir: float = 0.0
-var _last_x: float = 0.0
+var _unstick_time: float = 0.0
+var _last_position: Vector2 = Vector2.ZERO
+## Index into the map's route, or -1 before the bot has placed itself on it.
+var _route_index: int = -1
+## True while chasing a route point that is not the last: run flat out at
+## it instead of easing in, because easing in is how a bot arrives at a gap
+## edge at walking pace and drops short.
+var _passing_through: bool = false
+## How long the current swing has lasted. A bot that has not let go after a
+## few seconds lets go anyway: hanging forever is the one failure a swing
+## must never have.
+var _swing_time: float = 0.0
+## 2v2: one recovery dash per trip off the island.
+var _recovery_dashed: bool = false
 
 
 func think(player: Player, arena: Node, delta: float) -> InputFrame:
 	_tick_cooldowns(delta)
+	_swing_time = _swing_time + delta if player.state == Player.State.SWING else 0.0
 	_update_stuck(player, delta)
+
+	if Net.mode == GameConfig.Mode.SLAP:
+		var recovery := _recover(player)
+		if recovery != null:
+			return recovery
 
 	var to_target := _aim(player, arena, delta) - player.global_position
 
 	var frame := InputFrame.new()
 	frame.move = _steer(player, to_target)
 	frame.jump_held = _jump_hold > 0.0
+	# Racing bots sprint whenever they are going somewhere, like people do.
+	# Racing bots sprint on the long stretches, like people do, and ease off
+	# for hops onto something small or lower, where sprinting overshoots.
+	frame.sprint_held = Net.mode == GameConfig.Mode.RACE and absf(frame.move.x) > 0.5 		and absf(to_target.x) > 280.0 and to_target.y < 40.0
 
 	if _should_jump(player, to_target):
 		frame.press(InputFrame.Action.JUMP)
@@ -66,7 +89,11 @@ func think(player: Player, arena: Node, delta: float) -> InputFrame:
 	if victim != null and _attack_cooldown <= 0.0:
 		var offset := victim.global_position - player.global_position
 		if offset.length() < ATTACK_RANGE and signf(offset.x) == signf(float(player.facing)):
-			frame.press(InputFrame.Action.ATTACK)
+			# In a race the route comes first: a bot that stops to trade
+			# slaps at every ledge never finishes, and neither does anyone
+			# it is trading with. Everywhere else, slapping is the point.
+			if Net.mode != GameConfig.Mode.RACE or randf() < 0.3:
+				frame.press(InputFrame.Action.ATTACK)
 			_attack_cooldown = 0.55 / maxf(skill_level, 0.3)
 
 	if _should_use_skill(player, victim):
@@ -80,6 +107,17 @@ func think(player: Player, arena: Node, delta: float) -> InputFrame:
 ## every tick is what makes a bot feel like a homing missile instead of an
 ## opponent.
 func _aim(player: Player, arena: Node, delta: float) -> Vector2:
+	var map := arena.get(&"map") as MapData
+	if map != null and player.global_position.y > map.kill_depth:
+		# Parked below the world waiting to respawn. Deciding anything from
+		# down here re-places the bot at the start of the route.
+		return _target
+	if Net.mode == GameConfig.Mode.RACE:
+		# The route is a plan, not a reaction: re-read it every frame, or a
+		# bot launched off a spring still steers for the spring.
+		_target = _pick_target(player, arena)
+		_has_target = true
+		return _target
 	_think_timer -= delta
 	if _think_timer <= 0.0 or not _has_target:
 		_target = _pick_target(player, arena)
@@ -95,16 +133,26 @@ func _tick_cooldowns(delta: float) -> void:
 
 
 func _update_stuck(player: Player, delta: float) -> void:
-	if absf(player.global_position.x - _last_x) < 4.0 and player.state != Player.State.SWING:
-		_stuck_time += delta
-	else:
+	# Distance, not x: a bot climbing straight up a trunk is not stuck.
+	var moved := player.global_position.distance_to(_last_position) >= 1.0
+	_last_position = player.global_position
+	if _unstick_time > 0.0:
+		_unstick_time -= delta
+		if _unstick_time <= 0.0:
+			# The detour is over; go back to the plan and judge afresh.
+			_unstick_dir = 0.0
+			_stuck_time = 0.0
+		return
+	if moved or player.state == Player.State.SWING:
 		_stuck_time = 0.0
-		_unstick_dir = 0.0
-	_last_x = player.global_position.x
-	if _stuck_time > 0.9 and _unstick_dir == 0.0:
+		return
+	_stuck_time += delta
+	if _stuck_time > 0.9:
 		# Commit to one direction for a while instead of re-deciding every
-		# frame, which is how a bot ends up vibrating against a wall.
+		# frame, which is how a bot ends up vibrating against a wall - but
+		# only for a while, or the detour becomes the new wall.
 		_unstick_dir = -signf(float(player.facing))
+		_unstick_time = 0.7
 
 
 # --- Targets -------------------------------------------------------
@@ -115,17 +163,91 @@ func _pick_target(player: Player, arena: Node) -> Vector2:
 			return _hoard_target(player, arena)
 		GameConfig.Mode.RACE:
 			return _race_target(player, arena)
+		GameConfig.Mode.SLAP:
+			var enemy := _nearest_opponent(player, arena, INF)
+			return enemy.global_position if enemy != null else Vector2(0.0, player.global_position.y)
 	return _free_play_target(player, arena)
 
 
+var _pads: Array = []
+
+
 func _race_target(player: Player, arena: Node) -> Vector2:
+	if _pads.is_empty():
+		_pads = player.get_tree().get_nodes_in_group(&"bounce_pad")
 	var map := arena.get(&"map") as MapData
 	if map == null:
 		return player.global_position + Vector2(400.0, 0.0)
+	var route := map.route_points()
+	_passing_through = false
+	if not route.is_empty():
+		_follow_route(player.global_position, route, player.is_on_floor())
+		if _route_index < route.size():
+			_passing_through = _route_index < route.size() - 1
+			return route[_route_index]
 	var finish := map.finish_line()
 	if finish != null:
-		return finish.global_position
+		return finish.global_position + Vector2(0.0, 40.0)
 	return player.global_position + map.progress_axis.normalized() * 600.0
+
+
+## Walks the route forward past every point already reached. A bot that is
+## far from where it thought it was - just spawned, just respawned, knocked
+## off a ledge - re-places itself on the nearest point instead.
+func _follow_route(here: Vector2, route: PackedVector2Array, grounded: bool) -> void:
+	var lost := _route_index < 0
+	if not lost and _route_index < route.size():
+		var target := route[_route_index]
+		# Far away, or standing well below a point a jump cannot reach:
+		# knocked off, respawned, or never got there. Find a real foothold.
+		lost = here.distance_to(target) > 600.0 or (grounded and here.y - target.y > 130.0) 			or (grounded and target.y - here.y > 220.0)
+	if lost:
+		_route_index = _nearest_reachable(here, route)
+	while _route_index < route.size() and (_reached(here, route[_route_index]) or _launched_past(here, route[_route_index])):
+		_route_index += 1
+
+
+## The furthest-along route point that is close and not above jump height,
+## so a bot knocked to the floor restarts at the first ledge it can reach,
+## and one standing on a ledge never walks back to the point below it.
+func _nearest_reachable(here: Vector2, route: PackedVector2Array) -> int:
+	var best := -1
+	for i in route.size():
+		if route[i].y < here.y - 110.0:
+			continue
+		if here.distance_to(route[i]) < 700.0:
+			best = i
+	if best >= 0:
+		return best
+	# Nothing close: the nearest point that is not out of reach overhead,
+	# and only if there is none of those, the nearest point at all.
+	var best_dist := INF
+	for pass_index in 2:
+		for i in route.size():
+			if pass_index == 0 and route[i].y < here.y - 110.0:
+				continue
+			var dist := here.distance_squared_to(route[i])
+			if dist < best_dist:
+				best_dist = dist
+				best = i
+		if best >= 0:
+			return best
+	return 0
+
+
+## A route point on a spring is passed the moment the spring throws you:
+## by the time you are back near it you are coming down on it again.
+func _launched_past(here: Vector2, point: Vector2) -> bool:
+	if here.y > point.y - 60.0 or absf(here.x - point.x) > 140.0:
+		return false
+	for node in _pads:
+		if (node as Node2D).global_position.distance_to(point + Vector2(0.0, 36.0)) < 40.0:
+			return true
+	return false
+
+
+func _reached(here: Vector2, point: Vector2) -> bool:
+	return absf(here.x - point.x) < 48.0 and absf(here.y - point.y) < 72.0
 
 
 func _hoard_target(player: Player, arena: Node) -> Vector2:
@@ -156,6 +278,8 @@ func _free_play_target(player: Player, arena: Node) -> Vector2:
 func _steer(player: Player, to_target: Vector2) -> Vector2:
 	var move := Vector2.ZERO
 	move.x = clampf(to_target.x / 90.0, -1.0, 1.0)
+	if _passing_through and absf(to_target.x) > 6.0:
+		move.x = signf(to_target.x)
 	if _unstick_dir != 0.0:
 		move.x = _unstick_dir
 
@@ -164,30 +288,110 @@ func _steer(player: Player, to_target: Vector2) -> Vector2:
 	# decide whether that means a wall or a vine.
 	if to_target.y < -60.0:
 		move.y = -1.0
-	elif to_target.y > 120.0 and player.state == Player.State.SWING:
-		move.y = 1.0
+	elif player.state == Player.State.CLIMB and to_target.y < 4.0:
+		# On a wall, keep going until level with the target. Stopping at
+		# "roughly level" leaves a bot hanging just under the lip.
+		move.y = -1.0
+	if player.state == Player.State.CLIMB and to_target.y < -10.0:
+		# Straight up until above the target, then step off toward it. A
+		# sideways push mid-climb peels the bot off the wall early and drops
+		# it beside the ledge it was climbing to.
+		move.x = 0.0
 
-	# Pump the swing in the direction of travel instead of toward the target,
-	# or a bot on a vine fights its own pendulum and hangs there.
-	if player.state == Player.State.SWING and absf(player.velocity.x) > 40.0:
-		move.x = signf(player.velocity.x)
+	if player.state == Player.State.SWING:
+		move.y = 0.0
+		move.x = _pump(player, to_target)
+	if Net.mode == GameConfig.Mode.SLAP and player.is_on_floor() and absf(move.x) > 0.1:
+		# On an island the edge is the enemy's best friend. Stop at it.
+		var edge := player.global_position + Vector2(signf(move.x) * GAP_PROBE, 0.0)
+		if not _ray(player, edge, edge + Vector2(0.0, GAP_DEPTH)):
+			move.x = 0.0
 	return move.limit_length(1.0)
+
+
+## Push with the swing, never against it. A constant push toward the target
+## just props the monkey at an angle - an equilibrium, not a swing - so a
+## bot at rest pushes only when hanging straight down, and otherwise lets
+## gravity start the arc and then feeds it.
+func _pump(player: Player, to_target: Vector2) -> float:
+	if absf(player.velocity.x) > 30.0:
+		return signf(player.velocity.x)
+	var anchor: Vector2 = player.get(&"_swing_anchor")
+	if absf(player.global_position.x - anchor.x) > 20.0:
+		return 0.0
+	return signf(to_target.x) if absf(to_target.x) > 1.0 else 1.0
 
 
 func _should_jump(player: Player, to_target: Vector2) -> bool:
 	if _jump_hold > 0.0:
 		return false
 	if player.state == Player.State.SWING:
-		# Release at the top of the forward arc, which is where a release
-		# actually converts the swing into distance.
+		# Target below: drop to it. Otherwise release on the forward arc,
+		# which is where a release turns into distance. And never hang on.
+		# Drop only when there is something under to land on, and never
+		# hang on for more than a few seconds whatever is below.
+		if to_target.y > 70.0 and _ray(player, player.global_position, player.global_position + Vector2(0.0, 500.0)):
+			return true
+		if _swing_time > 4.0:
+			return true
 		return player.velocity.x * signf(to_target.x) > 260.0
 	if not player.is_on_floor():
 		return false
+	# A spring only fires for a monkey landing on it or walking over it. A
+	# bot that jumps on the way sails over the one thing that would lift it.
+	if _near_pad(player):
+		return false
 	if _stuck_time > 0.6:
 		return true
-	if to_target.y < -70.0 and absf(to_target.x) < 260.0:
+	# Up to a higher ledge: jump from close in, not from way back, or the
+	# heavy monkeys run out of arc before they reach it. Never straight into
+	# a ceiling, though: that is a bonk, and a bot that bonks keeps bonking.
+	var reach := 60.0 + player.stats.run_speed() * 0.22
+	if to_target.y < -70.0 and absf(to_target.x) < reach and not _ceiling(player):
 		return true
-	return _wall_ahead(player) or _gap_ahead(player)
+	if _wall_ahead(player):
+		return true
+	# A gap is only worth jumping when the target is across it. When the
+	# target is down in it - a stepping stone, a lower ledge - walking off
+	# the edge is the move, and a full jump overshoots.
+	# Jumping a gap only makes sense when the target is not below: a lower
+	# target means drop down to it, and a full jump sails past.
+	if _gap_ahead(player):
+		if Net.mode == GameConfig.Mode.SLAP:
+			return false
+		return to_target.y < 40.0 or absf(to_target.x) > 170.0
+	return false
+
+
+## Knocked off the island: head for the middle, and spend the air dash on
+## the way back up. Returns null while there is ground below to land on.
+func _recover(player: Player) -> InputFrame:
+	if player.is_on_floor() or player.state == Player.State.CLIMB:
+		_recovery_dashed = false
+		return null
+	if _ray(player, player.global_position, player.global_position + Vector2(0.0, 900.0)):
+		return null
+	var frame := InputFrame.new()
+	var home := Vector2(-signf(player.global_position.x), -0.8).normalized()
+	frame.move = home
+	frame.sprint_held = true
+	if not _recovery_dashed and player.velocity.y > -100.0:
+		frame.press(InputFrame.Action.DASH)
+		_recovery_dashed = true
+	return frame
+
+
+func _ceiling(player: Player) -> bool:
+	var head := player.global_position + Vector2(0.0, -30.0)
+	return _ray(player, head, head + Vector2(0.0, -110.0))
+
+
+func _near_pad(player: Player) -> bool:
+	for node in player.get_tree().get_nodes_in_group(&"bounce_pad"):
+		var offset := (node as Node2D).global_position - player.global_position
+		if absf(offset.x) < 110.0 and offset.y > -20.0 and offset.y < 90.0:
+			return true
+	return false
 
 
 func _should_use_skill(player: Player, victim: Player) -> bool:
@@ -227,14 +431,18 @@ func _opponents(player: Player, arena: Node) -> Array:
 	var out: Array = []
 	for id in (table as Dictionary).keys():
 		var other := (table as Dictionary)[id] as Player
-		if other != null and other != player and not other.is_ghost():
-			out.append(other)
+		if other == null or other == player or other.is_ghost():
+			continue
+		# Teammates are not opponents. Outside 2v2 everyone has team -1.
+		if player.team >= 0 and other.team == player.team:
+			continue
+		out.append(other)
 	return out
 
 
-func _nearest_opponent(player: Player, arena: Node) -> Player:
+func _nearest_opponent(player: Player, arena: Node, reach: float = AGGRO_RANGE) -> Player:
 	var best: Player = null
-	var best_dist := AGGRO_RANGE * AGGRO_RANGE
+	var best_dist := reach * reach
 	for other in _opponents(player, arena):
 		var candidate := other as Player
 		var dist := player.global_position.distance_squared_to(candidate.global_position)

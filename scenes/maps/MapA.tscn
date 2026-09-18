@@ -1,4 +1,4 @@
-[gd_scene load_steps=15 format=3]
+[gd_scene load_steps=39 format=3]
 
 [ext_resource type="Script" path="res://scripts/world/MapData.gd" id="1_map"]
 [ext_resource type="PackedScene" path="res://scenes/Vine.tscn" id="2_vine"]
@@ -6,229 +6,798 @@
 [ext_resource type="PackedScene" path="res://scenes/Checkpoint.tscn" id="4_check"]
 [ext_resource type="PackedScene" path="res://scenes/FinishLine.tscn" id="5_finish"]
 [ext_resource type="PackedScene" path="res://scenes/BananaSpawn.tscn" id="6_banana"]
+[ext_resource type="PackedScene" path="res://scenes/BouncePad.tscn" id="7_pad"]
 
-[sub_resource type="RectangleShape2D" id="Rect_GroundStart"]
-size = Vector2(900, 80)
+[sub_resource type="RectangleShape2D" id="Rect_Bound1"]
+size = Vector2(48, 2000)
 
-[sub_resource type="RectangleShape2D" id="Rect_GroundMid"]
-size = Vector2(500, 80)
+[sub_resource type="RectangleShape2D" id="Rect_Ground2"]
+size = Vector2(1300, 100)
 
-[sub_resource type="RectangleShape2D" id="Rect_PlatformA"]
+[sub_resource type="RectangleShape2D" id="Rect_Ledge3"]
+size = Vector2(200, 32)
+
+[sub_resource type="RectangleShape2D" id="Rect_Ground4"]
+size = Vector2(420, 100)
+
+[sub_resource type="RectangleShape2D" id="Rect_Ground5"]
+size = Vector2(470, 100)
+
+[sub_resource type="RectangleShape2D" id="Rect_Ledge6"]
 size = Vector2(180, 32)
 
-[sub_resource type="RectangleShape2D" id="Rect_PlatformB"]
-size = Vector2(260, 32)
+[sub_resource type="RectangleShape2D" id="Rect_Ledge7"]
+size = Vector2(180, 32)
 
-[sub_resource type="RectangleShape2D" id="Rect_ClimbWall"]
-size = Vector2(48, 560)
+[sub_resource type="RectangleShape2D" id="Rect_Ledge8"]
+size = Vector2(180, 32)
 
-[sub_resource type="RectangleShape2D" id="Rect_LedgeTop"]
-size = Vector2(380, 32)
+[sub_resource type="RectangleShape2D" id="Rect_Ground9"]
+size = Vector2(590, 100)
 
-[sub_resource type="RectangleShape2D" id="Rect_PlatformC"]
-size = Vector2(260, 32)
+[sub_resource type="RectangleShape2D" id="Rect_Ground10"]
+size = Vector2(880, 330)
 
-[sub_resource type="RectangleShape2D" id="Rect_GroundEnd"]
-size = Vector2(620, 80)
+[sub_resource type="RectangleShape2D" id="Rect_Ledge11"]
+size = Vector2(200, 32)
+
+[sub_resource type="RectangleShape2D" id="Rect_Ledge12"]
+size = Vector2(220, 32)
+
+[sub_resource type="RectangleShape2D" id="Rect_Ledge13"]
+size = Vector2(220, 32)
+
+[sub_resource type="RectangleShape2D" id="Rect_Ledge14"]
+size = Vector2(170, 32)
+
+[sub_resource type="RectangleShape2D" id="Rect_Ledge15"]
+size = Vector2(170, 32)
+
+[sub_resource type="RectangleShape2D" id="Rect_Ledge16"]
+size = Vector2(170, 32)
+
+[sub_resource type="RectangleShape2D" id="Rect_Ground17"]
+size = Vector2(690, 100)
+
+[sub_resource type="RectangleShape2D" id="Rect_Ledge18"]
+size = Vector2(220, 32)
+
+[sub_resource type="RectangleShape2D" id="Rect_Ledge19"]
+size = Vector2(220, 32)
+
+[sub_resource type="RectangleShape2D" id="Rect_Ground20"]
+size = Vector2(280, 100)
+
+[sub_resource type="RectangleShape2D" id="Rect_Ground21"]
+size = Vector2(480, 100)
+
+[sub_resource type="RectangleShape2D" id="Rect_Ground22"]
+size = Vector2(400, 100)
+
+[sub_resource type="RectangleShape2D" id="Rect_Ground23"]
+size = Vector2(500, 300)
+
+[sub_resource type="RectangleShape2D" id="Rect_Ledge24"]
+size = Vector2(200, 32)
+
+[sub_resource type="RectangleShape2D" id="Rect_Ledge25"]
+size = Vector2(200, 32)
+
+[sub_resource type="RectangleShape2D" id="Rect_Ledge26"]
+size = Vector2(200, 32)
+
+[sub_resource type="RectangleShape2D" id="Rect_Ledge27"]
+size = Vector2(160, 32)
+
+[sub_resource type="RectangleShape2D" id="Rect_Ledge28"]
+size = Vector2(160, 32)
+
+[sub_resource type="RectangleShape2D" id="Rect_Ledge29"]
+size = Vector2(160, 32)
+
+[sub_resource type="RectangleShape2D" id="Rect_Ground30"]
+size = Vector2(900, 100)
+
+[sub_resource type="RectangleShape2D" id="Rect_Bound31"]
+size = Vector2(48, 1880)
 
 [node name="MapA" type="Node2D"]
 script = ExtResource("1_map")
-display_name = "Horizontal Run"
-spawn_point = Vector2(160, 420)
+display_name = "Jungle Run"
+spawn_point = Vector2(160, 440)
 spawn_stride = Vector2(72, 0)
-kill_depth = 1400.0
+kill_depth = 1150
 progress_axis = Vector2(1, 0)
-
-[node name="Background" type="ColorRect" parent="."]
-offset_left = -600
-offset_top = -900
-offset_right = 3800
-offset_bottom = 1500
-color = Color(0.09, 0.11, 0.13, 1)
-mouse_filter = 2
+skin_palette = 3
 
 [node name="Level" type="StaticBody2D" parent="."]
 collision_layer = 1
 collision_mask = 0
 
-[node name="ColGroundStart" type="CollisionShape2D" parent="Level"]
-position = Vector2(450, 540)
-shape = SubResource("Rect_GroundStart")
+[node name="ColBound1" type="CollisionShape2D" parent="Level"]
+position = Vector2(-176, -400)
+shape = SubResource("Rect_Bound1")
 
-[node name="VisGroundStart" type="ColorRect" parent="Level"]
-offset_left = 0.0
-offset_top = 500.0
-offset_right = 900.0
-offset_bottom = 580.0
+[node name="VisBound1" type="ColorRect" parent="Level"]
+offset_left = -200
+offset_top = -1400
+offset_right = -152
+offset_bottom = 600
 color = Color(0.22, 0.26, 0.24, 1)
 mouse_filter = 2
 
-[node name="ColGroundMid" type="CollisionShape2D" parent="Level"]
-position = Vector2(1400, 540)
-shape = SubResource("Rect_GroundMid")
+[node name="ColGround2" type="CollisionShape2D" parent="Level"]
+position = Vector2(450, 550)
+shape = SubResource("Rect_Ground2")
 
-[node name="VisGroundMid" type="ColorRect" parent="Level"]
-offset_left = 1150.0
-offset_top = 500.0
-offset_right = 1650.0
-offset_bottom = 580.0
+[node name="VisGround2" type="ColorRect" parent="Level"]
+offset_left = -200
+offset_top = 500
+offset_right = 1100
+offset_bottom = 600
 color = Color(0.22, 0.26, 0.24, 1)
 mouse_filter = 2
 
-[node name="ColPlatformA" type="CollisionShape2D" parent="Level"]
-position = Vector2(1000, 380)
-shape = SubResource("Rect_PlatformA")
+[node name="ColLedge3" type="CollisionShape2D" parent="Level"]
+position = Vector2(800, 396)
+shape = SubResource("Rect_Ledge3")
 
-[node name="VisPlatformA" type="ColorRect" parent="Level"]
-offset_left = 910.0
-offset_top = 364.0
-offset_right = 1090.0
-offset_bottom = 396.0
+[node name="VisLedge3" type="ColorRect" parent="Level"]
+offset_left = 700
+offset_top = 380
+offset_right = 900
+offset_bottom = 412
 color = Color(0.22, 0.26, 0.24, 1)
 mouse_filter = 2
 
-[node name="ColPlatformB" type="CollisionShape2D" parent="Level"]
-position = Vector2(1850, 460)
-shape = SubResource("Rect_PlatformB")
+[node name="ColGround4" type="CollisionShape2D" parent="Level"]
+position = Vector2(1310, 490)
+shape = SubResource("Rect_Ground4")
 
-[node name="VisPlatformB" type="ColorRect" parent="Level"]
-offset_left = 1720.0
-offset_top = 444.0
-offset_right = 1980.0
-offset_bottom = 476.0
+[node name="VisGround4" type="ColorRect" parent="Level"]
+offset_left = 1100
+offset_top = 440
+offset_right = 1520
+offset_bottom = 540
 color = Color(0.22, 0.26, 0.24, 1)
 mouse_filter = 2
 
-[node name="ColClimbWall" type="CollisionShape2D" parent="Level"]
-position = Vector2(2150, 300)
-shape = SubResource("Rect_ClimbWall")
+[node name="ColGround5" type="CollisionShape2D" parent="Level"]
+position = Vector2(1885, 510)
+shape = SubResource("Rect_Ground5")
 
-[node name="VisClimbWall" type="ColorRect" parent="Level"]
-offset_left = 2126.0
-offset_top = 20.0
-offset_right = 2174.0
-offset_bottom = 580.0
+[node name="VisGround5" type="ColorRect" parent="Level"]
+offset_left = 1650
+offset_top = 460
+offset_right = 2120
+offset_bottom = 560
 color = Color(0.22, 0.26, 0.24, 1)
 mouse_filter = 2
 
-[node name="ColLedgeTop" type="CollisionShape2D" parent="Level"]
-position = Vector2(2320, 40)
-shape = SubResource("Rect_LedgeTop")
+[node name="ColLedge6" type="CollisionShape2D" parent="Level"]
+position = Vector2(2270, 546)
+shape = SubResource("Rect_Ledge6")
 
-[node name="VisLedgeTop" type="ColorRect" parent="Level"]
-offset_left = 2130.0
-offset_top = 24.0
-offset_right = 2510.0
-offset_bottom = 56.0
+[node name="VisLedge6" type="ColorRect" parent="Level"]
+offset_left = 2180
+offset_top = 530
+offset_right = 2360
+offset_bottom = 562
 color = Color(0.22, 0.26, 0.24, 1)
 mouse_filter = 2
 
-[node name="ColPlatformC" type="CollisionShape2D" parent="Level"]
-position = Vector2(2600, -120)
-shape = SubResource("Rect_PlatformC")
+[node name="ColLedge7" type="CollisionShape2D" parent="Level"]
+position = Vector2(2510, 566)
+shape = SubResource("Rect_Ledge7")
 
-[node name="VisPlatformC" type="ColorRect" parent="Level"]
-offset_left = 2470.0
-offset_top = -136.0
-offset_right = 2730.0
-offset_bottom = -104.0
+[node name="VisLedge7" type="ColorRect" parent="Level"]
+offset_left = 2420
+offset_top = 550
+offset_right = 2600
+offset_bottom = 582
 color = Color(0.22, 0.26, 0.24, 1)
 mouse_filter = 2
 
-[node name="ColGroundEnd" type="CollisionShape2D" parent="Level"]
-position = Vector2(2980, 540)
-shape = SubResource("Rect_GroundEnd")
+[node name="ColLedge8" type="CollisionShape2D" parent="Level"]
+position = Vector2(2750, 546)
+shape = SubResource("Rect_Ledge8")
 
-[node name="VisGroundEnd" type="ColorRect" parent="Level"]
-offset_left = 2670.0
-offset_top = 500.0
-offset_right = 3290.0
-offset_bottom = 580.0
+[node name="VisLedge8" type="ColorRect" parent="Level"]
+offset_left = 2660
+offset_top = 530
+offset_right = 2840
+offset_bottom = 562
+color = Color(0.22, 0.26, 0.24, 1)
+mouse_filter = 2
+
+[node name="ColGround9" type="CollisionShape2D" parent="Level"]
+position = Vector2(3205, 520)
+shape = SubResource("Rect_Ground9")
+
+[node name="VisGround9" type="ColorRect" parent="Level"]
+offset_left = 2910
+offset_top = 470
+offset_right = 3500
+offset_bottom = 570
+color = Color(0.22, 0.26, 0.24, 1)
+mouse_filter = 2
+
+[node name="ColGround10" type="CollisionShape2D" parent="Level"]
+position = Vector2(3940, 305)
+shape = SubResource("Rect_Ground10")
+
+[node name="VisGround10" type="ColorRect" parent="Level"]
+offset_left = 3500
+offset_top = 140
+offset_right = 4380
+offset_bottom = 470
+color = Color(0.22, 0.26, 0.24, 1)
+mouse_filter = 2
+
+[node name="ColLedge11" type="CollisionShape2D" parent="Level"]
+position = Vector2(3960, 36)
+shape = SubResource("Rect_Ledge11")
+
+[node name="VisLedge11" type="ColorRect" parent="Level"]
+offset_left = 3860
+offset_top = 20
+offset_right = 4060
+offset_bottom = 52
+color = Color(0.22, 0.26, 0.24, 1)
+mouse_filter = 2
+
+[node name="ColLedge12" type="CollisionShape2D" parent="Level"]
+position = Vector2(4590, 246)
+shape = SubResource("Rect_Ledge12")
+
+[node name="VisLedge12" type="ColorRect" parent="Level"]
+offset_left = 4480
+offset_top = 230
+offset_right = 4700
+offset_bottom = 262
+color = Color(0.22, 0.26, 0.24, 1)
+mouse_filter = 2
+
+[node name="ColLedge13" type="CollisionShape2D" parent="Level"]
+position = Vector2(4910, 326)
+shape = SubResource("Rect_Ledge13")
+
+[node name="VisLedge13" type="ColorRect" parent="Level"]
+offset_left = 4800
+offset_top = 310
+offset_right = 5020
+offset_bottom = 342
+color = Color(0.22, 0.26, 0.24, 1)
+mouse_filter = 2
+
+[node name="ColLedge14" type="CollisionShape2D" parent="Level"]
+position = Vector2(5175, 396)
+shape = SubResource("Rect_Ledge14")
+
+[node name="VisLedge14" type="ColorRect" parent="Level"]
+offset_left = 5090
+offset_top = 380
+offset_right = 5260
+offset_bottom = 412
+color = Color(0.22, 0.26, 0.24, 1)
+mouse_filter = 2
+
+[node name="ColLedge15" type="CollisionShape2D" parent="Level"]
+position = Vector2(5415, 416)
+shape = SubResource("Rect_Ledge15")
+
+[node name="VisLedge15" type="ColorRect" parent="Level"]
+offset_left = 5330
+offset_top = 400
+offset_right = 5500
+offset_bottom = 432
+color = Color(0.22, 0.26, 0.24, 1)
+mouse_filter = 2
+
+[node name="ColLedge16" type="CollisionShape2D" parent="Level"]
+position = Vector2(5655, 396)
+shape = SubResource("Rect_Ledge16")
+
+[node name="VisLedge16" type="ColorRect" parent="Level"]
+offset_left = 5570
+offset_top = 380
+offset_right = 5740
+offset_bottom = 412
+color = Color(0.22, 0.26, 0.24, 1)
+mouse_filter = 2
+
+[node name="ColGround17" type="CollisionShape2D" parent="Level"]
+position = Vector2(6155, 450)
+shape = SubResource("Rect_Ground17")
+
+[node name="VisGround17" type="ColorRect" parent="Level"]
+offset_left = 5810
+offset_top = 400
+offset_right = 6500
+offset_bottom = 500
+color = Color(0.22, 0.26, 0.24, 1)
+mouse_filter = 2
+
+[node name="ColLedge18" type="CollisionShape2D" parent="Level"]
+position = Vector2(6110, 276)
+shape = SubResource("Rect_Ledge18")
+
+[node name="VisLedge18" type="ColorRect" parent="Level"]
+offset_left = 6000
+offset_top = 260
+offset_right = 6220
+offset_bottom = 292
+color = Color(0.22, 0.26, 0.24, 1)
+mouse_filter = 2
+
+[node name="ColLedge19" type="CollisionShape2D" parent="Level"]
+position = Vector2(6430, 206)
+shape = SubResource("Rect_Ledge19")
+
+[node name="VisLedge19" type="ColorRect" parent="Level"]
+offset_left = 6320
+offset_top = 190
+offset_right = 6540
+offset_bottom = 222
+color = Color(0.22, 0.26, 0.24, 1)
+mouse_filter = 2
+
+[node name="ColGround20" type="CollisionShape2D" parent="Level"]
+position = Vector2(6640, 390)
+shape = SubResource("Rect_Ground20")
+
+[node name="VisGround20" type="ColorRect" parent="Level"]
+offset_left = 6500
+offset_top = 340
+offset_right = 6780
+offset_bottom = 440
+color = Color(0.22, 0.26, 0.24, 1)
+mouse_filter = 2
+
+[node name="ColGround21" type="CollisionShape2D" parent="Level"]
+position = Vector2(7160, 410)
+shape = SubResource("Rect_Ground21")
+
+[node name="VisGround21" type="ColorRect" parent="Level"]
+offset_left = 6920
+offset_top = 360
+offset_right = 7400
+offset_bottom = 460
+color = Color(0.22, 0.26, 0.24, 1)
+mouse_filter = 2
+
+[node name="ColGround22" type="CollisionShape2D" parent="Level"]
+position = Vector2(7700, 380)
+shape = SubResource("Rect_Ground22")
+
+[node name="VisGround22" type="ColorRect" parent="Level"]
+offset_left = 7500
+offset_top = 330
+offset_right = 7900
+offset_bottom = 430
+color = Color(0.22, 0.26, 0.24, 1)
+mouse_filter = 2
+
+[node name="ColGround23" type="CollisionShape2D" parent="Level"]
+position = Vector2(8150, 150)
+shape = SubResource("Rect_Ground23")
+
+[node name="VisGround23" type="ColorRect" parent="Level"]
+offset_left = 7900
+offset_top = 0
+offset_right = 8400
+offset_bottom = 300
+color = Color(0.22, 0.26, 0.24, 1)
+mouse_filter = 2
+
+[node name="ColLedge24" type="CollisionShape2D" parent="Level"]
+position = Vector2(8580, 96)
+shape = SubResource("Rect_Ledge24")
+
+[node name="VisLedge24" type="ColorRect" parent="Level"]
+offset_left = 8480
+offset_top = 80
+offset_right = 8680
+offset_bottom = 112
+color = Color(0.22, 0.26, 0.24, 1)
+mouse_filter = 2
+
+[node name="ColLedge25" type="CollisionShape2D" parent="Level"]
+position = Vector2(8880, 176)
+shape = SubResource("Rect_Ledge25")
+
+[node name="VisLedge25" type="ColorRect" parent="Level"]
+offset_left = 8780
+offset_top = 160
+offset_right = 8980
+offset_bottom = 192
+color = Color(0.22, 0.26, 0.24, 1)
+mouse_filter = 2
+
+[node name="ColLedge26" type="CollisionShape2D" parent="Level"]
+position = Vector2(9180, 256)
+shape = SubResource("Rect_Ledge26")
+
+[node name="VisLedge26" type="ColorRect" parent="Level"]
+offset_left = 9080
+offset_top = 240
+offset_right = 9280
+offset_bottom = 272
+color = Color(0.22, 0.26, 0.24, 1)
+mouse_filter = 2
+
+[node name="ColLedge27" type="CollisionShape2D" parent="Level"]
+position = Vector2(9420, 346)
+shape = SubResource("Rect_Ledge27")
+
+[node name="VisLedge27" type="ColorRect" parent="Level"]
+offset_left = 9340
+offset_top = 330
+offset_right = 9500
+offset_bottom = 362
+color = Color(0.22, 0.26, 0.24, 1)
+mouse_filter = 2
+
+[node name="ColLedge28" type="CollisionShape2D" parent="Level"]
+position = Vector2(9680, 366)
+shape = SubResource("Rect_Ledge28")
+
+[node name="VisLedge28" type="ColorRect" parent="Level"]
+offset_left = 9600
+offset_top = 350
+offset_right = 9760
+offset_bottom = 382
+color = Color(0.22, 0.26, 0.24, 1)
+mouse_filter = 2
+
+[node name="ColLedge29" type="CollisionShape2D" parent="Level"]
+position = Vector2(9940, 346)
+shape = SubResource("Rect_Ledge29")
+
+[node name="VisLedge29" type="ColorRect" parent="Level"]
+offset_left = 9860
+offset_top = 330
+offset_right = 10020
+offset_bottom = 362
+color = Color(0.22, 0.26, 0.24, 1)
+mouse_filter = 2
+
+[node name="ColGround30" type="CollisionShape2D" parent="Level"]
+position = Vector2(10550, 430)
+shape = SubResource("Rect_Ground30")
+
+[node name="VisGround30" type="ColorRect" parent="Level"]
+offset_left = 10100
+offset_top = 380
+offset_right = 11000
+offset_bottom = 480
+color = Color(0.22, 0.26, 0.24, 1)
+mouse_filter = 2
+
+[node name="ColBound31" type="CollisionShape2D" parent="Level"]
+position = Vector2(11024, -460)
+shape = SubResource("Rect_Bound31")
+
+[node name="VisBound31" type="ColorRect" parent="Level"]
+offset_left = 11000
+offset_top = -1400
+offset_right = 11048
+offset_bottom = 480
 color = Color(0.22, 0.26, 0.24, 1)
 mouse_filter = 2
 
 [node name="Climbables" type="Node2D" parent="."]
 
 [node name="Climbable1" parent="Climbables" instance=ExtResource("3_climb")]
-position = Vector2(2150, 300)
-size = Vector2(96, 560)
+position = Vector2(3500, 295)
+size = Vector2(90, 350)
+
+[node name="Climbable2" parent="Climbables" instance=ExtResource("3_climb")]
+position = Vector2(7900, 140)
+size = Vector2(90, 320)
 
 [node name="Vines" type="Node2D" parent="."]
 
 [node name="Vine1" parent="Vines" instance=ExtResource("2_vine")]
-position = Vector2(1050, 120)
-length = 210.0
+position = Vector2(2300, 90)
+length = 190
 
 [node name="Vine2" parent="Vines" instance=ExtResource("2_vine")]
-position = Vector2(1260, 90)
-length = 250.0
+position = Vector2(2560, 90)
+length = 190
 
 [node name="Vine3" parent="Vines" instance=ExtResource("2_vine")]
-position = Vector2(1610, 60)
-length = 270.0
+position = Vector2(2820, 90)
+length = 190
 
 [node name="Vine4" parent="Vines" instance=ExtResource("2_vine")]
-position = Vector2(2480, -320)
-length = 300.0
+position = Vector2(5200, -60)
+length = 210
+
+[node name="Vine5" parent="Vines" instance=ExtResource("2_vine")]
+position = Vector2(5450, -60)
+length = 210
+
+[node name="Vine6" parent="Vines" instance=ExtResource("2_vine")]
+position = Vector2(5700, -60)
+length = 210
+
+[node name="Vine7" parent="Vines" instance=ExtResource("2_vine")]
+position = Vector2(9440, -120)
+length = 220
+
+[node name="Vine8" parent="Vines" instance=ExtResource("2_vine")]
+position = Vector2(9690, -120)
+length = 220
+
+[node name="Vine9" parent="Vines" instance=ExtResource("2_vine")]
+position = Vector2(9940, -120)
+length = 220
 
 [node name="Checkpoints" type="Node2D" parent="."]
 
 [node name="Checkpoint1" parent="Checkpoints" instance=ExtResource("4_check")]
-position = Vector2(1400, 470)
+position = Vector2(1760, 400)
 
 [node name="Checkpoint2" parent="Checkpoints" instance=ExtResource("4_check")]
-position = Vector2(2320, -20)
+position = Vector2(3040, 410)
 
 [node name="Checkpoint3" parent="Checkpoints" instance=ExtResource("4_check")]
-position = Vector2(2860, 470)
+position = Vector2(3650, 80)
+
+[node name="Checkpoint4" parent="Checkpoints" instance=ExtResource("4_check")]
+position = Vector2(5960, 340)
+
+[node name="Checkpoint5" parent="Checkpoints" instance=ExtResource("4_check")]
+position = Vector2(7000, 300)
+
+[node name="Checkpoint6" parent="Checkpoints" instance=ExtResource("4_check")]
+position = Vector2(8000, -60)
+
+[node name="Checkpoint7" parent="Checkpoints" instance=ExtResource("4_check")]
+position = Vector2(10250, 320)
 
 [node name="FinishLine" parent="." instance=ExtResource("5_finish")]
-position = Vector2(3200, 400)
-size = Vector2(80, 320)
+position = Vector2(10800, 230)
+size = Vector2(80, 300)
 
 [node name="BananaSpawns" type="Node2D" parent="."]
 
 [node name="Spawn1" parent="BananaSpawns" instance=ExtResource("6_banana")]
-position = Vector2(450, 460)
+position = Vector2(300, 460)
 value = 1
 lucky_chance = 0.1
 
 [node name="Spawn2" parent="BananaSpawns" instance=ExtResource("6_banana")]
-position = Vector2(1000, 320)
-value = 2
-lucky_chance = 0.15
+position = Vector2(600, 460)
+value = 1
+lucky_chance = 0.1
 
 [node name="Spawn3" parent="BananaSpawns" instance=ExtResource("6_banana")]
-position = Vector2(1260, 250)
-value = 3
-lucky_chance = 0.2
+position = Vector2(1300, 400)
+value = 1
+lucky_chance = 0.1
 
 [node name="Spawn4" parent="BananaSpawns" instance=ExtResource("6_banana")]
-position = Vector2(1400, 460)
+position = Vector2(1900, 420)
 value = 1
 lucky_chance = 0.1
 
 [node name="Spawn5" parent="BananaSpawns" instance=ExtResource("6_banana")]
-position = Vector2(1850, 400)
-value = 2
-lucky_chance = 0.15
+position = Vector2(2270, 490)
+value = 1
+lucky_chance = 0.1
 
 [node name="Spawn6" parent="BananaSpawns" instance=ExtResource("6_banana")]
-position = Vector2(2150, 100)
-value = 3
-lucky_chance = 0.15
+position = Vector2(2510, 510)
+value = 1
+lucky_chance = 0.1
 
 [node name="Spawn7" parent="BananaSpawns" instance=ExtResource("6_banana")]
-position = Vector2(2320, -30)
-value = 4
-lucky_chance = 0.2
+position = Vector2(2750, 490)
+value = 1
+lucky_chance = 0.1
 
 [node name="Spawn8" parent="BananaSpawns" instance=ExtResource("6_banana")]
-position = Vector2(2600, -180)
-value = 5
+position = Vector2(2300, 320)
+value = 3
 lucky_chance = 0.25
 
 [node name="Spawn9" parent="BananaSpawns" instance=ExtResource("6_banana")]
-position = Vector2(2980, 460)
+position = Vector2(2560, 320)
+value = 3
+lucky_chance = 0.25
+
+[node name="Spawn10" parent="BananaSpawns" instance=ExtResource("6_banana")]
+position = Vector2(2820, 320)
+value = 3
+lucky_chance = 0.25
+
+[node name="Spawn11" parent="BananaSpawns" instance=ExtResource("6_banana")]
+position = Vector2(3960, -20)
+value = 4
+lucky_chance = 0.3
+
+[node name="Spawn12" parent="BananaSpawns" instance=ExtResource("6_banana")]
+position = Vector2(4200, 100)
+value = 2
+lucky_chance = 0.15
+
+[node name="Spawn13" parent="BananaSpawns" instance=ExtResource("6_banana")]
+position = Vector2(4590, 190)
+value = 2
+lucky_chance = 0.15
+
+[node name="Spawn14" parent="BananaSpawns" instance=ExtResource("6_banana")]
+position = Vector2(5200, 210)
+value = 3
+lucky_chance = 0.25
+
+[node name="Spawn15" parent="BananaSpawns" instance=ExtResource("6_banana")]
+position = Vector2(5450, 210)
+value = 3
+lucky_chance = 0.25
+
+[node name="Spawn16" parent="BananaSpawns" instance=ExtResource("6_banana")]
+position = Vector2(5700, 210)
+value = 3
+lucky_chance = 0.25
+
+[node name="Spawn17" parent="BananaSpawns" instance=ExtResource("6_banana")]
+position = Vector2(6430, 150)
+value = 5
+lucky_chance = 0.35
+
+[node name="Spawn18" parent="BananaSpawns" instance=ExtResource("6_banana")]
+position = Vector2(8150, -40)
+value = 3
+lucky_chance = 0.2
+
+[node name="Spawn19" parent="BananaSpawns" instance=ExtResource("6_banana")]
+position = Vector2(9420, 290)
 value = 1
 lucky_chance = 0.1
+
+[node name="Spawn20" parent="BananaSpawns" instance=ExtResource("6_banana")]
+position = Vector2(9680, 310)
+value = 1
+lucky_chance = 0.1
+
+[node name="Spawn21" parent="BananaSpawns" instance=ExtResource("6_banana")]
+position = Vector2(9940, 290)
+value = 1
+lucky_chance = 0.1
+
+[node name="Spawn22" parent="BananaSpawns" instance=ExtResource("6_banana")]
+position = Vector2(9440, 110)
+value = 4
+lucky_chance = 0.3
+
+[node name="Spawn23" parent="BananaSpawns" instance=ExtResource("6_banana")]
+position = Vector2(9690, 110)
+value = 4
+lucky_chance = 0.3
+
+[node name="Spawn24" parent="BananaSpawns" instance=ExtResource("6_banana")]
+position = Vector2(9940, 110)
+value = 4
+lucky_chance = 0.3
+
+[node name="Spawn25" parent="BananaSpawns" instance=ExtResource("6_banana")]
+position = Vector2(10500, 340)
+value = 2
+lucky_chance = 0.2
+
+[node name="Pads" type="Node2D" parent="."]
+
+[node name="Pad1" parent="Pads" instance=ExtResource("7_pad")]
+position = Vector2(3330, 470)
+strength = 1200
+
+[node name="Pad2" parent="Pads" instance=ExtResource("7_pad")]
+position = Vector2(7780, 330)
+strength = 1300
+
+[node name="Route" type="Node2D" parent="."]
+
+[node name="Point1" type="Marker2D" parent="Route"]
+position = Vector2(1060, 464)
+
+[node name="Point2" type="Marker2D" parent="Route"]
+position = Vector2(1480, 404)
+
+[node name="Point3" type="Marker2D" parent="Route"]
+position = Vector2(1700, 424)
+
+[node name="Point4" type="Marker2D" parent="Route"]
+position = Vector2(2080, 424)
+
+[node name="Point5" type="Marker2D" parent="Route"]
+position = Vector2(2270, 494)
+
+[node name="Point6" type="Marker2D" parent="Route"]
+position = Vector2(2510, 514)
+
+[node name="Point7" type="Marker2D" parent="Route"]
+position = Vector2(2750, 494)
+
+[node name="Point8" type="Marker2D" parent="Route"]
+position = Vector2(2990, 434)
+
+[node name="Point9" type="Marker2D" parent="Route"]
+position = Vector2(3330, 434)
+
+[node name="Point10" type="Marker2D" parent="Route"]
+position = Vector2(3600, 104)
+
+[node name="Point11" type="Marker2D" parent="Route"]
+position = Vector2(3800, 104)
+
+[node name="Point12" type="Marker2D" parent="Route"]
+position = Vector2(4340, 104)
+
+[node name="Point13" type="Marker2D" parent="Route"]
+position = Vector2(4590, 194)
+
+[node name="Point14" type="Marker2D" parent="Route"]
+position = Vector2(4910, 274)
+
+[node name="Point15" type="Marker2D" parent="Route"]
+position = Vector2(5175, 344)
+
+[node name="Point16" type="Marker2D" parent="Route"]
+position = Vector2(5415, 364)
+
+[node name="Point17" type="Marker2D" parent="Route"]
+position = Vector2(5655, 344)
+
+[node name="Point18" type="Marker2D" parent="Route"]
+position = Vector2(5900, 364)
+
+[node name="Point19" type="Marker2D" parent="Route"]
+position = Vector2(6460, 364)
+
+[node name="Point20" type="Marker2D" parent="Route"]
+position = Vector2(6700, 304)
+
+[node name="Point21" type="Marker2D" parent="Route"]
+position = Vector2(6960, 324)
+
+[node name="Point22" type="Marker2D" parent="Route"]
+position = Vector2(7360, 324)
+
+[node name="Point23" type="Marker2D" parent="Route"]
+position = Vector2(7560, 294)
+
+[node name="Point24" type="Marker2D" parent="Route"]
+position = Vector2(7780, 294)
+
+[node name="Point25" type="Marker2D" parent="Route"]
+position = Vector2(8000, -36)
+
+[node name="Point26" type="Marker2D" parent="Route"]
+position = Vector2(8380, -36)
+
+[node name="Point27" type="Marker2D" parent="Route"]
+position = Vector2(8580, 44)
+
+[node name="Point28" type="Marker2D" parent="Route"]
+position = Vector2(8880, 124)
+
+[node name="Point29" type="Marker2D" parent="Route"]
+position = Vector2(9180, 204)
+
+[node name="Point30" type="Marker2D" parent="Route"]
+position = Vector2(9420, 294)
+
+[node name="Point31" type="Marker2D" parent="Route"]
+position = Vector2(9680, 314)
+
+[node name="Point32" type="Marker2D" parent="Route"]
+position = Vector2(9940, 294)
+
+[node name="Point33" type="Marker2D" parent="Route"]
+position = Vector2(10200, 344)
+
+[node name="Point34" type="Marker2D" parent="Route"]
+position = Vector2(10800, 344)

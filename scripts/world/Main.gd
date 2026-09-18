@@ -42,6 +42,7 @@ var _local_below_kill: bool = false
 @onready var _pickup_root: Node2D = $Pickups
 @onready var race: RaceDirector = $RaceDirector
 @onready var hoard: HoardDirector = $HoardDirector
+@onready var slap: SlapDirector = $SlapDirector
 
 
 func _ready() -> void:
@@ -91,10 +92,12 @@ func _spawn_ui() -> void:
 func _start_mode() -> void:
 	race.setup(self, map)
 	hoard.setup(self, map, _pickup_root)
+	slap.setup(self)
 	if map == null:
 		return
 	race.race_over.connect(_on_match_over)
 	hoard.hoard_over.connect(_on_match_over)
+	slap.slap_over.connect(_on_match_over)
 
 	# Only the host counts down. Clients follow the broadcast, otherwise four
 	# machines each start their own round a few frames apart.
@@ -105,6 +108,8 @@ func _start_mode() -> void:
 			race.begin()
 		GameConfig.Mode.HOARD:
 			hoard.begin()
+		GameConfig.Mode.SLAP:
+			slap.begin()
 		_:
 			pass
 
@@ -166,8 +171,11 @@ func _spawn_player(id: int, monkey_id: StringName, slot: int, hat_id: StringName
 	# time rather than being corrected a frame later.
 	player.is_bot = is_bot
 	player.bot_name = bot_name
+	player.team = GameConfig.team_of(slot) if Net.mode == GameConfig.Mode.SLAP else -1
 	player.setup(GameConfig.get_monkey(monkey_id), id, id == _local_id, GameConfig.tint_for_index(slot), hat_id)
 	player.position = _spawn_position(slot)
+	if map != null and player.camera != null:
+		player.camera.zoom = Vector2.ONE * map.camera_zoom
 	_player_root.add_child(player)
 	players[id] = player
 	if id == _local_id:
@@ -259,7 +267,7 @@ func _track_local_fall() -> void:
 
 
 func _input_locked() -> bool:
-	return race.is_input_locked() or hoard.is_input_locked()
+	return race.is_input_locked() or hoard.is_input_locked() or slap.is_input_locked()
 
 
 func _check_falls() -> void:
@@ -268,12 +276,16 @@ func _check_falls() -> void:
 		if bool(_respawning.get(id, false)):
 			continue
 		var player := players[id] as Player
-		if player.global_position.y > limit:
+		# Past the blast line to either side counts too, on maps that have
+		# one: a slap that sends you flying sideways is as final as the sea.
+		var blasted := map != null and map.blast_half_width > 0.0 and absf(player.global_position.x) > map.blast_half_width
+		if player.global_position.y > limit or blasted:
 			_begin_respawn(int(id))
 
 
 func _begin_respawn(id: int) -> void:
 	_respawning[id] = true
+	slap.player_fell(id)
 	var player := players.get(id) as Player
 	if player == null:
 		return

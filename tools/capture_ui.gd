@@ -10,9 +10,20 @@ extends Node
 # ============================================================
 
 const SHOTS := {
-	"lobby": "res://scenes/Lobby.tscn",
+	"splash": "res://scenes/Splash.tscn",
+	"home": "res://scenes/Menu.tscn|page0",
+	"monkeys": "res://scenes/Menu.tscn|page1",
+	"play_mode": "res://scenes/Menu.tscn|page2",
+	"play_map": "res://scenes/Menu.tscn|page2step1",
+	"play_ai": "res://scenes/Menu.tscn|page2step2",
+	"party": "res://scenes/Menu.tscn|page3",
+	"shop": "res://scenes/Menu.tscn|page4",
+	"settings": "res://scenes/Menu.tscn|page5",
+	"loading": "res://scenes/MatchLoading.tscn|cast",
+	"loading_slap": "res://scenes/MatchLoading.tscn|slapcast",
 	"game_a": "res://scenes/Main.tscn|map_a",
 	"game_b": "res://scenes/Main.tscn|map_b",
+	"game_c": "res://scenes/Main.tscn|map_c",
 	"overview_a": "res://scenes/maps/MapA.tscn|overview",
 	"overview_b": "res://scenes/maps/MapB.tscn|overview",
 }
@@ -35,6 +46,8 @@ func _ready() -> void:
 	for key in SHOTS.keys():
 		if only.is_empty() or only.has(String(key)):
 			await _shoot(String(key), String(SHOTS[key]), out)
+	if only.has("sheets"):
+		_dump_sheets(out)
 	get_tree().quit()
 
 
@@ -50,16 +63,35 @@ func _shoot(key: String, path: String, out: String) -> void:
 	if path.contains("|"):
 		extra = path.get_slice("|", 1)
 		path = path.get_slice("|", 0)
-	if extra.begins_with("map_"):
-		Net.map_id = StringName(extra)
+	if extra.begins_with("map_") or extra.ends_with("cast"):
+		Net.mode = GameConfig.Mode.SLAP if extra == "slapcast" or extra == "map_c" else GameConfig.Mode.RACE
+		if extra.begins_with("map_"):
+			Net.map_id = StringName(extra)
+		# A full lobby of different monkeys, three of them bots, so the shot
+		# shows the roster side by side and something is always moving.
 		Net.roster.clear()
+		var cast: Array[StringName] = [&"macaque", &"gorilla", &"capuchin", &"orangutan"]
+		for slot in cast.size():
+			Net.roster[slot + 1] = {"monkey": cast[slot], "hat": &"none", "slot": slot, "bot": slot > 0, "name": ["", "Mango", "Kiwi", "Pip"][slot]}
 	var screen: Node = load(path).instantiate()
+	if screen.get(&"force_touch_controls") != null:
+		screen.set(&"force_touch_controls", true)
 	# Set on the screen itself, not on the root window the way Boot does it.
 	# A SubViewport is not a Window, so a theme on the real one never reaches
 	# in here, and the shot would quietly come back in the engine default.
 	if screen is Control:
 		(screen as Control).theme = UiTheme.build()
 	viewport.add_child(screen)
+	if extra.begins_with("page"):
+		# Menu pages: jump straight to one, and to a step inside PLAY.
+		var parts := extra.trim_prefix("page").split("step")
+		screen.call(&"_show", int(parts[0]), false)
+		if parts.size() > 1:
+			screen.call(&"_set_step", int(parts[1]))
+	var shared_theme := UiTheme.build()
+	for node in screen.find_children("*", "Control", true, false):
+		if not (node.get_parent() is Control):
+			(node as Control).theme = shared_theme
 	if extra == "overview":
 		_frame_whole_map(viewport, screen as Node2D)
 
@@ -95,3 +127,21 @@ func _frame_whole_map(viewport: SubViewport, map: Node2D) -> void:
 	camera.zoom = Vector2(fit, fit)
 	viewport.add_child(camera)
 	camera.make_current()
+
+
+## Every monkey's generated sprite sheet, one species per row, scaled up so
+## single pixels are visible. Asked for with --shots=sheets.
+func _dump_sheets(out: String) -> void:
+	const ZOOM := 4
+	var species: Array[StringName] = [&"gorilla", &"gibbon", &"macaque", &"orangutan", &"capuchin"]
+	var cell := MonkeySprite.CANVAS * ZOOM
+	var sheet := Image.create_empty(cell * MonkeySprite.POSES.size(), cell * species.size() * 2, false, Image.FORMAT_RGBA8)
+	sheet.fill(Color8(120, 170, 190))
+	for row in species.size():
+		for pass_index in 2:
+			var source: Dictionary = MonkeySprite.front_sheet_for(species[row]) if pass_index == 1 else MonkeySprite.sheet_for(species[row])
+			var image: Image = (source["texture"] as Texture2D).get_image()
+			image.resize(image.get_width() * ZOOM, image.get_height() * ZOOM, Image.INTERPOLATE_NEAREST)
+			sheet.blend_rect(image, Rect2i(Vector2i.ZERO, image.get_size()), Vector2i(0, (row * 2 + pass_index) * cell))
+	var file := "%s/shot_sheets.png" % out.trim_suffix("/")
+	print("capture sheets -> %s (%d)" % [file, sheet.save_png(file)])

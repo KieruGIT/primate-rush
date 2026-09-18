@@ -43,7 +43,11 @@ func _make_row(place: int, entry: Dictionary) -> Label:
 	# Race rows carry a time, hoard rows carry a score. One overlay serves
 	# both rather than two near-identical scenes drifting apart.
 	var detail := ""
-	if entry.has("score"):
+	if entry.has("team"):
+		var team := int(entry["team"])
+		var verdict := "draw" if bool(entry.get("draw", false)) else ("WIN" if bool(entry.get("won", false)) else "lost")
+		detail = "Team %s  %d KOs  %s" % [GameConfig.TEAM_NAMES[team], int(entry["score"]), verdict]
+	elif entry.has("score"):
 		detail = "%d bananas" % int(entry["score"])
 	elif bool(entry.get("finished", false)):
 		detail = "%.2fs" % float(entry.get("time", 0.0))

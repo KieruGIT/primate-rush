@@ -14,6 +14,8 @@ signal pause_requested
 
 var touch_move: Vector2 = Vector2.ZERO
 var touch_jump_held: bool = false
+## Stick past this and the monkey sprints. See InputFrame.sprint_held.
+const TOUCH_SPRINT_AT: float = 0.92
 
 # Contextual actions (climb, swing) are deliberately not buttons. They
 # trigger on contact, which keeps the touch layout down to a stick and two
@@ -34,12 +36,18 @@ func _notification(what: int) -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	# A left click slaps, but only from a real mouse. Phones turn every tap
+	# into an emulated click, and a slap on every touch would be chaos.
+	if event is InputEventMouseButton and (OS.has_feature("mobile") or event.device == InputEvent.DEVICE_ID_EMULATION):
+		return
 	if event.is_action_pressed(&"jump"):
 		_frame.press(InputFrame.Action.JUMP)
 	elif event.is_action_pressed(&"attack"):
 		_frame.press(InputFrame.Action.ATTACK)
 	elif event.is_action_pressed(&"skill"):
 		_frame.press(InputFrame.Action.SKILL)
+	elif event.is_action_pressed(&"dash"):
+		_frame.press(InputFrame.Action.DASH)
 	elif event.is_action_pressed(&"ui_cancel"):
 		pause_requested.emit()
 
@@ -56,6 +64,7 @@ func take_local_frame() -> InputFrame:
 	var out := InputFrame.new()
 	out.move = _resolve_move()
 	out.jump_held = _resolve_jump_held()
+	out.sprint_held = Input.is_action_pressed(&"sprint") or touch_move.length() >= TOUCH_SPRINT_AT
 	out.merge_buttons(_frame)
 	_frame.clear_buttons()
 	return out

@@ -18,12 +18,104 @@ const GO_FLASH_SECONDS: float = 0.9
 var _player: Player = null
 var _race: RaceDirector = null
 var _hoard: HoardDirector = null
+var _slap: SlapDirector = null
 var _center_timer: float = 0.0
+## F1 shows the movement-state readout. Off by default: it is a tuning aid,
+## and on a phone it covers the part of the screen you jump into.
+var _debug: bool = false
+var _portrait: TextureRect = null
+var _portrait_for: StringName = &""
 
 
 func _ready() -> void:
 	layer = 5
 	_center.text = ""
+	_build_card()
+	if not OS.has_feature("mobile"):
+		_build_key_strip()
+	_center.theme_type_variation = &"HudBig"
+	_center.add_theme_font_size_override(&"font_size", 88)
+	# Above the monkeys, who stand in the middle of the screen.
+	_center.offset_top -= 190.0
+	_center.offset_bottom -= 190.0
+	_board.theme_type_variation = &"HudLabel"
+	# Below the pause button, which owns the top-right corner on a phone.
+	_board.offset_top = 96.0
+
+
+## Wraps the scene's Title and Info labels in a card with the monkey's face,
+## so who you are is a picture first and a word second.
+func _build_card() -> void:
+	var top: Control = _title.get_parent()
+	var card := PanelContainer.new()
+	card.theme_type_variation = &"Card"
+	card.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	card.position = Vector2(20.0, 16.0)
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override(&"separation", 12)
+	card.add_child(row)
+	_portrait = TextureRect.new()
+	_portrait.custom_minimum_size = Vector2(56, 56)
+	_portrait.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	_portrait.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_portrait.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	row.add_child(_portrait)
+	var text := VBoxContainer.new()
+	text.alignment = BoxContainer.ALIGNMENT_CENTER
+	row.add_child(text)
+	_title.reparent(text)
+	_info.reparent(text)
+	_title.theme_type_variation = &"HudValue"
+	_info.theme_type_variation = &"HudLabel"
+	top.get_parent().add_child(card)
+	top.queue_free()
+
+
+## Keyboard players get the controls along the bottom edge, always. The
+## touch layout draws its own; a keyboard has nothing on screen to learn
+## from, which is how "where are the controls" gets asked.
+func _build_key_strip() -> void:
+	var strip := HBoxContainer.new()
+	strip.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
+	strip.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	strip.offset_left = 18.0
+	strip.offset_bottom = -14.0
+	strip.add_theme_constant_override(&"separation", 14)
+	strip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	strip.modulate = Color(1, 1, 1, 0.85)
+	for pair in [["A D", "MOVE"], ["SPACE / W", "JUMP + CLIMB"], ["SHIFT", "SPRINT"], ["L", "DASH"], ["LEFT CLICK", "SLAP"], ["E", "SKILL"], ["ESC", "PAUSE"]]:
+		var item := HBoxContainer.new()
+		item.add_theme_constant_override(&"separation", 6)
+		var chip := PanelContainer.new()
+		var box := StyleBoxFlat.new()
+		box.bg_color = Color(0.94, 0.95, 0.92)
+		box.border_color = Color(0.13, 0.11, 0.10)
+		box.set_border_width_all(2)
+		box.border_width_bottom = 4
+		box.set_corner_radius_all(6)
+		box.content_margin_left = 8
+		box.content_margin_right = 8
+		box.content_margin_top = 2
+		box.content_margin_bottom = 2
+		chip.add_theme_stylebox_override(&"panel", box)
+		var key := Label.new()
+		key.text = pair[0]
+		key.add_theme_font_size_override(&"font_size", 13)
+		key.add_theme_color_override(&"font_color", Color(0.15, 0.13, 0.12))
+		chip.add_child(key)
+		item.add_child(chip)
+		var what := Label.new()
+		what.text = pair[1]
+		what.theme_type_variation = &"HudLabel"
+		what.add_theme_font_size_override(&"font_size", 14)
+		item.add_child(what)
+		strip.add_child(item)
+	add_child(strip)
+
+
+func _unhandled_input(event: InputEvent) -> void:
+	if event.is_action_pressed(&"debug_toggle"):
+		_debug = not _debug
 
 
 func _process(delta: float) -> void:
@@ -41,15 +133,26 @@ func _process(delta: float) -> void:
 		_info.text = "waiting for spawn"
 		return
 
-	_title.text = "%s  #%d" % [_player.stats.display_name, _player.player_id]
-	_info.text = "   ".join(_info_parts())
+	_title.text = _player.stats.display_name
+	if _portrait_for != _player.stats.id:
+		_portrait_for = _player.stats.id
+		_portrait.texture = MonkeyPortrait.texture(_portrait_for)
+	var parts := _info_parts()
+	_info.text = "   ".join(parts)
+	_info.visible = not parts.is_empty()
 
 
 func _info_parts() -> PackedStringArray:
-	var parts: PackedStringArray = [_mode_text(), _state_text(_player.state), "%d px/s" % int(_player.velocity.length()), _skill_text()]
+	var parts: PackedStringArray = []
+	if _debug:
+		parts.append_array([_mode_text(), _state_text(_player.state), "%d px/s" % int(_player.velocity.length()), _skill_text()])
 	if _race != null and _race.is_running():
 		parts.append("%.1fs" % _race.elapsed)
 		parts.append("place %d of %d" % [_live_place(), _field_size()])
+	if _slap != null and _slap.is_running() and _player.team >= 0:
+		parts.append("TEAM %s" % GameConfig.TEAM_NAMES[_player.team].to_upper())
+		parts.append("%d DMG" % int(_player.slap_damage))
+		parts.append("%d:%02d" % [int(_slap.time_left) / 60, int(_slap.time_left) % 60])
 	if _hoard != null and _hoard.is_running():
 		parts.append("%d bananas" % _player.bananas)
 		parts.append("%d:%02d left" % [int(_hoard.time_left) / 60, int(_hoard.time_left) % 60])
@@ -82,6 +185,11 @@ func _board_rows() -> Array:
 		return []
 	var hoard_running := _hoard != null and _hoard.is_running()
 	var race_running := _race != null and _race.is_running()
+	if _slap != null and _slap.is_running():
+		return [
+			{"name": "TEAM %s" % GameConfig.TEAM_NAMES[0].to_upper(), "sort": 1.0, "detail": str(_slap.scores[0])},
+			{"name": "TEAM %s" % GameConfig.TEAM_NAMES[1].to_upper(), "sort": 0.0, "detail": str(_slap.scores[1])},
+		]
 	if not hoard_running and not race_running:
 		return []
 
@@ -135,6 +243,13 @@ func _bind() -> void:
 			_hoard.countdown_changed.connect(_on_countdown)
 			_hoard.hoard_began.connect(_on_race_began)
 
+	if _slap == null or not is_instance_valid(_slap):
+		_slap = arena.get(&"slap") as SlapDirector
+		if _slap != null:
+			_slap.countdown_changed.connect(_on_countdown)
+			_slap.slap_began.connect(_on_race_began)
+			_slap.scores_changed.connect(_on_slap_scores)
+
 
 ## Live placement is recomputed rather than stored: it changes every time
 ## anyone gets knocked backwards, which is the entire point of hitting people.
@@ -161,6 +276,14 @@ func _field_size() -> int:
 		return 1
 	var table: Variant = arena.get(&"players")
 	return (table as Dictionary).size() if table is Dictionary else 1
+
+
+## The team score flashed big after every knock-out: the only number in a
+## 2v2 that anybody needs mid-fight.
+func _on_slap_scores(scores: Array) -> void:
+	_center.text = "%d  -  %d" % [scores[0], scores[1]]
+	_center_timer = 1.1
+	Sfx.play(&"finish")
 
 
 func _on_countdown(value: int) -> void:

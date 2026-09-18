@@ -288,6 +288,9 @@ func _assign_bots() -> void:
 	_clear_bots()
 	var seats := GameConfig.NET_MAX_PLAYERS - roster.size()
 	var wanted := mini(bot_count, maxi(seats, 0))
+	if mode == GameConfig.Mode.SLAP:
+		# 2v2 is always four. Empty seats are AI whatever the count says.
+		wanted = maxi(seats, 0)
 	var names := GameConfig.bot_names(wanted)
 	var slot := roster.size()
 	for index in wanted:
@@ -345,14 +348,14 @@ func _end_match() -> void:
 func send_local_input(frame: InputFrame) -> void:
 	if link != Link.CLIENT:
 		return
-	_push_axes.rpc_id(1, frame.move, frame.jump_held)
+	_push_axes.rpc_id(1, frame.move, frame.jump_held, frame.sprint_held)
 	var buttons := frame.button_counts()
 	if not buttons.is_empty():
 		_push_buttons.rpc_id(1, buttons)
 
 
 @rpc("any_peer", "unreliable_ordered")
-func _push_axes(move: Vector2, jump_held: bool) -> void:
+func _push_axes(move: Vector2, jump_held: bool, sprint_held: bool) -> void:
 	if not is_host():
 		return
 	var id := multiplayer.get_remote_sender_id()
@@ -362,6 +365,7 @@ func _push_axes(move: Vector2, jump_held: bool) -> void:
 		_remote_inputs[id] = frame
 	frame.move = move.limit_length(1.0)
 	frame.jump_held = jump_held
+	frame.sprint_held = sprint_held
 
 
 @rpc("any_peer", "reliable")
@@ -384,6 +388,7 @@ func take_remote_input(peer_id: int) -> InputFrame:
 	var out := InputFrame.new()
 	out.move = frame.move
 	out.jump_held = frame.jump_held
+	out.sprint_held = frame.sprint_held
 	out.merge_buttons(frame)
 	frame.clear_buttons()
 	return out

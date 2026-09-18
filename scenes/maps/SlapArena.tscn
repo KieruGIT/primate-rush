@@ -1,0 +1,130 @@
+[gd_scene load_steps=12 format=3]
+
+[ext_resource type="Script" path="res://scripts/world/MapData.gd" id="1_map"]
+[ext_resource type="PackedScene" path="res://scenes/Vine.tscn" id="2_vine"]
+[ext_resource type="PackedScene" path="res://scenes/Climbable.tscn" id="3_climb"]
+[ext_resource type="PackedScene" path="res://scenes/Checkpoint.tscn" id="4_check"]
+[ext_resource type="PackedScene" path="res://scenes/FinishLine.tscn" id="5_finish"]
+[ext_resource type="PackedScene" path="res://scenes/BananaSpawn.tscn" id="6_banana"]
+[ext_resource type="PackedScene" path="res://scenes/BouncePad.tscn" id="7_pad"]
+
+[sub_resource type="RectangleShape2D" id="Rect_Ground1"]
+size = Vector2(1120, 120)
+
+[sub_resource type="RectangleShape2D" id="Rect_Ledge2"]
+size = Vector2(220, 32)
+
+[sub_resource type="RectangleShape2D" id="Rect_Ledge3"]
+size = Vector2(220, 32)
+
+[sub_resource type="RectangleShape2D" id="Rect_Ledge4"]
+size = Vector2(220, 32)
+
+[node name="SlapArena" type="Node2D"]
+script = ExtResource("1_map")
+display_name = "Slap Island"
+spawn_point = Vector2(-360, 260)
+spawn_stride = Vector2(240, 0)
+kill_depth = 720
+progress_axis = Vector2(1, 0)
+camera_zoom = 0.78
+blast_half_width = 1250
+skin_palette = 3
+
+[node name="Level" type="StaticBody2D" parent="."]
+collision_layer = 1
+collision_mask = 0
+
+[node name="ColGround1" type="CollisionShape2D" parent="Level"]
+position = Vector2(0, 360)
+shape = SubResource("Rect_Ground1")
+
+[node name="VisGround1" type="ColorRect" parent="Level"]
+offset_left = -560
+offset_top = 300
+offset_right = 560
+offset_bottom = 420
+color = Color(0.22, 0.26, 0.24, 1)
+mouse_filter = 2
+
+[node name="ColLedge2" type="CollisionShape2D" parent="Level"]
+position = Vector2(-310, 166)
+shape = SubResource("Rect_Ledge2")
+
+[node name="VisLedge2" type="ColorRect" parent="Level"]
+offset_left = -420
+offset_top = 150
+offset_right = -200
+offset_bottom = 182
+color = Color(0.22, 0.26, 0.24, 1)
+mouse_filter = 2
+
+[node name="ColLedge3" type="CollisionShape2D" parent="Level"]
+position = Vector2(310, 166)
+shape = SubResource("Rect_Ledge3")
+
+[node name="VisLedge3" type="ColorRect" parent="Level"]
+offset_left = 200
+offset_top = 150
+offset_right = 420
+offset_bottom = 182
+color = Color(0.22, 0.26, 0.24, 1)
+mouse_filter = 2
+
+[node name="ColLedge4" type="CollisionShape2D" parent="Level"]
+position = Vector2(0, 36)
+shape = SubResource("Rect_Ledge4")
+
+[node name="VisLedge4" type="ColorRect" parent="Level"]
+offset_left = -110
+offset_top = 20
+offset_right = 110
+offset_bottom = 52
+color = Color(0.22, 0.26, 0.24, 1)
+mouse_filter = 2
+
+[node name="Climbables" type="Node2D" parent="."]
+
+[node name="Vines" type="Node2D" parent="."]
+
+[node name="Vine1" parent="Vines" instance=ExtResource("2_vine")]
+position = Vector2(0, -280)
+length = 180
+
+[node name="Checkpoints" type="Node2D" parent="."]
+
+[node name="BananaSpawns" type="Node2D" parent="."]
+
+[node name="Spawn1" parent="BananaSpawns" instance=ExtResource("6_banana")]
+position = Vector2(-300, 260)
+value = 2
+lucky_chance = 0.3
+
+[node name="Spawn2" parent="BananaSpawns" instance=ExtResource("6_banana")]
+position = Vector2(300, 260)
+value = 2
+lucky_chance = 0.3
+
+[node name="Spawn3" parent="BananaSpawns" instance=ExtResource("6_banana")]
+position = Vector2(-310, 110)
+value = 2
+lucky_chance = 0.3
+
+[node name="Spawn4" parent="BananaSpawns" instance=ExtResource("6_banana")]
+position = Vector2(310, 110)
+value = 2
+lucky_chance = 0.3
+
+[node name="Spawn5" parent="BananaSpawns" instance=ExtResource("6_banana")]
+position = Vector2(0, -20)
+value = 2
+lucky_chance = 0.3
+
+[node name="Spawn6" parent="BananaSpawns" instance=ExtResource("6_banana")]
+position = Vector2(0, 260)
+value = 2
+lucky_chance = 0.3
+
+[node name="Pads" type="Node2D" parent="."]
+
+[node name="Route" type="Node2D" parent="."]
