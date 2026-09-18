@@ -40,7 +40,8 @@ var map_id: StringName = &"map_a"
 var mode: int = GameConfig.Mode.RACE
 ## Filled into the roster at match start. Bots are ordinary roster entries
 ## with a negative id, so clients spawn them exactly like people.
-var bot_count: int = 0
+var bot_count: int = GameConfig.DEFAULT_BOTS
+var bot_skill: int = GameConfig.BotSkill.NORMAL
 var arena: Node = null
 
 var _peer: ENetMultiplayerPeer = null
@@ -205,6 +206,7 @@ func roster_wire() -> Dictionary:
 			"hat": String(roster[id].get("hat", &"none")),
 			"slot": int(roster[id]["slot"]),
 			"bot": bool(roster[id].get("bot", false)),
+			"name": String(roster[id].get("name", "")),
 		}
 	return wire
 
@@ -217,6 +219,7 @@ func apply_roster_wire(wire: Dictionary) -> void:
 			"hat": StringName(wire[key].get("hat", "none")),
 			"slot": int(wire[key]["slot"]),
 			"bot": bool(wire[key].get("bot", false)),
+			"name": String(wire[key].get("name", "")),
 		}
 	roster_changed.emit()
 
@@ -229,23 +232,31 @@ func _sync_roster(wire: Dictionary) -> void:
 func set_match_config(new_map: StringName, new_mode: int) -> void:
 	map_id = new_map
 	mode = new_mode
-	config_changed.emit()
-	if is_host():
-		_sync_config.rpc(String(new_map), new_mode, bot_count)
+	_push_config()
 
 
 func set_bot_count(count: int) -> void:
 	bot_count = clampi(count, 0, GameConfig.NET_MAX_PLAYERS - 1)
+	_push_config()
+
+
+func set_bot_skill(skill: int) -> void:
+	bot_skill = clampi(skill, 0, GameConfig.BOT_SKILL_NAMES.size() - 1)
+	_push_config()
+
+
+func _push_config() -> void:
 	config_changed.emit()
 	if is_host():
-		_sync_config.rpc(String(map_id), mode, bot_count)
+		_sync_config.rpc(String(map_id), mode, bot_count, bot_skill)
 
 
 @rpc("authority", "reliable")
-func _sync_config(wire_map: String, wire_mode: int, wire_bots: int) -> void:
+func _sync_config(wire_map: String, wire_mode: int, wire_bots: int, wire_skill: int) -> void:
 	map_id = StringName(wire_map)
 	mode = wire_mode
 	bot_count = wire_bots
+	bot_skill = wire_skill
 	config_changed.emit()
 
 
@@ -265,7 +276,7 @@ func start_match() -> void:
 	_assign_bots()
 	# Config and roster first, and reliably, so a client cannot start loading
 	# a match before it knows the map or who is in it.
-	_sync_config.rpc(String(map_id), mode, bot_count)
+	_sync_config.rpc(String(map_id), mode, bot_count, bot_skill)
 	_broadcast_roster()
 	_start_match.rpc()
 	_start_match()
@@ -277,6 +288,7 @@ func _assign_bots() -> void:
 	_clear_bots()
 	var seats := GameConfig.NET_MAX_PLAYERS - roster.size()
 	var wanted := mini(bot_count, maxi(seats, 0))
+	var names := GameConfig.bot_names(wanted)
 	var slot := roster.size()
 	for index in wanted:
 		roster[-(index + 1)] = {
@@ -284,6 +296,7 @@ func _assign_bots() -> void:
 			"hat": &"none",
 			"slot": slot,
 			"bot": true,
+			"name": names[index],
 		}
 		slot += 1
 

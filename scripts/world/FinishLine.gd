@@ -37,15 +37,24 @@ func _on_area_entered(area: Area2D) -> void:
 
 
 func _draw() -> void:
-	# Checkerboard, because a solid rectangle in a gray-box level reads as
-	# more level geometry rather than as the thing you are running at.
-	var cell := 20.0
+	# A chequered banner between two poles. Black and white rather than the
+	# banner colour, which goes on the frame: a finish line should read as a
+	# finish line before it reads as this game's palette.
+	var outline := Color8(30, 26, 24)
+	var wood := Color8(142, 96, 58)
 	var origin := -size * 0.5
-	var rows := int(size.y / cell)
-	var cols := int(size.x / cell)
+	var cell := 16.0
+	var cols := maxi(1, int(size.x / cell))
+	var rows := maxi(1, int(size.y / cell))
+	var cell_size := Vector2(size.x / cols, size.y / rows)
+	draw_rect(Rect2(origin - Vector2(4, 4), size + Vector2(8, 8)), outline)
 	for row in rows:
 		for col in cols:
-			if (row + col) % 2 != 0:
-				continue
-			draw_rect(Rect2(origin + Vector2(col * cell, row * cell), Vector2(cell, cell)), banner_color, true)
-	draw_rect(Rect2(origin, size), banner_color.darkened(0.3), false, 3.0)
+			var light := (row + col) % 2 == 0
+			draw_rect(Rect2(origin + Vector2(col, row) * cell_size, cell_size), Color(0.96, 0.96, 0.92) if light else Color8(40, 38, 44))
+	draw_rect(Rect2(origin - Vector2(2, 2), size + Vector2(4, 4)), banner_color, false, 3.0)
+	for x in [origin.x - 10.0, origin.x + size.x + 2.0]:
+		draw_rect(Rect2(x, origin.y - 18.0, 8.0, size.y + 18.0), outline)
+		draw_rect(Rect2(x + 2.0, origin.y - 16.0, 4.0, size.y + 16.0), wood)
+		draw_circle(Vector2(x + 4.0, origin.y - 18.0), 6.0, outline)
+		draw_circle(Vector2(x + 4.0, origin.y - 18.0), 4.0, banner_color)

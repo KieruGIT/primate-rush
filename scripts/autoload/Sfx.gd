@@ -1,20 +1,22 @@
 extends Node
 
 # ============================================================
-# SFX - sound, synthesised at startup, with no audio files.
+# SFX - gameplay sound synthesised at startup, interface sound from the pack.
 #
-# The project has no art and no audio budget, but silence hides real
-# information: you cannot hear that your hit connected, that a jump was
-# short, or that someone picked up the banana you were running at. These are
-# short waveforms built into AudioStreamWAV buffers when the game loads -
-# a few hundred kilobytes of RAM, nothing on disk, nothing to license.
+# The project has no audio budget, but silence hides real information: you
+# cannot hear that your hit connected, that a jump was short, or that someone
+# picked up the banana you were running at. Every gameplay cue is a short
+# waveform built into an AudioStreamWAV buffer when the game loads - a few
+# hundred kilobytes of RAM, nothing on disk, nothing to license.
 #
-# They are placeholders in the same sense the coloured rectangles are: the
-# call sites are what matter, and swapping in recorded audio later means
-# replacing the buffers, not finding every place a sound should play.
+# Interface clicks are the exception. A menu tap is a transient, which is the
+# one shape a sine sweep cannot fake, and the UI pack ships three of them.
+# Those load from disk with a synthesised blip as the fallback, so a stripped
+# assets folder costs the game a nicer click and nothing else.
 # ============================================================
 
 const RATE: int = 22050
+const UI_SOUND_DIR := "res://assets/kenney_ui-pack/Sounds"
 ## Enough voices that a four-monkey pile-up does not cut itself off, few
 ## enough that nothing is ever queued.
 const VOICES: int = 10
@@ -46,7 +48,7 @@ func _exit_tree() -> void:
 
 
 func play(id: StringName, pitch: float = 1.0, volume_db: float = 0.0) -> void:
-	var stream: AudioStreamWAV = _sounds.get(id)
+	var stream: AudioStream = _sounds.get(id)
 	if stream == null or _pool.is_empty():
 		return
 	# Round robin rather than "find a free one": the oldest voice is the
@@ -88,6 +90,17 @@ func _build_sounds() -> void:
 	_sounds[&"beep"] = _sweep(620.0, 620.0, 0.10, 0.0, 7.0)
 	_sounds[&"go"] = _sweep(880.0, 1180.0, 0.28, 0.0, 3.5)
 	_sounds[&"finish"] = _sweep(660.0, 1320.0, 0.45, 0.0, 2.5)
+	_sounds[&"ui_click"] = _file("click-a.ogg", _sweep(900.0, 620.0, 0.05, 0.25, 22.0))
+	_sounds[&"ui_select"] = _file("switch-a.ogg", _sweep(520.0, 780.0, 0.07, 0.1, 16.0))
+	_sounds[&"ui_deny"] = _file("tap-b.ogg", _sweep(300.0, 170.0, 0.14, 0.3, 12.0))
+
+
+func _file(name: String, fallback: AudioStream) -> AudioStream:
+	var path := "%s/%s" % [UI_SOUND_DIR, name]
+	if not ResourceLoader.exists(path):
+		return fallback
+	var stream := load(path) as AudioStream
+	return stream if stream != null else fallback
 
 
 ## One voice: a sine sweeping from start to end, mixed with `noise` worth of

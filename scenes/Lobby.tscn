@@ -1,6 +1,17 @@
-[gd_scene load_steps=2 format=3]
+[gd_scene load_steps=5 format=3]
 
 [ext_resource type="Script" path="res://scripts/ui/Lobby.gd" id="1_lobby"]
+
+[sub_resource type="Gradient" id="Gradient_bg"]
+offsets = PackedFloat32Array(0, 0.55, 1)
+colors = PackedColorArray(0.086, 0.161, 0.125, 1, 0.055, 0.094, 0.078, 1, 0.031, 0.047, 0.043, 1)
+
+[sub_resource type="GradientTexture2D" id="GradientTexture2D_bg"]
+gradient = SubResource("Gradient_bg")
+width = 8
+height = 256
+fill_from = Vector2(0, 0)
+fill_to = Vector2(0, 1)
 
 [node name="Lobby" type="Control"]
 anchors_preset = 15
@@ -10,211 +21,353 @@ grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1_lobby")
 
-[node name="Background" type="ColorRect" parent="."]
+[node name="Background" type="TextureRect" parent="."]
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-color = Color(0.09, 0.11, 0.13, 1)
+texture = SubResource("GradientTexture2D_bg")
+expand_mode = 1
+stretch_mode = 1
 mouse_filter = 2
 
-[node name="Scroll" type="ScrollContainer" parent="."]
+[node name="Margin" type="MarginContainer" parent="."]
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
+theme_override_constants/margin_left = 28
+theme_override_constants/margin_top = 20
+theme_override_constants/margin_right = 28
+theme_override_constants/margin_bottom = 20
 
-[node name="Margin" type="MarginContainer" parent="Scroll"]
+[node name="Root" type="VBoxContainer" parent="Margin"]
+layout_mode = 2
+theme_override_constants/separation = 16
+
+[node name="Header" type="HBoxContainer" parent="Margin/Root"]
+layout_mode = 2
+theme_override_constants/separation = 20
+
+[node name="Titles" type="VBoxContainer" parent="Margin/Root/Header"]
 layout_mode = 2
 size_flags_horizontal = 3
-size_flags_vertical = 3
-theme_override_constants/margin_left = 32
-theme_override_constants/margin_top = 22
-theme_override_constants/margin_right = 32
-theme_override_constants/margin_bottom = 22
+theme_override_constants/separation = 2
 
-[node name="Columns" type="HBoxContainer" parent="Scroll/Margin"]
+[node name="Title" type="Label" parent="Margin/Root/Header/Titles"]
 layout_mode = 2
-theme_override_constants/separation = 36
-
-[node name="Left" type="VBoxContainer" parent="Scroll/Margin/Columns"]
-layout_mode = 2
-size_flags_horizontal = 3
-theme_override_constants/separation = 10
-
-[node name="Title" type="Label" parent="Scroll/Margin/Columns/Left"]
-layout_mode = 2
+theme_type_variation = &"Title"
 text = "MONKEY"
 
-[node name="Subtitle" type="Label" parent="Scroll/Margin/Columns/Left"]
+[node name="Subtitle" type="Label" parent="Margin/Root/Header/Titles"]
 layout_mode = 2
-autowrap_mode = 3
+theme_type_variation = &"Muted"
 text = "Nobody dies. You just get knocked around."
 
-[node name="MonkeyLabel" type="Label" parent="Scroll/Margin/Columns/Left"]
+[node name="CareerCard" type="PanelContainer" parent="Margin/Root/Header"]
 layout_mode = 2
-text = "Monkey"
+size_flags_vertical = 4
+theme_type_variation = &"Card"
 
-[node name="MonkeyRow" type="GridContainer" parent="Scroll/Margin/Columns/Left"]
+[node name="CareerBox" type="VBoxContainer" parent="Margin/Root/Header/CareerCard"]
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="CareerLabel" type="Label" parent="Margin/Root/Header/CareerCard/CareerBox"]
+layout_mode = 2
+theme_type_variation = &"Subheading"
+text = "CAREER"
+
+[node name="Career" type="Label" parent="Margin/Root/Header/CareerCard/CareerBox"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(320, 0)
+layout_mode = 2
+theme_type_variation = &"Muted"
+autowrap_mode = 3
+text = ""
+
+[node name="Body" type="HBoxContainer" parent="Margin/Root"]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_constants/separation = 18
+
+[node name="Roster" type="PanelContainer" parent="Margin/Root/Body"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_stretch_ratio = 1.35
+theme_type_variation = &"Card"
+
+[node name="RosterScroll" type="ScrollContainer" parent="Margin/Root/Body/Roster"]
+layout_mode = 2
+horizontal_scroll_mode = 0
+
+[node name="RosterBox" type="VBoxContainer" parent="Margin/Root/Body/Roster/RosterScroll"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 12
+
+[node name="MonkeyLabel" type="Label" parent="Margin/Root/Body/Roster/RosterScroll/RosterBox"]
+layout_mode = 2
+theme_type_variation = &"Heading"
+text = "CHOOSE YOUR MONKEY"
+
+[node name="MonkeyRow" type="GridContainer" parent="Margin/Root/Body/Roster/RosterScroll/RosterBox"]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_constants/h_separation = 10
 theme_override_constants/v_separation = 10
 columns = 3
 
-[node name="Blurb" type="Label" parent="Scroll/Margin/Columns/Left"]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 64)
+[node name="Detail" type="PanelContainer" parent="Margin/Root/Body/Roster/RosterScroll/RosterBox"]
 layout_mode = 2
+theme_type_variation = &"CardHighlight"
+
+[node name="DetailBox" type="HBoxContainer" parent="Margin/Root/Body/Roster/RosterScroll/RosterBox/Detail"]
+layout_mode = 2
+theme_override_constants/separation = 14
+
+[node name="Portrait" type="TextureRect" parent="Margin/Root/Body/Roster/RosterScroll/RosterBox/Detail/DetailBox"]
+unique_name_in_owner = true
+texture_filter = 1
+custom_minimum_size = Vector2(96, 96)
+layout_mode = 2
+size_flags_vertical = 4
+expand_mode = 1
+stretch_mode = 5
+
+[node name="DetailText" type="VBoxContainer" parent="Margin/Root/Body/Roster/RosterScroll/RosterBox/Detail/DetailBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 8
+
+[node name="PickedName" type="Label" parent="Margin/Root/Body/Roster/RosterScroll/RosterBox/Detail/DetailBox/DetailText"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_type_variation = &"Value"
+text = ""
+
+[node name="Blurb" type="Label" parent="Margin/Root/Body/Roster/RosterScroll/RosterBox/Detail/DetailBox/DetailText"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 40)
+layout_mode = 2
+theme_type_variation = &"Muted"
 autowrap_mode = 3
 text = ""
 
-[node name="HatLabel" type="Label" parent="Scroll/Margin/Columns/Left"]
+[node name="Stats" type="GridContainer" parent="Margin/Root/Body/Roster/RosterScroll/RosterBox/Detail/DetailBox/DetailText"]
+unique_name_in_owner = true
 layout_mode = 2
-text = "Headwear"
+theme_override_constants/h_separation = 12
+theme_override_constants/v_separation = 6
+columns = 2
 
-[node name="HatRow" type="GridContainer" parent="Scroll/Margin/Columns/Left"]
+[node name="Skill" type="Label" parent="Margin/Root/Body/Roster/RosterScroll/RosterBox/Detail/DetailBox/DetailText"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_type_variation = &"Subheading"
+autowrap_mode = 3
+text = ""
+
+[node name="HatLabel" type="Label" parent="Margin/Root/Body/Roster/RosterScroll/RosterBox"]
+layout_mode = 2
+theme_type_variation = &"Heading"
+text = "HEADWEAR"
+
+[node name="HatRow" type="GridContainer" parent="Margin/Root/Body/Roster/RosterScroll/RosterBox"]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_constants/h_separation = 10
 theme_override_constants/v_separation = 10
 columns = 3
 
-[node name="CareerLabel" type="Label" parent="Scroll/Margin/Columns/Left"]
+[node name="Help" type="Label" parent="Margin/Root/Body/Roster/RosterScroll/RosterBox"]
 layout_mode = 2
-text = "Career"
-
-[node name="Career" type="Label" parent="Scroll/Margin/Columns/Left"]
-unique_name_in_owner = true
-layout_mode = 2
+theme_type_variation = &"Muted"
 autowrap_mode = 3
-text = ""
+text = "A / D move    W / S climb and rope    Space jump    J hit    K skill    Esc leave"
 
-[node name="Help" type="Label" parent="Scroll/Margin/Columns/Left"]
+[node name="Match" type="PanelContainer" parent="Margin/Root/Body"]
 layout_mode = 2
-autowrap_mode = 3
-text = "Keyboard: A/D move, W/S climb and rope, Space jump, J hit, K skill, Esc leave."
+size_flags_horizontal = 3
+theme_type_variation = &"Card"
 
-[node name="Right" type="VBoxContainer" parent="Scroll/Margin/Columns"]
+[node name="MatchScroll" type="ScrollContainer" parent="Margin/Root/Body/Match"]
+layout_mode = 2
+horizontal_scroll_mode = 0
+
+[node name="MatchBox" type="VBoxContainer" parent="Margin/Root/Body/Match/MatchScroll"]
 layout_mode = 2
 size_flags_horizontal = 3
 theme_override_constants/separation = 10
 
-[node name="MapLabel" type="Label" parent="Scroll/Margin/Columns/Right"]
+[node name="MatchLabel" type="Label" parent="Margin/Root/Body/Match/MatchScroll/MatchBox"]
 layout_mode = 2
-text = "Map and mode (host decides)"
+theme_type_variation = &"Heading"
+text = "MATCH"
 
-[node name="MapRow" type="HBoxContainer" parent="Scroll/Margin/Columns/Right"]
+[node name="MapCaption" type="Label" parent="Margin/Root/Body/Match/MatchScroll/MatchBox"]
+layout_mode = 2
+theme_type_variation = &"Subheading"
+text = "MAP"
+
+[node name="MapRow" type="HBoxContainer" parent="Margin/Root/Body/Match/MatchScroll/MatchBox"]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_constants/separation = 10
+theme_override_constants/separation = 8
 
-[node name="ModeRow" type="HBoxContainer" parent="Scroll/Margin/Columns/Right"]
+[node name="ModeCaption" type="Label" parent="Margin/Root/Body/Match/MatchScroll/MatchBox"]
+layout_mode = 2
+theme_type_variation = &"Subheading"
+text = "MODE"
+
+[node name="ModeRow" type="HBoxContainer" parent="Margin/Root/Body/Match/MatchScroll/MatchBox"]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_constants/separation = 10
+theme_override_constants/separation = 8
 
-[node name="BotLabel" type="Label" parent="Scroll/Margin/Columns/Right"]
-layout_mode = 2
-text = "Bots filling empty seats"
-
-[node name="BotRow" type="HBoxContainer" parent="Scroll/Margin/Columns/Right"]
+[node name="BotLabel" type="Label" parent="Margin/Root/Body/Match/MatchScroll/MatchBox"]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_constants/separation = 10
+theme_type_variation = &"Subheading"
+text = "AI OPPONENTS"
 
-[node name="HostsLabel" type="Label" parent="Scroll/Margin/Columns/Right"]
+[node name="BotRow" type="HBoxContainer" parent="Margin/Root/Body/Match/MatchScroll/MatchBox"]
+unique_name_in_owner = true
 layout_mode = 2
-text = "Hosts on this network"
+theme_override_constants/separation = 8
 
-[node name="HostsList" type="VBoxContainer" parent="Scroll/Margin/Columns/Right"]
+[node name="SkillCaption" type="Label" parent="Margin/Root/Body/Match/MatchScroll/MatchBox"]
+layout_mode = 2
+theme_type_variation = &"Subheading"
+text = "AI SKILL"
+
+[node name="SkillRow" type="HBoxContainer" parent="Margin/Root/Body/Match/MatchScroll/MatchBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="PlayLabel" type="Label" parent="Margin/Root/Body/Match/MatchScroll/MatchBox"]
+layout_mode = 2
+theme_type_variation = &"Heading"
+text = "PLAY"
+
+[node name="SoloButton" type="Button" parent="Margin/Root/Body/Match/MatchScroll/MatchBox"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 68)
+layout_mode = 2
+theme_type_variation = &"PrimaryButton"
+text = "PLAY SOLO"
+
+[node name="MatchRow" type="HBoxContainer" parent="Margin/Root/Body/Match/MatchScroll/MatchBox"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="StartButton" type="Button" parent="Margin/Root/Body/Match/MatchScroll/MatchBox/MatchRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 56)
+layout_mode = 2
+size_flags_horizontal = 3
+theme_type_variation = &"PrimaryButton"
+text = "START MATCH"
+
+[node name="LeaveButton" type="Button" parent="Margin/Root/Body/Match/MatchScroll/MatchBox/MatchRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(130, 56)
+layout_mode = 2
+theme_type_variation = &"DangerButton"
+text = "LEAVE"
+
+[node name="OnlineLabel" type="Label" parent="Margin/Root/Body/Match/MatchScroll/MatchBox"]
+layout_mode = 2
+theme_type_variation = &"Heading"
+text = "PLAY TOGETHER"
+
+[node name="NetRow" type="HBoxContainer" parent="Margin/Root/Body/Match/MatchScroll/MatchBox"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="HostButton" type="Button" parent="Margin/Root/Body/Match/MatchScroll/MatchBox/NetRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(120, 54)
+layout_mode = 2
+text = "HOST"
+
+[node name="IpField" type="LineEdit" parent="Margin/Root/Body/Match/MatchScroll/MatchBox/NetRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 54)
+layout_mode = 2
+size_flags_horizontal = 3
+placeholder_text = "host IP"
+
+[node name="JoinButton" type="Button" parent="Margin/Root/Body/Match/MatchScroll/MatchBox/NetRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(120, 54)
+layout_mode = 2
+text = "JOIN"
+
+[node name="HostsCaption" type="Label" parent="Margin/Root/Body/Match/MatchScroll/MatchBox"]
+layout_mode = 2
+theme_type_variation = &"Subheading"
+text = "HOSTS ON THIS NETWORK"
+
+[node name="HostsList" type="VBoxContainer" parent="Margin/Root/Body/Match/MatchScroll/MatchBox"]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_constants/separation = 6
 
-[node name="NetRow" type="HBoxContainer" parent="Scroll/Margin/Columns/Right"]
+[node name="RosterCaption" type="Label" parent="Margin/Root/Body/Match/MatchScroll/MatchBox"]
 layout_mode = 2
-theme_override_constants/separation = 10
+theme_type_variation = &"Subheading"
+text = "IN THIS LOBBY"
 
-[node name="HostButton" type="Button" parent="Scroll/Margin/Columns/Right/NetRow"]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(120, 52)
-layout_mode = 2
-text = "Host"
-
-[node name="IpField" type="LineEdit" parent="Scroll/Margin/Columns/Right/NetRow"]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(240, 52)
-layout_mode = 2
-placeholder_text = "host IP, e.g. 192.168.1.20"
-
-[node name="JoinButton" type="Button" parent="Scroll/Margin/Columns/Right/NetRow"]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(120, 52)
-layout_mode = 2
-text = "Join"
-
-[node name="MatchRow" type="HBoxContainer" parent="Scroll/Margin/Columns/Right"]
-layout_mode = 2
-theme_override_constants/separation = 10
-
-[node name="SoloButton" type="Button" parent="Scroll/Margin/Columns/Right/MatchRow"]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(140, 52)
-layout_mode = 2
-text = "Play solo"
-
-[node name="StartButton" type="Button" parent="Scroll/Margin/Columns/Right/MatchRow"]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(160, 52)
-layout_mode = 2
-text = "Start match"
-
-[node name="LeaveButton" type="Button" parent="Scroll/Margin/Columns/Right/MatchRow"]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(120, 52)
-layout_mode = 2
-text = "Leave"
-
-[node name="InternetButton" type="Button" parent="Scroll/Margin/Columns/Right"]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 48)
-layout_mode = 2
-text = "Open this game to the internet (UPnP)"
-
-[node name="PublicAddress" type="Label" parent="Scroll/Margin/Columns/Right"]
+[node name="RosterList" type="Label" parent="Margin/Root/Body/Match/MatchScroll/MatchBox"]
 unique_name_in_owner = true
 layout_mode = 2
-autowrap_mode = 3
-text = ""
-
-[node name="RosterList" type="Label" parent="Scroll/Margin/Columns/Right"]
-unique_name_in_owner = true
-layout_mode = 2
+theme_type_variation = &"Muted"
 autowrap_mode = 3
 text = "Not connected."
 
-[node name="StoreRow" type="HBoxContainer" parent="Scroll/Margin/Columns/Right"]
-layout_mode = 2
-theme_override_constants/separation = 10
-
-[node name="StoreButton" type="Button" parent="Scroll/Margin/Columns/Right/StoreRow"]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(260, 52)
-layout_mode = 2
-text = "Unlock premium monkey"
-
-[node name="RestoreButton" type="Button" parent="Scroll/Margin/Columns/Right/StoreRow"]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(160, 52)
-layout_mode = 2
-text = "Restore"
-
-[node name="Status" type="Label" parent="Scroll/Margin/Columns/Right"]
+[node name="InternetButton" type="Button" parent="Margin/Root/Body/Match/MatchScroll/MatchBox"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(0, 48)
+layout_mode = 2
+theme_type_variation = &"QuietButton"
+text = "OPEN TO THE INTERNET (UPnP)"
+
+[node name="PublicAddress" type="Label" parent="Margin/Root/Body/Match/MatchScroll/MatchBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_type_variation = &"Muted"
+autowrap_mode = 3
+text = ""
+
+[node name="StoreRow" type="HBoxContainer" parent="Margin/Root/Body/Match/MatchScroll/MatchBox"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="StoreButton" type="Button" parent="Margin/Root/Body/Match/MatchScroll/MatchBox/StoreRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 48)
+layout_mode = 2
+size_flags_horizontal = 3
+theme_type_variation = &"QuietButton"
+text = "UNLOCK PREMIUM MONKEY"
+
+[node name="RestoreButton" type="Button" parent="Margin/Root/Body/Match/MatchScroll/MatchBox/StoreRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(130, 48)
+layout_mode = 2
+theme_type_variation = &"QuietButton"
+text = "RESTORE"
+
+[node name="StatusBar" type="PanelContainer" parent="Margin/Root"]
+layout_mode = 2
+theme_type_variation = &"Overlay"
+
+[node name="Status" type="Label" parent="Margin/Root/StatusBar"]
+unique_name_in_owner = true
 layout_mode = 2
 autowrap_mode = 3
 text = ""
