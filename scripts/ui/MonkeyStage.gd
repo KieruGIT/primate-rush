@@ -36,9 +36,10 @@ func set_monkey(id: StringName, locked: bool = false) -> void:
 	# Menus show the monkey facing you.
 	_sprite.setup(id, true)
 	_sprite.scale = Vector2.ONE * pixel_scale
-	# A locked monkey is a silhouette: you can see what you would get, which
-	# is the whole pitch, without it looking like you already have it.
-	_sprite.modulate = Color(0.05, 0.08, 0.07, 0.9) if locked else Color.WHITE
+	# A locked monkey is a muted silhouette, but it must still read on the shop
+	# card: showing the shape is the purchase pitch. Near-black disappeared into
+	# the glass panel on dim phone screens and looked like a missing asset.
+	_sprite.modulate = Color(0.34, 0.39, 0.35, 0.92) if locked else Color.WHITE
 	_sprite.play(&"idle")
 	_place()
 	queue_redraw()

@@ -19,6 +19,7 @@ extends Node2D
 # ============================================================
 
 const PACK := "res://assets/kenney_pixel-platformer/"
+const CLIMBABLE_SCENE := preload("res://scenes/Climbable.tscn")
 const SRC: int = 18
 const SCALE: int = 2
 const TILE: int = SRC * SCALE
@@ -130,6 +131,10 @@ func _draw() -> void:
 		if bool(item[3]):
 			_draw_decor(item)
 	_draw_water()
+	# Projected side/bottom faces sit behind the playable collision surface.
+	# They do not change the map, but stop platforms reading as paper cutouts.
+	for rect in _solids:
+		_draw_depth_extrusion(rect)
 	for rect in _thick:
 		_draw_ground(rect)
 	for rect in _columns:
@@ -139,6 +144,23 @@ func _draw() -> void:
 	for item in _decor:
 		if not bool(item[3]):
 			_draw_decor(item)
+
+
+func _draw_depth_extrusion(rect: Rect2) -> void:
+	var offset := Vector2(12.0, 15.0)
+	var visible_depth := minf(rect.size.y, 42.0)
+	var top_right := Vector2(rect.end.x, rect.position.y)
+	var lower_right := Vector2(rect.end.x, rect.position.y + visible_depth)
+	var lower_left := Vector2(rect.position.x, rect.position.y + visible_depth)
+	# Right plane catches cool ambient shade; lower plane is deeper and gives
+	# every ledge a readable thickness against the sky and water.
+	draw_colored_polygon(PackedVector2Array([
+		top_right, top_right + offset, lower_right + offset, lower_right
+	]), Color(0.12, 0.15, 0.25, 0.68))
+	draw_colored_polygon(PackedVector2Array([
+		lower_left, lower_right, lower_right + offset, lower_left + offset
+	]), Color(0.075, 0.085, 0.16, 0.78))
+	draw_line(top_right + Vector2(2, 3), top_right + offset, Color(0.48, 0.64, 0.68, 0.45), 2.0)
 
 
 func _draw_ground(rect: Rect2) -> void:
@@ -234,10 +256,14 @@ func _plan_decor() -> void:
 		while x < rect.end.x - 120.0:
 			var roll := rng.randf()
 			if roll < 0.35:
-				_decor.append([&"tree", Vector2(x, rect.position.y), rng.randf() < 0.5, true])
+				var foot := Vector2(x, rect.position.y)
+				_decor.append([&"tree", foot, rng.randf() < 0.5, true])
+				_add_tree_climbable(foot, TILE * 3.6, TILE * 0.8)
 				x += rng.randf_range(260.0, 420.0)
 			elif roll < 0.55:
-				_decor.append([&"thin_tree", Vector2(x, rect.position.y), false, true])
+				var foot := Vector2(x, rect.position.y)
+				_decor.append([&"thin_tree", foot, false, true])
+				_add_tree_climbable(foot, TILE * 5.8, TILE * 0.7)
 				x += rng.randf_range(160.0, 260.0)
 			else:
 				_decor.append([SHRUBS[rng.randi() % SHRUBS.size()], Vector2(x, rect.position.y), rng.randf() < 0.5, false])
@@ -248,6 +274,15 @@ func _plan_decor() -> void:
 			_decor.append([SHRUBS[rng.randi() % SHRUBS.size()], at, rng.randf() < 0.5, false])
 
 
+func _add_tree_climbable(foot: Vector2, height: float, width: float) -> void:
+	var climbable := CLIMBABLE_SCENE.instantiate() as Climbable
+	climbable.name = "TreeClimbable%d" % get_child_count()
+	climbable.position = foot - Vector2(0.0, height * 0.5)
+	climbable.size = Vector2(width, height)
+	climbable.draw_debug_face = false
+	add_child(climbable)
+
+
 func _draw_decor(item: Array) -> void:
 	var kind: Variant = item[0]
 	var foot: Vector2 = item[1]
@@ -256,6 +291,7 @@ func _draw_decor(item: Array) -> void:
 		var trunk_x := foot.x - TILE * 0.5
 		for i in TRUNK.size():
 			_blit(TRUNK[i], 0.0, SRC, SRC, Vector2(trunk_x, foot.y - TILE * (TRUNK.size() - i)))
+		_draw_climb_marks(foot, TILE * 3.0)
 		var canopy_top := foot.y - TILE * (TRUNK.size() + 3) + 6.0
 		for row in 3:
 			for col in 3:
@@ -264,8 +300,19 @@ func _draw_decor(item: Array) -> void:
 		var x := foot.x - TILE * 0.5
 		for i in THIN_TREE.size():
 			_blit(THIN_TREE[i], 0.0, SRC, SRC, Vector2(x, foot.y - TILE * (THIN_TREE.size() - i)))
+		_draw_climb_marks(foot, TILE * 5.5)
 	else:
 		_blit(int(kind), 0.0, SRC, SRC, foot - Vector2(TILE * 0.5, TILE))
+
+
+func _draw_climb_marks(foot: Vector2, height: float) -> void:
+	# A few bright ivy hooks teach the player that the trunk is gameplay.
+	var green := Color(0.35, 0.82, 0.28, 0.95)
+	var y := foot.y - 24.0
+	while y > foot.y - height:
+		draw_line(Vector2(foot.x - 7.0, y), Vector2(foot.x + 6.0, y - 8.0), green, 3.0)
+		draw_circle(Vector2(foot.x + 8.0, y - 9.0), 3.5, green.lightened(0.18))
+		y -= 30.0
 
 
 # --- Backdrop ------------------------------------------------------

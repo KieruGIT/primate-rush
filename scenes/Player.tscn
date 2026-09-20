@@ -13,7 +13,7 @@ size = Vector2(44, 56)
 radius = 60.0
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_hit"]
-size = Vector2(52, 52)
+size = Vector2(116, 66)
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_hurt"]
 size = Vector2(32, 64)
@@ -53,7 +53,7 @@ monitorable = false
 shape = SubResource("CircleShape2D_vine")
 
 [node name="Hitbox" type="Area2D" parent="."]
-position = Vector2(38, -4)
+position = Vector2(58, -4)
 collision_layer = 4
 collision_mask = 8
 monitoring = false

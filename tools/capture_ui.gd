@@ -21,9 +21,11 @@ const SHOTS := {
 	"settings": "res://scenes/Menu.tscn|page5",
 	"loading": "res://scenes/MatchLoading.tscn|cast",
 	"loading_slap": "res://scenes/MatchLoading.tscn|slapcast",
+	"results": "res://scenes/Results.tscn|results",
 	"game_a": "res://scenes/Main.tscn|map_a",
 	"game_b": "res://scenes/Main.tscn|map_b",
 	"game_c": "res://scenes/Main.tscn|map_c",
+	"slap_demo": "res://scenes/Main.tscn|slap_demo",
 	"overview_a": "res://scenes/maps/MapA.tscn|overview",
 	"overview_b": "res://scenes/maps/MapB.tscn|overview",
 }
@@ -31,7 +33,7 @@ const SHOTS := {
 const SIZE := Vector2i(1280, 720)
 ## Long enough for the theme to apply, the rows to build and one layout pass
 ## to settle. A shot taken on the first frame catches every container at zero.
-const SETTLE_SECONDS := 1.2
+const SETTLE_FRAMES := 72
 
 
 func _ready() -> void:
@@ -63,16 +65,27 @@ func _shoot(key: String, path: String, out: String) -> void:
 	if path.contains("|"):
 		extra = path.get_slice("|", 1)
 		path = path.get_slice("|", 0)
-	if extra.begins_with("map_") or extra.ends_with("cast"):
-		Net.mode = GameConfig.Mode.SLAP if extra == "slapcast" or extra == "map_c" else GameConfig.Mode.RACE
+	if extra.begins_with("map_") or extra.ends_with("cast") or extra == "slap_demo":
+		Net.mode = GameConfig.Mode.SLAP if extra == "slapcast" or extra == "map_c" or extra == "slap_demo" else GameConfig.Mode.RACE
 		if extra.begins_with("map_"):
 			Net.map_id = StringName(extra)
+		elif extra == "slap_demo":
+			Net.map_id = &"map_c"
 		# A full lobby of different monkeys, three of them bots, so the shot
 		# shows the roster side by side and something is always moving.
 		Net.roster.clear()
 		var cast: Array[StringName] = [&"macaque", &"gorilla", &"capuchin", &"orangutan"]
 		for slot in cast.size():
 			Net.roster[slot + 1] = {"monkey": cast[slot], "hat": &"none", "slot": slot, "bot": slot > 0, "name": ["", "Mango", "Kiwi", "Pip"][slot]}
+	elif extra == "results":
+		Net.mode = GameConfig.Mode.RACE
+		Net.map_id = &"map_a"
+		Net.roster = {
+			1: {"monkey": &"macaque", "hat": &"none", "slot": 0, "name": ""},
+			-1: {"monkey": &"gorilla", "hat": &"none", "slot": 1, "bot": true, "name": "Mango"},
+			-2: {"monkey": &"capuchin", "hat": &"none", "slot": 2, "bot": true, "name": "Kiwi"},
+			-3: {"monkey": &"orangutan", "hat": &"none", "slot": 3, "bot": true, "name": "Pip"},
+		}
 	var screen: Node = load(path).instantiate()
 	if screen.get(&"force_touch_controls") != null:
 		screen.set(&"force_touch_controls", true)
@@ -82,6 +95,13 @@ func _shoot(key: String, path: String, out: String) -> void:
 	if screen is Control:
 		(screen as Control).theme = UiTheme.build()
 	viewport.add_child(screen)
+	if extra == "results":
+		screen.call(&"show_results", [
+			{"id": 1, "time": 37.20, "finished": true},
+			{"id": -1, "time": 39.84, "finished": true},
+			{"id": -2, "time": 44.12, "finished": true},
+			{"id": -3, "time": 0.0, "finished": false},
+		])
 	if extra.begins_with("page"):
 		# Menu pages: jump straight to one, and to a step inside PLAY.
 		var parts := extra.trim_prefix("page").split("step")
@@ -95,16 +115,28 @@ func _shoot(key: String, path: String, out: String) -> void:
 	if extra == "overview":
 		_frame_whole_map(viewport, screen as Node2D)
 
-	var elapsed := 0.0
-	while elapsed < SETTLE_SECONDS:
+	# Headless rendering can report a zero process delta on Windows. Counting
+	# frames keeps capture automation deterministic, and the draw barrier keeps
+	# rapid batch captures from reading a half-laid-out render-thread frame.
+	for _frame in SETTLE_FRAMES:
 		await get_tree().process_frame
-		elapsed += get_process_delta_time()
-	await RenderingServer.frame_post_draw
+		await RenderingServer.frame_post_draw
+	if extra == "slap_demo":
+		# Freeze a real active frame, not a hand-authored mock. This keeps the
+		# combat readability check in the same capture loop as the menus.
+		var monkeys := screen.find_children("*", "Player", true, false)
+		if not monkeys.is_empty():
+			(monkeys[0] as Player).call(&"_try_attack")
+			for _frame in 7:
+				await get_tree().process_frame
+				await RenderingServer.frame_post_draw
 
 	var file := "%s/shot_%s.png" % [out.trim_suffix("/"), key]
 	var error := viewport.get_texture().get_image().save_png(file)
 	print("capture %s -> %s (%d)" % [key, file, error])
-	viewport.queue_free()
+	# The capture loop owns this isolated viewport outright. Free it now so a
+	# previous screen cannot survive one deferred frame into the next shot.
+	viewport.free()
 
 
 ## Fits every visible piece of a level into the shot. Walks CanvasItems for

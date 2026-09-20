@@ -25,12 +25,14 @@ var _center_timer: float = 0.0
 var _debug: bool = false
 var _portrait: TextureRect = null
 var _portrait_for: StringName = &""
+var _board_card: PanelContainer = null
 
 
 func _ready() -> void:
 	layer = 5
 	_center.text = ""
 	_build_card()
+	_build_board_card()
 	if not OS.has_feature("mobile"):
 		_build_key_strip()
 	_center.theme_type_variation = &"HudBig"
@@ -39,8 +41,25 @@ func _ready() -> void:
 	_center.offset_top -= 190.0
 	_center.offset_bottom -= 190.0
 	_board.theme_type_variation = &"HudLabel"
-	# Below the pause button, which owns the top-right corner on a phone.
-	_board.offset_top = 96.0
+
+
+## Standings need a stable dark surface: on Map A their old outlined text
+## disappeared into the clouds, while on Map B it disappeared into the bark.
+func _build_board_card() -> void:
+	var root := _board.get_parent() as Control
+	_board_card = PanelContainer.new()
+	_board_card.theme_type_variation = &"Glass"
+	_board_card.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_board_card.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	_board_card.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+	_board_card.offset_left = -330.0
+	_board_card.offset_top = 96.0
+	_board_card.offset_right = -20.0
+	_board_card.custom_minimum_size = Vector2(310.0, 0.0)
+	root.add_child(_board_card)
+	_board.reparent(_board_card)
+	_board.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	_board_card.visible = false
 
 
 ## Wraps the scene's Title and Info labels in a card with the monkey's face,
@@ -167,7 +186,9 @@ func _update_board() -> void:
 	var rows := _board_rows()
 	if rows.is_empty():
 		_board.text = ""
+		_board_card.visible = false
 		return
+	_board_card.visible = true
 	rows.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return a["sort"] > b["sort"])
 	var lines: PackedStringArray = []
 	for index in rows.size():
