@@ -78,11 +78,13 @@ const ATTACK_FLAVORS: Array[StringName] = [&"slap", &"punch", &"kick"]
 @export var swing_min_length: float = 48.0
 @export var swing_max_length: float = 260.0
 ## Pumping the stick adds angular velocity, which is the whole skill.
-@export var swing_pump: float = 5.5
+@export var swing_pump: float = 8.2
 ## Climbing the rope itself, in pixels per second.
 @export var swing_rope_speed: float = 180.0
 ## Release speed multiplier. Above 1.0 so a well-timed release beats running.
-@export var swing_release_boost: float = 1.08
+@export var swing_release_boost: float = 1.18
+## Prevents a shortened rope from becoming an accidental physics cannon.
+@export var swing_max_speed: float = 1320.0
 @export var swing_regrab_delay: float = 0.35
 
 @export_group("Attack")
@@ -92,6 +94,9 @@ const ATTACK_FLAVORS: Array[StringName] = [&"slap", &"punch", &"kick"]
 @export var attack_active: float = 0.10
 @export var attack_recovery: float = 0.16
 @export var attack_cooldown: float = 0.34
+## Small forward commitment makes a slap close distance instead of feeling
+## like the fist is detached from the monkey.
+@export var attack_lunge: float = 115.0
 ## Upward share of knockback. Pure sideways knockback slides people along
 ## the floor and reads as nothing happening.
 @export var knockback_lift: float = 0.55
@@ -221,6 +226,8 @@ var _swing_node: Node2D = null
 var _swing_length: float = 0.0
 var _swing_angle: float = 0.0
 var _swing_ang_vel: float = 0.0
+var _sprint_blend: float = 0.0
+var _sprint_latched: bool = false
 
 var _shake_time: float = 0.0
 var _shake_power: float = 0.0
@@ -235,6 +242,12 @@ var _has_net_target: bool = false
 ## which makes it the quickest way to check the art against the hitbox.
 @onready var body: ColorRect = $Body
 var sprite: MonkeySprite = null
+var _sprite_shadow: Sprite2D = null
+var _sprite_rim: Sprite2D = null
+var _slap_fist: SlapFist = null
+var _attack_was_visible: bool = false
+var _ground_shadow_y: float = 34.0
+var _ground_shadow_alpha: float = 0.0
 var _last_position: Vector2 = Vector2.ZERO
 var _moved_speed: float = 0.0
 @onready var shape: CollisionShape2D = $Collision
@@ -284,6 +297,26 @@ func _apply_appearance() -> void:
 		add_child(sprite)
 		move_child(sprite, 0)
 	sprite.setup(stats.id)
+	if _sprite_shadow == null:
+		_sprite_shadow = Sprite2D.new()
+		_sprite_shadow.name = "CharacterDepthShadow"
+		_sprite_shadow.z_index = -1
+		_sprite_shadow.modulate = Color(0.06, 0.035, 0.07, 0.34)
+		add_child(_sprite_shadow)
+		move_child(_sprite_shadow, 0)
+	if _sprite_rim == null:
+		_sprite_rim = Sprite2D.new()
+		_sprite_rim.name = "CharacterLightRim"
+		_sprite_rim.z_index = -1
+		_sprite_rim.modulate = Color(1.0, 0.78, 0.32, 0.48)
+		add_child(_sprite_rim)
+		move_child(_sprite_rim, 1)
+	if _slap_fist == null:
+		_slap_fist = SlapFist.new()
+		_slap_fist.name = "SlapFist"
+		_slap_fist.z_index = 8
+		add_child(_slap_fist)
+		_slap_fist.visible = false
 	# Feet on the bottom of the collision box, whatever size the monkey is.
 	sprite.position = Vector2(0.0, size.y * 0.5)
 	var head_top := size.y * 0.5 - MonkeySprite.head_height(stats.id)
@@ -484,11 +517,21 @@ func _apply_horizontal(delta: float) -> void:
 	var grounded := is_on_floor()
 	var accel := ground_accel if grounded else air_accel * stats.air_control()
 	var friction := ground_friction if grounded else air_friction
+	var wants_sprint := _input.sprint_held and absf(axis) > 0.1
+	var sprint_rate := 7.5 if wants_sprint else 4.5
+	_sprint_blend = move_toward(_sprint_blend, 1.0 if wants_sprint else 0.0, sprint_rate * delta)
+	if wants_sprint and grounded and not _sprint_latched:
+		# A small launch on the first stride makes sprint a verb rather than a
+		# barely visible maximum-speed setting.
+		velocity.x += axis * 72.0
+	_sprint_latched = wants_sprint
 
 	if absf(axis) > 0.1:
-		var top := stats.run_speed() * _speed_multiplier()
-		if _input.sprint_held:
-			top *= sprint_multiplier
+		var top := stats.run_speed() * _speed_multiplier() * lerpf(1.0, sprint_multiplier, _sprint_blend)
+		if grounded:
+			accel *= lerpf(1.0, 1.72, _sprint_blend)
+			if signf(velocity.x) != signf(axis):
+				accel *= 1.28
 		velocity.x = move_toward(velocity.x, axis * top, accel * delta)
 	else:
 		velocity.x = move_toward(velocity.x, 0.0, friction * delta)
@@ -660,16 +703,30 @@ func _process_swing(delta: float) -> void:
 	# is PI/2 and gravity's tangential component is cos(angle).
 	var ang_accel := (GameConfig.BASE_GRAVITY / _swing_length) * cos(_swing_angle)
 	_swing_ang_vel += ang_accel * delta
-	# Pumping: pushing in the direction of travel adds energy, which is the
-	# entire skill expression of the swing.
-	_swing_ang_vel += _input.move.x * swing_pump * stats.air_control() * delta
-	_swing_ang_vel *= stats.swing_retention()
+	# Horizontal input is projected onto the rope's tangent.  Raw world-X
+	# input was previously added straight to angular velocity, which made the
+	# correct pump direction reverse at surprising points in the arc.
+	var tangent := Vector2(-sin(_swing_angle), cos(_swing_angle))
+	var pump := _input.move.x * tangent.x
+	var helping := absf(_swing_ang_vel) < 0.05 or signf(pump) == signf(_swing_ang_vel)
+	_swing_ang_vel += pump * swing_pump * stats.air_control() * (1.0 if helping else 0.42) * delta
+	# Stats used to damp once per physics tick.  Making that time based keeps
+	# feel stable at other tick rates, while the gentler exponent preserves a
+	# satisfying arc instead of bleeding all momentum before release.
+	_swing_ang_vel *= pow(stats.swing_retention(), delta * 20.0)
 
+	var old_length := _swing_length
 	_swing_length = clampf(
 		_swing_length + _input.move.y * swing_rope_speed * delta,
 		swing_min_length,
 		swing_max_length
 	)
+	# Pulling inward conserves tangential speed, the intuitive reward for
+	# actively working the rope.  The speed cap keeps the result competitive.
+	if _swing_length < old_length:
+		_swing_ang_vel *= old_length / maxf(_swing_length, 1.0)
+	var tangential_speed := clampf(_swing_ang_vel * _swing_length, -swing_max_speed, swing_max_speed)
+	_swing_ang_vel = tangential_speed / _swing_length
 	_swing_angle += _swing_ang_vel * delta
 
 	var target := _swing_anchor + Vector2(cos(_swing_angle), sin(_swing_angle)) * _swing_length
@@ -687,7 +744,8 @@ func _release_swing(boosted: bool) -> void:
 	velocity = tangent * _swing_ang_vel * _swing_length
 	if boosted:
 		velocity *= swing_release_boost
-		velocity.y = minf(velocity.y, stats.jump_velocity() * 0.35)
+		var release_lift := lerpf(0.32, 0.52, clampf(velocity.length() / swing_max_speed, 0.0, 1.0))
+		velocity.y = minf(velocity.y, stats.jump_velocity() * release_lift)
 	_swing_node = null
 	_swing_lock = swing_regrab_delay
 	if boosted:
@@ -721,10 +779,15 @@ func _try_attack() -> void:
 	is_attacking = true
 	_attack_timer = 0.0
 	_already_hit.clear()
+	var lunge := attack_lunge if is_on_floor() else attack_lunge * 0.45
+	velocity.x += float(facing) * lunge
 	# The three flavors are cosmetic and must stay mechanically identical.
 	# The moment a kick outranges a slap, players fish for an animation they
 	# cannot choose, and a variety system becomes a frustration system.
 	Sfx.play(&"attack", _voice_pitch())
+	if _slap_fist != null:
+		_slap_fist.play(facing, stats.body_color)
+		_attack_was_visible = true
 	attacked.emit(ATTACK_FLAVORS[randi() % ATTACK_FLAVORS.size()])
 
 
@@ -810,6 +873,10 @@ func _resolve_hit(area: Area2D) -> void:
 		# Super Hit is not the whole pickup wasted.
 		set_ability(&"", 0.0)
 	target.take_hit(player_id, force, GameConfig.BASE_STUN_TIME, super_hit)
+	if _slap_fist != null:
+		_slap_fist.impact()
+	if local_control:
+		kick_camera(4.5 if not super_hit else 8.0, 0.10)
 	hit_landed.emit(target.player_id)
 	if Net.is_online():
 		Net.broadcast_hit(target.player_id, force, GameConfig.BASE_STUN_TIME, player_id)
@@ -1230,7 +1297,15 @@ func _process(delta: float) -> void:
 	_tick_landing()
 	_tick_shake(delta)
 	_tick_squash(delta)
+	_update_ground_shadow()
+	# Remote attacks arrive as one boolean in snapshots.  Detect the rising
+	# edge here so they get the same full animation as the local attacker.
+	if is_attacking and not _attack_was_visible and _slap_fist != null:
+		_slap_fist.play(facing, stats.body_color)
+	_attack_was_visible = is_attacking
 	if is_attacking or state == State.SWING or _dash_kind == &"grapple":
+		queue_redraw()
+	elif _sprint_blend > 0.01 or _ground_shadow_alpha > 0.01:
 		queue_redraw()
 
 
@@ -1239,6 +1314,8 @@ func _process(delta: float) -> void:
 ## None of it is decoration: a vine you cannot see is a vine you cannot aim
 ## at, and an attack with no telegraph is an attack nobody can respect.
 func _draw() -> void:
+	_draw_ground_shadow()
+	_draw_speed_lines()
 	if state == State.SWING and _swing_node != null and is_instance_valid(_swing_node):
 		Vine.draw_vine(self, to_local(_swing_anchor), Vector2(0.0, -12.0), Color(0.35, 0.55, 0.28))
 
@@ -1253,12 +1330,54 @@ func _draw() -> void:
 
 func _draw_attack_arc() -> void:
 	var radius: float = absf(hitbox.position.x) + 8.0
+	if hitbox_shape.shape is RectangleShape2D:
+		radius = absf(hitbox.position.x) + (hitbox_shape.shape as RectangleShape2D).size.x * 0.5
 	var facing_angle: float = 0.0 if facing > 0 else PI
 	var windup_done: bool = _attack_timer >= attack_windup
 	var spread: float = 0.75 if windup_done else 0.35
 	var color := Color(1.0, 0.95, 0.6, 0.9) if windup_done else Color(1.0, 1.0, 1.0, 0.35)
 	var width: float = 7.0 if windup_done else 3.0
 	draw_arc(Vector2(0.0, -4.0), radius, facing_angle - spread, facing_angle + spread, 16, color, width)
+
+
+func _update_ground_shadow() -> void:
+	if not is_inside_tree():
+		return
+	var query := PhysicsRayQueryParameters2D.create(global_position + Vector2(0, 8), global_position + Vector2(0, 330), GameConfig.LAYER_WORLD, [get_rid()])
+	var hit := get_world_2d().direct_space_state.intersect_ray(query)
+	if hit.is_empty():
+		_ground_shadow_alpha = move_toward(_ground_shadow_alpha, 0.0, 0.16)
+		return
+	_ground_shadow_y = to_local(hit.get("position", global_position + Vector2(0, 34))).y - 2.0
+	var distance := maxf(_ground_shadow_y, 0.0)
+	_ground_shadow_alpha = clampf(0.34 - distance / 900.0, 0.08, 0.34)
+
+
+func _draw_ground_shadow() -> void:
+	if _ground_shadow_alpha <= 0.01:
+		return
+	var distance_scale := clampf(1.0 - maxf(_ground_shadow_y - 35.0, 0.0) / 520.0, 0.45, 1.0)
+	var center := Vector2(5.0, _ground_shadow_y)
+	for ring in 3:
+		var rx := (24.0 + ring * 7.0) * distance_scale
+		var ry := (5.0 + ring * 2.0) * distance_scale
+		var points := PackedVector2Array()
+		for i in 20:
+			var a := TAU * float(i) / 20.0
+			points.append(center + Vector2(cos(a) * rx, sin(a) * ry))
+		draw_colored_polygon(points, Color(0.025, 0.02, 0.05, _ground_shadow_alpha * (1.0 - ring * 0.23)))
+
+
+func _draw_speed_lines() -> void:
+	if _sprint_blend < 0.22 or state != State.GROUND or absf(velocity.x) < 220.0:
+		return
+	var back := -float(facing)
+	var pulse := fmod(float(Time.get_ticks_msec()) * 0.09, 16.0)
+	for i in 3:
+		var y := 3.0 + i * 9.0
+		var start := Vector2(back * (23.0 + pulse + i * 8.0), y)
+		var finish := start + Vector2(back * (18.0 + _sprint_blend * 24.0), 0.0)
+		draw_line(start, finish, Color(1.0, 0.94, 0.68, 0.22 + _sprint_blend * 0.28), 2.0 + i)
 
 
 ## Heavier monkeys sound lower. One number, and the roster reads by ear.
@@ -1364,8 +1483,31 @@ func _update_visual() -> void:
 				sprite.play(&"idle")
 	if is_attacking and state != State.STUN:
 		sprite.play(&"punch")
+		sprite.rotation = float(facing) * -0.075
+		sprite.scale *= Vector2(1.08, 0.94)
 		if _hitbox_open:
 			tint = Color(1.25, 1.2, 1.05)
 	if _spawn_shield > 0.0 and int(Time.get_ticks_msec() / 90) % 2 == 0:
 		tint.a = 0.35
 	sprite.self_modulate = tint
+	if state == State.GROUND and _sprint_blend > 0.05 and absf(step.x) > 0.05:
+		sprite.rotation = float(facing) * 0.055 * _sprint_blend
+		sprite.speed_scale *= lerpf(1.0, 1.26, _sprint_blend)
+	if _sprite_shadow != null:
+		_sync_sprite_layer(_sprite_shadow, Vector2(5.0, 6.0), 1.015)
+	if _sprite_rim != null:
+		_sync_sprite_layer(_sprite_rim, Vector2(-2.0, -2.0), 1.0)
+
+
+func _sync_sprite_layer(layer: Sprite2D, offset_position: Vector2, size_scale: float) -> void:
+	layer.texture = sprite.texture
+	layer.hframes = sprite.hframes
+	layer.vframes = sprite.vframes
+	layer.frame = sprite.frame
+	layer.centered = sprite.centered
+	layer.offset = sprite.offset
+	layer.flip_h = sprite.flip_h
+	layer.position = sprite.position + offset_position
+	layer.rotation = sprite.rotation
+	layer.scale = sprite.scale * size_scale
+	layer.visible = sprite.visible

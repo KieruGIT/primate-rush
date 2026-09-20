@@ -187,8 +187,26 @@ func _page_root(title: String) -> Control:
 	root.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	if title.is_empty():
 		return root
+	# Secondary screens share one quiet header surface. It separates navigation
+	# from the animated canopy and keeps both BACK and the page title readable
+	# on bright phones without turning every page into a boxed-in dialog.
+	var header := PanelContainer.new()
+	header.name = "PageHeader"
+	header.theme_type_variation = &"Glass"
+	header.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	header.set_anchors_preset(Control.PRESET_TOP_WIDE)
+	header.offset_left = 12.0
+	header.offset_top = 10.0
+	header.offset_right = -12.0
+	header.offset_bottom = 92.0
+	header.z_index = 9
+	root.add_child(header)
 	var back := _button("    BACK", &"QuietButton", Vector2(170, 66), _go_back)
+	back.name = "BackButton"
 	back.position = Vector2(24, 20)
+	# Full-height page cards are added after the shared header. Keep navigation
+	# above them so a tall panel can never paint over BACK or clip the title.
+	back.z_index = 10
 	var back_icon := ArrowIcon.new()
 	back_icon.left = true
 	back_icon.position = Vector2(8, 4)
@@ -197,6 +215,8 @@ func _page_root(title: String) -> Control:
 	back.add_child(back_icon)
 	root.add_child(back)
 	var heading := _label(title, &"DisplayBig", 48)
+	heading.name = "PageTitle"
+	heading.z_index = 10
 	heading.set_anchors_preset(Control.PRESET_CENTER_TOP)
 	heading.grow_horizontal = Control.GROW_DIRECTION_BOTH
 	heading.offset_top = 18.0
