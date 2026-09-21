@@ -21,7 +21,7 @@ extends Area2D
 	set(value):
 		grab_radius = maxf(value, 8.0)
 		_rebuild()
-@export var rope_color: Color = Color(0.35, 0.55, 0.28)
+@export var rope_color: Color = Color8(30, 92, 62)          # JunglePalette.LEAF_DARK
 
 @onready var _shape: CollisionShape2D = $Shape
 
@@ -59,7 +59,7 @@ func _draw() -> void:
 ## Shared with the swing rope a monkey draws, so the vine it holds looks like
 ## the vine it grabbed. Stem, a leaf pair every so often, a knot at the top.
 static func draw_vine(canvas: CanvasItem, from: Vector2, to: Vector2, color: Color) -> void:
-	var outline := Color8(28, 44, 30)
+	var outline := JunglePalette.BARK_DARK
 	var leaf := color.lightened(0.35)
 	var leaf_dark := color.darkened(0.15)
 	var span := to - from

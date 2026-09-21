@@ -94,13 +94,48 @@ func _draw() -> void:
 		# Worth more means bigger and brighter, so a player can read the
 		# value of a spawn from across the map instead of memorizing it.
 		var size_scale := 1.0 + float(value - 1) * 0.18
-		var color := Color(0.95, 0.82, 0.25).lerp(Color(1.0, 0.55, 0.15), clampf(float(value - 1) / 4.0, 0.0, 1.0))
-		draw_circle(Vector2(0.0, lift), 12.0 * size_scale, color)
-		draw_arc(Vector2(0.0, lift), 17.0 * size_scale, 0.0, TAU, 20, color.darkened(0.3), 3.0)
+		var heat := clampf(float(value - 1) / 4.0, 0.0, 1.0)
+		var color := JunglePalette.BANANA.lerp(JunglePalette.FLAME, heat)
+		_draw_banana(Vector2(0.0, lift), size_scale, color)
 		if value > 1:
-			draw_string(ThemeDB.fallback_font, Vector2(-6.0, lift + 34.0), str(value), HORIZONTAL_ALIGNMENT_LEFT, -1, 18, color)
+			draw_string(ThemeDB.fallback_font, Vector2(-6.0, lift + 34.0), str(value), HORIZONTAL_ALIGNMENT_LEFT, -1, 18, JunglePalette.BANANA_LIGHT)
 	else:
 		var box := Rect2(Vector2(-18.0, -18.0 + lift), Vector2(36.0, 36.0))
-		draw_rect(box, Color(0.45, 0.75, 0.95), true)
-		draw_rect(box, Color(0.15, 0.3, 0.45), false, 3.0)
-		draw_string(ThemeDB.fallback_font, Vector2(-6.0, 8.0 + lift), "?", HORIZONTAL_ALIGNMENT_LEFT, -1, 24, Color(0.1, 0.2, 0.3))
+		draw_rect(box, JunglePalette.CANOPY_NEAR, true)
+		draw_rect(box, JunglePalette.LEAF, false, 3.0)
+		draw_string(ThemeDB.fallback_font, Vector2(-6.0, 8.0 + lift), "?", HORIZONTAL_ALIGNMENT_LEFT, -1, 24, JunglePalette.BANANA_LIGHT)
+
+
+## An actual banana rather than a yellow dot. In a night level the bananas
+## are the second light source after the torches, so each one carries its own
+## small halo: a plain silhouette this size vanishes against dark ground.
+func _draw_banana(at: Vector2, size_scale: float, color: Color) -> void:
+	JunglePalette.draw_glow(self, at, 46.0 * size_scale, Color(color, 0.32))
+
+	# The crescent: an arc of segments swept from one tip to the other, each
+	# one a quad, fat in the middle and pinched at both ends. Built from the
+	# curve rather than from a polygon literal so the value scaling stays a
+	# single multiply and the shape never shears.
+	var steps := 14
+	var outer := PackedVector2Array()
+	var inner := PackedVector2Array()
+	for i in steps + 1:
+		var t := float(i) / float(steps)
+		var angle := lerpf(PI * 0.82, PI * 0.18, t)
+		var centre := Vector2(cos(angle), -sin(angle)) * 17.0 * size_scale
+		var thickness := sin(t * PI) * 6.5 * size_scale + 1.5 * size_scale
+		var out_dir := centre.normalized()
+		outer.append(at + centre + out_dir * thickness)
+		inner.append(at + centre - out_dir * thickness)
+
+	var body := PackedVector2Array(outer)
+	for i in range(inner.size() - 1, -1, -1):
+		body.append(inner[i])
+	draw_colored_polygon(body, color)
+
+	# Brown tips top and bottom, and a highlight along the outer edge, which
+	# is what makes it read as a banana and not as a crescent moon.
+	draw_circle(outer[0].lerp(inner[0], 0.5), 3.0 * size_scale, JunglePalette.BARK)
+	draw_circle(outer[steps].lerp(inner[steps], 0.5), 3.0 * size_scale, JunglePalette.BARK)
+	for i in steps:
+		draw_line(outer[i], outer[i + 1], JunglePalette.BANANA_LIGHT, 2.0 * size_scale)

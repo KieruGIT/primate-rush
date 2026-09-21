@@ -9,8 +9,15 @@ extends Node2D
 # grass and dirt over the same footprint, so a level edit is still one
 # number in a .tscn and the art follows it rather than drifting from it.
 #
-# Art: Kenney's Pixel Platformer (CC0), 18 px tiles drawn at 2x. The monkeys
-# are 2x pixel art too, so level and characters share one pixel size.
+# Art: 18 px tiles baked by JungleTiles, drawn at 2x. The monkeys are 2x
+# pixel art too, so level, props and characters share one pixel size.
+#
+# Art direction is the key art: a moonlit jungle. The tiles are daylight art,
+# so the terrain is baked by JungleTiles to the art bible's platform anatomy
+# instead: lit grass cap, dark underside, one shared outline, moss fringe.
+# That is what makes a standable surface readable at a glance in a four-way
+# race, and no amount of tinting a flat tile gets there.
+# Every colour in here comes from JunglePalette; nothing defines its own.
 #
 # Shape decides the look, never a name:
 #   tall and narrow  -> an ivy-covered earth pillar (the climb walls)
@@ -18,31 +25,14 @@ extends Node2D
 #   thin             -> a one-tile grass ledge
 # ============================================================
 
-const PACK := "res://assets/kenney_pixel-platformer/"
 const CLIMBABLE_SCENE := preload("res://scenes/Climbable.tscn")
-const SRC: int = 18
+const SRC: int = JungleTiles.SRC
 const SCALE: int = 2
 const TILE: int = SRC * SCALE
-const COLUMNS: int = 20        # tiles per row in tilemap_packed.png
+const COLUMNS: int = JungleTiles.COLUMNS
 
-# Tile indices, left / middle / right.
-const LEDGE: Array[int] = [1, 2, 3]
-const LEDGE_SOLO: int = 0
-const TOP: Array[int] = [21, 22, 23]
-const FILL: Array[int] = [121, 122, 123]
-const WATER_TOP: int = 33
-const WATER_FILL: int = 53
-const CANOPY: Array = [[17, 18, 19], [37, 38, 39], [57, 58, 59]]
-const TRUNK: Array[int] = [97, 117, 137]
-const THIN_TREE: Array[int] = [36, 56, 76, 96, 116, 136]
-const SHRUBS: Array[int] = [124, 125, 126, 128]
-const CLOUD: Array[int] = [153, 154, 155]
-
-const SKY_TOP := Color8(96, 190, 236)
-const SKY_BOTTOM := Color8(196, 244, 214)
-const WATER := Color8(44, 197, 246)
-const WATER_DEEP := Color8(22, 70, 120)
-const DEPTH_SHADE := Color8(120, 110, 130)
+## How far apart torches stand along a ground, in world pixels.
+const TORCH_SPACING := Vector2(420.0, 760.0)
 
 ## Seed for decoration placement, so every machine in a match - and every
 ## run of the capture tool - grows the same trees in the same places.
@@ -51,7 +41,6 @@ const DEPTH_SHADE := Color8(120, 110, 130)
 @export var palette: int = 3
 
 var _tiles: Texture2D
-var _backdrops: Texture2D
 var _solids: Array[Rect2] = []
 var _columns: Array[Rect2] = []
 var _thick: Array[Rect2] = []
@@ -64,14 +53,14 @@ var _water_y: float = 0.0
 func _ready() -> void:
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	z_index = -5
-	_tiles = load(PACK + "tilemap_packed.png")
-	_backdrops = load(PACK + "tilemap-backgrounds_packed.png")
+	_tiles = JungleTiles.atlas()
 	var map := get_parent()
 	_collect(map)
 	_hide_graybox(map)
 	_restyle_props(map)
 	_build_backdrop()
 	_plan_decor()
+	Atmosphere.install(self, seed_value)
 	queue_redraw()
 
 
@@ -160,38 +149,115 @@ func _draw_depth_extrusion(rect: Rect2) -> void:
 	draw_colored_polygon(PackedVector2Array([
 		lower_left, lower_right, lower_right + offset, lower_left + offset
 	]), Color(0.075, 0.085, 0.16, 0.78))
-	draw_line(top_right + Vector2(2, 3), top_right + offset, Color(0.48, 0.64, 0.68, 0.45), 2.0)
+	draw_line(top_right + Vector2(2, 3), top_right + offset, Color(JunglePalette.SUN_RIM, 0.35), 2.0)
+	# Light comes down through the canopy, so the top edge of everything
+	# catches a warm rim. Two pixels of it is the difference between a shaded
+	# scene and a murky one.
+	draw_rect(Rect2(rect.position.x, rect.position.y - 2.0, rect.size.x, 2.0), Color(JunglePalette.SUN_RIM, 0.30))
 
 
 func _draw_ground(rect: Rect2) -> void:
 	# Grounds run down into the water so none floats in the sky.
 	var bottom := maxf(rect.end.y, _water_y + TILE)
-	_row(TOP, rect.position.x, rect.size.x, rect.position.y)
+	_row(JungleTiles.GRASS, rect.position.x, rect.size.x, rect.position.y)
 	var y := rect.position.y + TILE
 	var depth := 1
 	while y < bottom:
-		var shade := Color.WHITE.lerp(DEPTH_SHADE, clampf(depth * 0.09, 0.0, 0.55))
-		_row(FILL, rect.position.x, rect.size.x, y, minf(TILE, bottom - y), shade)
+		var shade := Color.WHITE.lerp(JunglePalette.DEPTH_TINT, clampf(depth * 0.11, 0.0, 0.7))
+		_row(JungleTiles.DIRT, rect.position.x, rect.size.x, y, minf(TILE, bottom - y), shade)
 		y += TILE
 		depth += 1
+	_scatter_soil(rect, bottom)
+	_scatter_grass(rect)
 
 
+## Tufts standing up off a ground's grass line, at spacings unrelated to the
+## tile grid. The baked cap gives the surface its colour and its outline;
+## this is what stops forty tiles of it reading as a ruled green stripe.
+func _scatter_grass(rect: Rect2) -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = seed_value * 977 + int(rect.position.x) * 17
+	var x := rect.position.x + rng.randf_range(4.0, 40.0)
+	while x < rect.end.x - 8.0:
+		var blades := rng.randi_range(2, 4)
+		var lean := -1.0 if rng.randf() < 0.5 else 1.0
+		for b in blades:
+			var height := float(rng.randi_range(2, 5) * SCALE)
+			var at := Vector2(
+				floorf((x + float(b * SCALE)) / float(SCALE)) * float(SCALE),
+				rect.position.y
+			)
+			# A blade is a stepped column, two art pixels wide, leaning one
+			# pixel at the tip. Never a line: a line would antialias.
+			draw_rect(Rect2(at.x, at.y - height, float(SCALE), height), JunglePalette.GRASS_DARK)
+			draw_rect(Rect2(at.x + lean * float(SCALE), at.y - height - float(SCALE), float(SCALE), float(SCALE)), JunglePalette.GRASS_SUN)
+		x += rng.randf_range(26.0, 90.0)
+
+
+## Rocks and roots thrown across a ground's soil at sizes and spacings that
+## are nothing to do with the tile grid. An 18 px tile repeated forty times
+## is visibly forty copies of one tile, however well grained it is; the only
+## fix is detail that does not share the grid's period.
+func _scatter_soil(rect: Rect2, bottom: float) -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = seed_value * 613 + int(rect.position.x) * 31 + int(rect.position.y)
+	var top := rect.position.y + TILE
+	var count := int((rect.size.x / TILE) * maxf((bottom - top) / TILE, 1.0) * 0.16)
+	for i in count:
+		var at := Vector2(
+			rng.randf_range(rect.position.x + 6.0, rect.end.x - 18.0),
+			rng.randf_range(top + 8.0, maxf(bottom - 14.0, top + 10.0))
+		)
+		# Snapped to the art grid, like every other pixel in the level.
+		at = (at / float(SCALE)).floor() * float(SCALE)
+		var fade := clampf(1.0 - (at.y - top) / maxf(bottom - top, 1.0), 0.25, 1.0)
+		if rng.randf() < 0.62:
+			_pebble(at, rng.randi_range(2, 4) * SCALE, fade)
+		else:
+			_root(at, rng.randi_range(5, 11) * SCALE, rng.randf() < 0.5, fade)
+
+
+## A rounded stone: dark body, one lit pixel row on the sun side.
+func _pebble(at: Vector2, size: float, fade: float) -> void:
+	var body := JunglePalette.DIRT_DARK
+	var lit := JunglePalette.DIRT_LIGHT
+	draw_rect(Rect2(at, Vector2(size, size)), Color(body, 0.85 * fade))
+	draw_rect(Rect2(at, Vector2(size, float(SCALE))), Color(lit, 0.55 * fade))
+	draw_rect(Rect2(at, Vector2(float(SCALE), size)), Color(lit, 0.35 * fade))
+
+
+## A root running through the soil: a stepped line, because a diagonal drawn
+## as a line antialiases and a root made of blocks does not.
+func _root(at: Vector2, length: float, downward: bool, fade: float) -> void:
+	var tone := Color(JunglePalette.BARK_DARK, 0.7 * fade)
+	var step := float(SCALE)
+	var x := at.x
+	var y := at.y
+	var run := int(length / step)
+	for i in run:
+		draw_rect(Rect2(x, y, step * 2.0, step), tone)
+		x += step * 2.0
+		if i % 2 == 0:
+			y += step if downward else -step
+
+
+## A climb wall is a tree, so it is bark all the way down with a crown of
+## leaves on top - never a pillar of soil standing in the air.
 func _draw_column(rect: Rect2) -> void:
 	var bottom := rect.end.y
 	if not _rests_on_ground(rect):
 		bottom = maxf(bottom, _water_y + TILE)
-	_row(TOP, rect.position.x, rect.size.x, rect.position.y)
-	var y := rect.position.y + TILE
+	var y := rect.position.y
 	while y < bottom:
-		_row(FILL, rect.position.x, rect.size.x, y, minf(TILE, bottom - y))
+		_row(JungleTiles.TRUNK, rect.position.x, rect.size.x, y, minf(TILE, bottom - y))
 		y += TILE
 
 
 func _draw_ledge(rect: Rect2) -> void:
 	if rect.size.x < TILE:
-		_blit(LEDGE_SOLO, 0.0, rect.size.x / SCALE, SRC, Vector2(rect.position.x, rect.position.y))
+		_blit(JungleTiles.LEDGE_SOLO, 0.0, rect.size.x / SCALE, SRC, Vector2(rect.position.x, rect.position.y))
 		return
-	_row(LEDGE, rect.position.x, rect.size.x, rect.position.y)
+	_row(JungleTiles.LEDGE, rect.position.x, rect.size.x, rect.position.y)
 
 
 ## A three-slice row: left cap, repeated middle, right cap. Narrower than two
@@ -217,7 +283,9 @@ func _row(tiles: Array[int], x: float, width: float, y: float, height: float = T
 ## Draws part of one tile: `src_x` and `src_w` are in source pixels, from
 ## the tile's left edge, which is how a cut cap keeps its outer outline.
 func _blit(tile: int, src_x: float, src_w: float, src_h: float, at: Vector2, shade: Color = Color.WHITE) -> void:
-	var origin := Vector2((tile % COLUMNS) * SRC + src_x, (tile / COLUMNS) * SRC)
+	var origin := JungleTiles.origin(tile) + Vector2(src_x, 0.0)
+	# No blanket tint: the atlas is authored in the jungle palette already.
+	# `shade` is depth only - a tile further underground, or further away.
 	draw_texture_rect_region(_tiles, Rect2(at, Vector2(src_w, src_h) * SCALE), Rect2(origin, Vector2(src_w, src_h)), shade)
 
 
@@ -229,19 +297,43 @@ func _rests_on_ground(rect: Rect2) -> bool:
 
 
 func _draw_water() -> void:
+	# The Kenney water tiles are a flat cyan that fights the jungle greens, so
+	# the surface is drawn instead: a lit rim, a ramp into the depths, and a
+	# scatter of glints where light through the canopy breaks on it.
 	var left := floorf((_bounds.position.x - 3000.0) / TILE) * TILE
 	var right := _bounds.end.x + 3000.0
-	var x := left
-	while x < right:
-		_blit(WATER_TOP, 0.0, SRC, SRC, Vector2(x, _water_y))
-		_blit(WATER_FILL, 0.0, SRC, SRC, Vector2(x, _water_y + TILE))
-		x += TILE
-	var deep_top := _water_y + TILE * 2
+	var width := right - left
+
+	draw_rect(Rect2(left, _water_y, width, 6.0), Color(JunglePalette.WATER_GLINT, 0.55))
 	draw_polygon(
-		PackedVector2Array([Vector2(left, deep_top), Vector2(right, deep_top), Vector2(right, deep_top + 900.0), Vector2(left, deep_top + 900.0)]),
-		PackedColorArray([WATER, WATER, WATER_DEEP, WATER_DEEP])
+		PackedVector2Array([
+			Vector2(left, _water_y + 6.0), Vector2(right, _water_y + 6.0),
+			Vector2(right, _water_y + 620.0), Vector2(left, _water_y + 620.0)
+		]),
+		PackedColorArray([JunglePalette.WATER, JunglePalette.WATER, JunglePalette.WATER_DEEP, JunglePalette.WATER_DEEP])
 	)
-	draw_rect(Rect2(left, deep_top + 900.0, right - left, 4000.0), WATER_DEEP)
+	draw_rect(Rect2(left, _water_y + 620.0, width, 4000.0), JunglePalette.WATER_DEEP)
+	_draw_surface_glints(left, right)
+
+
+## Light broken on the surface: a column of glints down the middle of the
+## level, brightest at the top. Seeded, so it is the same on every machine in
+## a match and never flickers between two clients.
+func _draw_surface_glints(left: float, right: float) -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = seed_value * 977 + 41
+	var centre := (_bounds.position.x + _bounds.end.x) * 0.5
+	var rows := 14
+	for row in rows:
+		var y := _water_y + 8.0 + row * 9.0
+		var fade := 1.0 - float(row) / float(rows)
+		var spread := 40.0 + row * 16.0
+		for i in 3:
+			var w := rng.randf_range(16.0, 70.0) * fade
+			var x := centre + rng.randf_range(-spread, spread) - w * 0.5
+			if x + w < left or x > right:
+				continue
+			draw_rect(Rect2(x, y, w, 3.0), Color(JunglePalette.WATER_GLINT, 0.30 * fade))
 
 
 # --- Decoration ----------------------------------------------------
@@ -252,26 +344,45 @@ func _plan_decor() -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = seed_value * 31 + 5
 	for rect in _thick:
+		_light_ground(rect, rng)
+	for rect in _thick:
 		var x := rect.position.x + rng.randf_range(60.0, 200.0)
 		while x < rect.end.x - 120.0:
 			var roll := rng.randf()
-			if roll < 0.35:
+			if roll < 0.32:
 				var foot := Vector2(x, rect.position.y)
 				_decor.append([&"tree", foot, rng.randf() < 0.5, true])
 				_add_tree_climbable(foot, TILE * 3.6, TILE * 0.8)
 				x += rng.randf_range(260.0, 420.0)
-			elif roll < 0.55:
+			elif roll < 0.50:
 				var foot := Vector2(x, rect.position.y)
-				_decor.append([&"thin_tree", foot, false, true])
+				_decor.append([&"palm", foot, rng.randf() < 0.5, true])
 				_add_tree_climbable(foot, TILE * 5.8, TILE * 0.7)
 				x += rng.randf_range(160.0, 260.0)
 			else:
-				_decor.append([SHRUBS[rng.randi() % SHRUBS.size()], Vector2(x, rect.position.y), rng.randf() < 0.5, false])
+				# Undergrowth sits in front of the player's feet, so it is
+				# drawn late and never hides a platform edge.
+				_decor.append([&"fern" if rng.randf() < 0.45 else &"shrub", Vector2(x, rect.position.y), rng.randf() < 0.5, false])
 				x += rng.randf_range(90.0, 200.0)
 	for rect in _thin:
 		if rect.size.x >= 180.0 and rng.randf() < 0.6:
 			var at := Vector2(rng.randf_range(rect.position.x + 30.0, rect.end.x - 60.0), rect.position.y)
-			_decor.append([SHRUBS[rng.randi() % SHRUBS.size()], at, rng.randf() < 0.5, false])
+			_decor.append([&"shrub", at, rng.randf() < 0.5, false])
+
+
+## Torches at intervals along a ground. Warm accents on a shaded jungle
+## floor, and signposting with it: the spacing is loose enough that a player
+## running a dim stretch is always heading toward the next one.
+func _light_ground(rect: Rect2, rng: RandomNumberGenerator) -> void:
+	var x := rect.position.x + rng.randf_range(80.0, 200.0)
+	while x < rect.end.x - 60.0:
+		var torch := Torch.new()
+		torch.name = "Torch%d" % get_child_count()
+		torch.position = Vector2(x, rect.position.y)
+		torch.phase = rng.randf_range(0.0, 6.0)
+		torch.reach = rng.randf_range(150.0, 200.0)
+		add_child(torch)
+		x += rng.randf_range(TORCH_SPACING.x, TORCH_SPACING.y)
 
 
 func _add_tree_climbable(foot: Vector2, height: float, width: float) -> void:
@@ -284,30 +395,51 @@ func _add_tree_climbable(foot: Vector2, height: float, width: float) -> void:
 
 
 func _draw_decor(item: Array) -> void:
-	var kind: Variant = item[0]
+	var kind: StringName = item[0]
 	var foot: Vector2 = item[1]
-	if kind is StringName and kind == &"tree":
-		# Three-by-three canopy on a three-tile trunk, the trunk centred.
-		var trunk_x := foot.x - TILE * 0.5
-		for i in TRUNK.size():
-			_blit(TRUNK[i], 0.0, SRC, SRC, Vector2(trunk_x, foot.y - TILE * (TRUNK.size() - i)))
-		_draw_climb_marks(foot, TILE * 3.0)
-		var canopy_top := foot.y - TILE * (TRUNK.size() + 3) + 6.0
-		for row in 3:
-			for col in 3:
-				_blit(CANOPY[row][col], 0.0, SRC, SRC, Vector2(trunk_x - TILE + col * TILE, canopy_top + row * TILE))
-	elif kind is StringName and kind == &"thin_tree":
-		var x := foot.x - TILE * 0.5
-		for i in THIN_TREE.size():
-			_blit(THIN_TREE[i], 0.0, SRC, SRC, Vector2(x, foot.y - TILE * (THIN_TREE.size() - i)))
-		_draw_climb_marks(foot, TILE * 5.5)
-	else:
-		_blit(int(kind), 0.0, SRC, SRC, foot - Vector2(TILE * 0.5, TILE))
+	var flip: bool = bool(item[2])
+	match kind:
+		&"tree":
+			var height := TILE * 3.0
+			_trunk_column(foot, height)
+			_draw_climb_marks(foot, height)
+			_prop(&"crown_big", foot - Vector2(0.0, height), flip)
+		&"palm":
+			var tall := TILE * 5.5
+			_trunk_column(foot, tall)
+			_draw_climb_marks(foot, tall)
+			_prop(&"crown_small", foot - Vector2(0.0, tall), flip)
+		_:
+			_prop(kind, foot, flip, 1.0)
+
+
+## A stack of trunk tiles from the ground up to `height`.
+func _trunk_column(foot: Vector2, height: float) -> void:
+	var y := foot.y - TILE
+	while y > foot.y - height:
+		_row(JungleTiles.TRUNK, foot.x - TILE * 0.5, TILE, y)
+		y -= TILE
+	_row(JungleTiles.TRUNK, foot.x - TILE * 0.5, TILE, foot.y - height)
+
+
+## Draws a baked prop with its foot on `at`, at the shared 2x art scale.
+## `anchor` 0 hangs it by its middle, 1 stands it on its bottom edge.
+func _prop(kind: StringName, at: Vector2, flip: bool, anchor: float = 0.5) -> void:
+	var texture := JungleTiles.prop(kind)
+	var size := Vector2(texture.get_size()) * float(SCALE)
+	var top_left := at - Vector2(size.x * 0.5, size.y * anchor)
+	# Snapped to the art grid: half a pixel of offset is a blurred sprite.
+	top_left = (top_left / float(SCALE)).round() * float(SCALE)
+	var region := Rect2(Vector2.ZERO, texture.get_size())
+	if flip:
+		region.position.x = texture.get_size().x
+		region.size.x = -texture.get_size().x
+	draw_texture_rect_region(texture, Rect2(top_left, size), region)
 
 
 func _draw_climb_marks(foot: Vector2, height: float) -> void:
 	# A few bright ivy hooks teach the player that the trunk is gameplay.
-	var green := Color(0.35, 0.82, 0.28, 0.95)
+	var green := Color(JunglePalette.LEAF_LIGHT, 0.95)
 	var y := foot.y - 24.0
 	while y > foot.y - height:
 		draw_line(Vector2(foot.x - 7.0, y), Vector2(foot.x + 6.0, y - 8.0), green, 3.0)
@@ -317,97 +449,106 @@ func _draw_climb_marks(foot: Vector2, height: float) -> void:
 
 # --- Backdrop ------------------------------------------------------
 
+## Four planes of jungle, back to front: hazy air, a far wall of canopy, the
+## detailed middle distance, and a dark near frame. Each one is baked pixel
+## art from JungleBackdrop rather than drawn here, so the background is made
+## of the same size pixels as the tiles and the monkeys.
 func _build_backdrop() -> void:
 	var sky_layer := CanvasLayer.new()
 	sky_layer.layer = -100
 	add_child(sky_layer)
+	sky_layer.add_child(_sky())
+
+	# Anchored to where the camera actually looks, not to the water line.
+	# Water is derived from a map's lowest ground, which says nothing about
+	# where the play is: on the arena map it sits far below the fighting and
+	# put the whole canopy off the top of the screen, leaving a forest of
+	# trunks standing in bare sky.
+	var eye := _eye_level()
+	# How much world the camera shows above the player. A map that zooms out
+	# to fit an arena sees more sky, so its canopy has to hang higher.
+	var reach := 360.0 / maxf(_camera_zoom(), 0.2)
+	# Fractions of that reach, all inside the frame: a canopy placed a whole
+	# reach up sits exactly on the top edge and disappears the moment a map
+	# zooms out, which is how the arena ended up as a forest of bare trunks.
+	_band(&"far", Vector2(0.14, 0.09), eye - reach * 0.12, -30)
+	_band(&"mid", Vector2(0.34, 0.20), eye - reach * 0.38, -24)
+	_band(&"near", Vector2(0.62, 0.40), eye - reach * 0.75, -18)
+
+
+## Eye level: the spawn point if the map declares one, since that is where
+## the camera opens and where the race is fought. Falls back to the highest
+## ground, then to the water line, so a map with neither still gets a sky.
+func _eye_level() -> float:
+	var map := get_parent()
+	if map != null:
+		var spawn: Variant = map.get(&"spawn_point")
+		if spawn is Vector2 and not (spawn as Vector2).is_zero_approx():
+			return (spawn as Vector2).y
+	if not _solids.is_empty():
+		return _bounds.position.y
+	return _water_y - 300.0
+
+
+func _camera_zoom() -> float:
+	var map := get_parent()
+	if map == null:
+		return 1.0
+	var zoom: Variant = map.get(&"camera_zoom")
+	return float(zoom) if zoom != null else 1.0
+
+
+## One parallax plane carrying one baked layer, tiled across the level.
+## `canopy_y` is where that layer's canopy line should sit in world space;
+## the sprite's own top edge is worked back from it.
+func _band(kind: StringName, scroll: Vector2, canopy_y: float, z: int) -> void:
+	var texture := JungleBackdrop.layer(kind, seed_value)
+	var sprite := Sprite2D.new()
+	sprite.texture = texture
+	sprite.centered = false
+	sprite.scale = Vector2.ONE * float(JungleBackdrop.ZOOM)
+	sprite.position = Vector2(0.0, canopy_y - float(JungleBackdrop.canopy_line(kind) * JungleBackdrop.ZOOM))
+	sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	_parallax(scroll, float(JungleBackdrop.WIDTH * JungleBackdrop.ZOOM), z).add_child(sprite)
+
+
+## The air behind everything. A flat wash under the baked layers: the sky
+## layer of the backdrop carries the banding and the light shafts, this is
+## only there so no gap in the canopy shows the clear colour behind it.
+func _sky() -> TextureRect:
 	var gradient := Gradient.new()
-	gradient.set_color(0, SKY_TOP)
-	gradient.set_color(1, SKY_BOTTOM)
-	var sky_texture := GradientTexture2D.new()
-	sky_texture.gradient = gradient
-	sky_texture.fill_to = Vector2(0.0, 1.0)
-	sky_texture.width = 4
-	sky_texture.height = 256
+	gradient.set_offset(0, 0.0)
+	gradient.set_color(0, JunglePalette.SKY_HIGH)
+	gradient.set_offset(1, 1.0)
+	gradient.set_color(1, JunglePalette.at_distance(JunglePalette.CANOPY_FAR, 0.5))
+
+	var texture := GradientTexture2D.new()
+	texture.gradient = gradient
+	texture.fill_to = Vector2(0.0, 1.0)
+	texture.width = 4
+	texture.height = 256
+
 	var sky := TextureRect.new()
-	sky.texture = sky_texture
+	sky.texture = texture
 	sky.stretch_mode = TextureRect.STRETCH_SCALE
 	sky.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	sky.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	sky_layer.add_child(sky)
-
-	# Horizon a little under the average ground height, where the eye is.
-	var horizon := _water_y - 260.0
-	var clouds := _parallax(Vector2(0.1, 0.06), 1728.0, -30)
-	clouds.autoscroll = Vector2(-12.0, 0.0)
-	clouds.add_child(Clouds.new(_tiles, horizon - 520.0, seed_value))
-	# Kenney's backdrop strips: pale far hills, then the green tree line.
-	_parallax(Vector2(0.2, 0.15), 1728.0, -25).add_child(Strip.new(_backdrops, [0, 1, 2, 3], horizon - 120.0, 3))
-	_parallax(Vector2(0.45, 0.35), 1728.0, -20).add_child(Strip.new(_backdrops, [6, 7], horizon + 40.0, 3))
+	return sky
 
 
 func _parallax(scroll: Vector2, repeat: float, z: int) -> Parallax2D:
 	var layer := Parallax2D.new()
 	layer.scroll_scale = scroll
 	layer.repeat_size = Vector2(repeat, 0.0)
-	layer.repeat_times = 4
+	# Enough copies to cover the longest level at the widest camera. Four was
+	# not: a zoomed-out view ran off the end of the backdrop and showed the
+	# flat sky colour behind it, as a rectangle, in the middle of the jungle.
+	layer.repeat_times = 16
 	layer.z_index = z
 	layer.z_as_relative = false
 	layer.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	add_child(layer)
 	return layer
-
-
-## One of Kenney's 24 px backdrop columns (sky, horizon, fill) repeated
-## across a parallax repeat width, the fill carried on far below.
-class Strip extends Node2D:
-	var texture: Texture2D
-	var columns: Array
-	var top: float
-	var zoom: int
-
-	func _init(p_texture: Texture2D, p_columns: Array, p_top: float, p_zoom: int) -> void:
-		texture = p_texture
-		columns = p_columns
-		top = p_top
-		zoom = p_zoom
-
-	func _draw() -> void:
-		var cell := 24.0 * zoom
-		var count := int(ceilf(1728.0 / cell))
-		for i in count:
-			var col: int = columns[i % columns.size()]
-			var x := i * cell
-			draw_texture_rect_region(texture, Rect2(x, top, cell, cell), Rect2(col * 24, 24, 24, 24))
-			draw_texture_rect_region(texture, Rect2(x, top + cell, cell, 3000.0), Rect2(col * 24, 48, 24, 1))
-
-
-class Clouds extends Node2D:
-	var texture: Texture2D
-	var base: float
-	var seed_value: int
-
-	func _init(p_texture: Texture2D, p_base: float, p_seed: int) -> void:
-		texture = p_texture
-		base = p_base
-		seed_value = p_seed
-
-	func _draw() -> void:
-		var rng := RandomNumberGenerator.new()
-		rng.seed = seed_value
-		var x := 40.0
-		while x < 1600.0:
-			var width := rng.randi_range(1, 3)
-			var y := base + rng.randf_range(-160.0, 160.0)
-			var tiles: Array[int] = [153]
-			for i in width:
-				tiles.append(154)
-			tiles.append(155)
-			for i in tiles.size():
-				var tile: int = tiles[i]
-				var origin := Vector2((tile % 20) * 18, (tile / 20) * 18)
-				draw_texture_rect_region(texture, Rect2(x + i * 54.0, y, 54.0, 54.0), Rect2(origin, Vector2(18, 18)), Color(1, 1, 1, 0.95))
-			x += tiles.size() * 54.0 + rng.randf_range(120.0, 320.0)
 
 
 ## Hanging ivy for a climbable face: a few strands, a leaf every so often,
@@ -416,10 +557,10 @@ class Ivy extends Node2D:
 	var size: Vector2 = Vector2(48.0, 400.0)
 
 	func _draw() -> void:
-		var stem := Color8(34, 96, 64)
-		var leaf := Color8(54, 227, 119)
-		var leaf_dark := Color8(46, 176, 130)
-		var outline := Color8(38, 43, 68)
+		var stem := JunglePalette.LEAF_DARK.darkened(0.25)
+		var leaf := JunglePalette.LEAF
+		var leaf_dark := JunglePalette.LEAF_DARK
+		var outline := JunglePalette.BARK_DARK
 		var rng := RandomNumberGenerator.new()
 		rng.seed = int(size.x * 7 + size.y)
 		var strands := maxi(2, int(size.x / 18.0))
