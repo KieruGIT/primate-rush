@@ -1,0 +1,154 @@
+class_name JunglePalette
+extends RefCounted
+
+# ============================================================
+# JUNGLE PALETTE - one colour language for the whole game.
+#
+# The look is the key art: deep jungle in daylight. Not a night scene - the
+# frames are dark because the canopy is thick and the player is *under* it,
+# which is a different thing and a warmer one. Light comes down through the
+# leaves in shafts, the foliage reads teal-green in shade and yellow-green
+# where the sun reaches it, and the wood is warm brown. Torches still burn,
+# because the jungle floor is dim, but they are accents now rather than the
+# only light in the frame.
+#
+# Kept as one table rather than as constants scattered through LevelSkin,
+# Pickup and Vine, because the moment two files each own "jungle green" the
+# jungle stops being one jungle.
+# ============================================================
+
+# --- Sky and air ---------------------------------------------------
+## What little sky shows through the canopy: hazy, bright, washed out.
+const SKY_HIGH := Color8(126, 214, 198)
+const SKY_LOW := Color8(176, 232, 198)
+## The haze the far jungle sits in. Everything distant fades toward this.
+const HAZE := Color8(108, 178, 166)
+## A shaft of sun coming down through a gap in the leaves.
+const SUNSHAFT := Color8(228, 248, 190)
+
+# --- Foliage, back to front ----------------------------------------
+# Four depths. Each one is darker, greener and more detailed than the one
+# behind it - that progression is the whole illusion of a deep jungle.
+const CANOPY_FAR := Color8(74, 150, 136)
+const CANOPY_MID := Color8(46, 118, 96)
+const CANOPY_NEAR := Color8(30, 84, 64)
+const CANOPY_FRAME := Color8(16, 48, 40)
+
+const LEAF := Color8(58, 158, 92)
+const LEAF_DARK := Color8(30, 92, 62)
+const LEAF_LIGHT := Color8(138, 214, 96)
+## Where sun catches the very top of a leaf cluster.
+const LEAF_SUN := Color8(190, 236, 118)
+
+const BARK := Color8(74, 53, 38)
+const BARK_LIGHT := Color8(122, 86, 52)
+const BARK_DARK := Color8(46, 32, 24)
+
+# --- Terrain -------------------------------------------------------
+# The platform palette, top to bottom. Read the list downward and you have
+# the anatomy the art bible specifies: lit cap, grass, dark seam, soil,
+# darker soil, outline.
+
+## The one dark line that goes round every solid thing in the game. A single
+## shared outline colour is most of what makes a tileset look like a set.
+const OUTLINE := Color8(22, 30, 28)
+
+const GRASS_SUN := Color8(158, 220, 92)
+const GRASS := Color8(86, 170, 74)
+const GRASS_DARK := Color8(46, 112, 60)
+## The fringe hanging under a platform's lip.
+const MOSS := Color8(58, 132, 66)
+
+const DIRT := Color8(104, 68, 44)
+const DIRT_LIGHT := Color8(138, 96, 60)
+const DIRT_DARK := Color8(64, 41, 28)
+
+
+## Multiplied over the Kenney tiles. Barely tinted: this is shade, not night,
+## so the tiles keep their own colour and only lose a little of the sun.
+const SHADE_TINT := Color(0.82, 0.90, 0.84)
+## Deeper underground, away from the light coming through the canopy.
+const DEPTH_TINT := Color(0.42, 0.44, 0.46)
+## The lit top edge of a ledge, where light through the leaves lands.
+const SUN_RIM := Color8(198, 236, 152)
+
+# --- Water ---------------------------------------------------------
+const WATER := Color8(46, 134, 138)
+const WATER_DEEP := Color8(18, 62, 74)
+const WATER_GLINT := Color8(158, 226, 212)
+
+# --- Light ---------------------------------------------------------
+# The warm end of the palette. A flame is drawn as three stacked circles -
+# core, body, glow - and these are those three, in order.
+const FLAME_CORE := Color8(255, 243, 186)
+const FLAME := Color8(255, 168, 56)
+const FLAME_GLOW := Color8(255, 116, 24)
+const EMBER := Color8(255, 190, 96)
+
+const BANANA := Color8(255, 210, 51)
+const BANANA_LIGHT := Color8(255, 237, 154)
+const BANANA_DARK := Color8(196, 134, 20)
+## Pollen and insects drifting in the light shafts.
+const MOTE := Color8(226, 248, 168)
+
+## The corners of the frame. The key art vignettes every panel, but gently -
+## it is shade closing in, not a spotlight.
+const VIGNETTE := Color8(8, 26, 22)
+
+
+## Atmospheric perspective: pushes `color` toward the haze as `distance` goes
+## 0 (underfoot) to 1 (on the skyline). One function, so every far layer
+## fades by the same rule and they read as one depth.
+static func at_distance(color: Color, distance: float) -> Color:
+	return color.lerp(HAZE, clampf(distance, 0.0, 1.0) * 0.72)
+
+
+## A warm pool of torchlight, for drawing over the jungle floor.
+## `strength` 0..1 fades it out at the edge of its reach.
+static func torchlight(strength: float) -> Color:
+	var warm := FLAME_GLOW
+	return Color(warm.r, warm.g, warm.b, clampf(strength, 0.0, 1.0) * 0.5)
+
+
+# --- Glow ----------------------------------------------------------
+# Every light in the game - torch, flame, moon halo, banana, finish line -
+# is this one texture, tinted and scaled. It exists because the obvious
+# thing, a stack of draw_circle calls with low alpha, does not work: a
+# circle has a hard edge, so three of them read as three flat discs sitting
+# on the level rather than as one pool of light. A radial alpha ramp is the
+# difference between a lit scene and a scene with brown rings painted on it.
+#
+# Built once and shared: one 128px texture for every light on every level.
+
+static var _glow: Texture2D = null
+
+
+static func glow_texture() -> Texture2D:
+	if _glow != null:
+		return _glow
+	var gradient := Gradient.new()
+	# Interpolated rather than a straight ramp, so the centre stays bright
+	# and the falloff is long and invisible at the edge.
+	gradient.set_offset(0, 0.0)
+	gradient.set_color(0, Color(1, 1, 1, 1.0))
+	gradient.add_point(0.22, Color(1, 1, 1, 0.72))
+	gradient.add_point(0.48, Color(1, 1, 1, 0.30))
+	gradient.add_point(0.74, Color(1, 1, 1, 0.09))
+	gradient.set_offset(gradient.get_point_count() - 1, 1.0)
+	gradient.set_color(gradient.get_point_count() - 1, Color(1, 1, 1, 0.0))
+
+	var texture := GradientTexture2D.new()
+	texture.gradient = gradient
+	texture.fill = GradientTexture2D.FILL_RADIAL
+	texture.fill_from = Vector2(0.5, 0.5)
+	texture.fill_to = Vector2(1.0, 0.5)
+	texture.width = 128
+	texture.height = 128
+	_glow = texture
+	return _glow
+
+
+## Draws a soft light of `radius` centred on `at`, in `tint`'s colour at
+## `tint`'s alpha. The one way anything in this game emits light.
+static func draw_glow(on: CanvasItem, at: Vector2, radius: float, tint: Color) -> void:
+	on.draw_texture_rect(glow_texture(), Rect2(at - Vector2(radius, radius), Vector2(radius, radius) * 2.0), false, tint)

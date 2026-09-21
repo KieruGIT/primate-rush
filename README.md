@@ -161,6 +161,11 @@ first-run checklist, the LAN test, Android export, and the known gaps, and
 [docs/MULTIPLAYER.md](docs/MULTIPLAYER.md) for how far multiplayer can go
 beyond the same wifi and what each step actually costs.
 
+The look is specified rather than improvised: [docs/ART_BIBLE.md](docs/ART_BIBLE.md)
+is authoritative for pixel size, lighting direction, visual hierarchy and
+platform anatomy, and every art change should be checked against it with a
+screenshot from `tools/CaptureUi.tscn` rather than by reading the diff.
+
 ## License
 
 MIT. See [LICENSE](LICENSE).
