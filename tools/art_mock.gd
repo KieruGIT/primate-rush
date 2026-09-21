@@ -36,16 +36,19 @@ const CAST := [
 func _ready() -> void:
 	var out := "user://"
 	var skin := "drawn"
+	var zoom := 1.0
 	for argument in OS.get_cmdline_user_args():
 		if argument.begins_with("--out="):
 			out = argument.trim_prefix("--out=")
 		elif argument.begins_with("--skin="):
 			skin = argument.trim_prefix("--skin=")
-	await _shoot(out, skin)
+		elif argument.begins_with("--zoom="):
+			zoom = float(argument.trim_prefix("--zoom="))
+	await _shoot(out, skin, zoom)
 	get_tree().quit()
 
 
-func _shoot(out: String, skin: String) -> void:
+func _shoot(out: String, skin: String, zoom: float) -> void:
 	var viewport := SubViewport.new()
 	viewport.size = SIZE
 	viewport.render_target_update_mode = SubViewport.UPDATE_ALWAYS
@@ -71,19 +74,23 @@ func _shoot(out: String, skin: String) -> void:
 		sprite.set_process(false)          # no animation clock: same shot every run
 		sprite.frame = MonkeySprite.POSES.keys().find(entry["pose"])
 		sprite.flip_h = bool(entry["flip"])
-		sprite.position = ground + (entry["at"] as Vector2)
+		sprite.position = _snap(ground + (entry["at"] as Vector2))
 		sprite.z_index = 10
 		viewport.add_child(sprite)
 
 	var camera := Camera2D.new()
-	camera.position = ground + Vector2(0.0, -150.0)
-	camera.zoom = Vector2.ONE * 1.35
+	# Snapped to the art grid. A camera at a fractional world position shifts
+	# the whole frame by part of a pixel, and then no art pixel lands on a
+	# whole screen pixel however clean the zoom is - which is what made the
+	# 2x shot score *below* chance on the grid audit.
+	camera.position = _snap(ground + Vector2(0.0, -150.0))
+	camera.zoom = Vector2.ONE * maxf(roundf(zoom), 1.0)
 	viewport.add_child(camera)
 	camera.make_current()
 
 	for i in SETTLE_FRAMES:
 		await get_tree().process_frame
-	var file := "%s/shot_art_%s.png" % [out.trim_suffix("/"), skin]
+	var file := "%s/shot_art_%s_z%d.png" % [out.trim_suffix("/"), skin, int(zoom)]
 	var error := viewport.get_texture().get_image().save_png(file)
 	print("art mock -> %s (%d)" % [file, error])
 
@@ -106,4 +113,11 @@ func _stage(map: Node) -> Vector2:
 			best = Rect2(col.global_position - size * 0.5, size)
 	if best.size.x <= 0.0:
 		return map.get(&"spawn_point")
-	return Vector2(best.position.x + best.size.x * 0.38, best.position.y)
+	return _snap(Vector2(best.position.x + best.size.x * 0.38, best.position.y))
+
+
+## Rounds a world position onto the art grid: one art pixel is SCALE world
+## pixels, so anything between two of them is half a pixel of blur.
+func _snap(at: Vector2) -> Vector2:
+	var grid := float(LevelSkin.SCALE)
+	return (at / grid).round() * grid

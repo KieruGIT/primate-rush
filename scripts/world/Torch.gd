@@ -40,13 +40,17 @@ func _ready() -> void:
 func _process(delta: float) -> void:
 	_t += delta
 	# 0.78..1.0, never dark, never a strobe.
-	_flicker = 0.89 + sin(_t * 9.3) * 0.07 + sin(_t * 3.7) * 0.04
+	# Quantised to whole art pixels. A flame whose radius is 13.4 pixels one
+	# frame and 13.9 the next is a flame whose edge never lands on the grid.
+	var raw := 0.89 + sin(_t * 9.3) * 0.07 + sin(_t * 3.7) * 0.04
+	_flicker = roundf(raw * 8.0) / 8.0
 	queue_redraw()
 
 
 func _draw() -> void:
 	var s := scale_factor
 	var flame_at := Vector2(0.0, -34.0 * s)
+	# _draw_flame works in torch-local space, so `at` is only the glow anchor.
 	_draw_pool(flame_at)
 	_draw_post(s)
 	_draw_flame(flame_at, s)
@@ -64,24 +68,37 @@ func _draw_pool(at: Vector2) -> void:
 func _draw_post(s: float) -> void:
 	var dark := JunglePalette.BARK
 	var light := JunglePalette.BARK_LIGHT
-	# Square pixels: the post is 6 art pixels wide at 2x, like everything else.
-	draw_rect(Rect2(-4.0 * s, -30.0 * s, 8.0 * s, 30.0 * s), dark)
-	draw_rect(Rect2(-4.0 * s, -30.0 * s, 4.0 * s, 30.0 * s), light)
-	# Binding under the bowl, and the bowl itself.
-	draw_rect(Rect2(-8.0 * s, -34.0 * s, 16.0 * s, 6.0 * s), dark)
-	draw_rect(Rect2(-8.0 * s, -34.0 * s, 16.0 * s, 2.0 * s), JunglePalette.EMBER)
+	# Every edge a whole number of art pixels from the torch's own position,
+	# which the skin already snapped to the grid.
+	_block(-4.0 * s, -30.0 * s, 8.0 * s, 30.0 * s, dark)
+	_block(-4.0 * s, -30.0 * s, 4.0 * s, 30.0 * s, light)
+	_block(-8.0 * s, -34.0 * s, 16.0 * s, 6.0 * s, dark)
+	_block(-8.0 * s, -34.0 * s, 16.0 * s, 2.0 * s, JunglePalette.EMBER)
 
 
+## A rectangle rounded onto the art grid.
+func _block(x: float, y: float, w: float, h: float, color: Color) -> void:
+	var g := float(JunglePalette.ART_PIXEL)
+	var a := (Vector2(x, y) / g).round() * g
+	var b := (Vector2(x + w, y + h) / g).round() * g
+	draw_rect(Rect2(a, b - a), color)
+
+
+## `at` is the bowl; the rows are drawn relative to it through _block, so
+## they inherit the same grid rounding as the post.
 func _draw_flame(at: Vector2, s: float) -> void:
 	var f := _flicker
-	# Halo, body, core - biggest and softest first, so the core stays crisp.
 	JunglePalette.draw_glow(self, at + Vector2(0.0, -7.0 * s * f), 26.0 * s * f, Color(JunglePalette.FLAME_CORE, 0.55))
-	draw_circle(at + Vector2(0.0, -7.0 * s * f), 8.0 * s * f, JunglePalette.FLAME)
-	draw_circle(at + Vector2(0.0, -9.0 * s * f), 4.0 * s * f, JunglePalette.FLAME_CORE)
-	# A tongue of flame leaning with the flicker, so it is not a bead.
-	var lean := sin(_t * 5.1) * 4.0 * s
-	draw_colored_polygon(PackedVector2Array([
-		at + Vector2(-5.0 * s, -6.0 * s),
-		at + Vector2(lean, -22.0 * s * f),
-		at + Vector2(5.0 * s, -6.0 * s),
-	]), Color(JunglePalette.FLAME, 0.9))
+	# The flame is a stack of rows, widest in the middle and pinched at the
+	# tip, rather than two circles and a triangle. Circles and polygons are
+	# vector calls: their edges land wherever the maths puts them, which on
+	# pixel art reads as a smudge of light rather than a flame.
+	var rows := 7
+	var lean := roundf(sin(_t * 5.1) * 1.5)
+	for i in rows:
+		var t := float(i) / float(rows - 1)
+		var half := roundf((1.0 - t) * 3.0 + sin(t * PI) * 1.5) + 1.0
+		var tone := JunglePalette.FLAME if t < 0.55 else JunglePalette.FLAME_CORE
+		_block(
+			(-half + lean * t) * 2.0 * s, (-6.0 - 16.0 * t * f) * s,
+			half * 4.0 * s, 3.0 * s, tone)
