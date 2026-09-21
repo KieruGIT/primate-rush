@@ -91,6 +91,10 @@ const BANANA_DARK := Color8(196, 134, 20)
 ## Pollen and insects drifting in the light shafts.
 const MOTE := Color8(226, 248, 168)
 
+## World pixels per art pixel. The one number the whole look depends on:
+## every position, radius and size in the game is a whole multiple of it.
+const ART_PIXEL: int = 2
+
 ## The corners of the frame. The key art vignettes every panel, but gently -
 ## it is shade closing in, not a spotlight.
 const VIGNETTE := Color8(8, 26, 22)
@@ -111,14 +115,20 @@ static func torchlight(strength: float) -> Color:
 
 
 # --- Glow ----------------------------------------------------------
-# Every light in the game - torch, flame, moon halo, banana, finish line -
-# is this one texture, tinted and scaled. It exists because the obvious
-# thing, a stack of draw_circle calls with low alpha, does not work: a
-# circle has a hard edge, so three of them read as three flat discs sitting
-# on the level rather than as one pool of light. A radial alpha ramp is the
-# difference between a lit scene and a scene with brown rings painted on it.
+# Every light in the game - torch, flame, banana, finish line - is this one
+# texture, tinted and scaled.
 #
-# Built once and shared: one 128px texture for every light on every level.
+# It is deliberately tiny and deliberately banded. A smooth 128 px gradient
+# stretched over a torch looks like a lens flare pasted onto pixel art, and
+# a grid audit of a frame full of them shows it: a quarter of every colour
+# edge on screen lands between pixels instead of on one. Real pixel art
+# lights in steps - a few rings of flat colour - so the ramp here has five
+# stops, the texture is 16 px, and it is drawn NEAREST at a whole multiple
+# of the art pixel. The rings are the point, not an artefact.
+
+## Art pixels across the glow texture. Small: each texel becomes a visible
+## step of light at the size a torch is actually drawn.
+const GLOW_TEXELS: int = 16
 
 static var _glow: Texture2D = null
 
@@ -127,13 +137,12 @@ static func glow_texture() -> Texture2D:
 	if _glow != null:
 		return _glow
 	var gradient := Gradient.new()
-	# Interpolated rather than a straight ramp, so the centre stays bright
-	# and the falloff is long and invisible at the edge.
+	gradient.interpolation_mode = Gradient.GRADIENT_INTERPOLATE_CONSTANT
 	gradient.set_offset(0, 0.0)
 	gradient.set_color(0, Color(1, 1, 1, 1.0))
-	gradient.add_point(0.22, Color(1, 1, 1, 0.72))
-	gradient.add_point(0.48, Color(1, 1, 1, 0.30))
-	gradient.add_point(0.74, Color(1, 1, 1, 0.09))
+	gradient.add_point(0.30, Color(1, 1, 1, 0.66))
+	gradient.add_point(0.52, Color(1, 1, 1, 0.38))
+	gradient.add_point(0.74, Color(1, 1, 1, 0.16))
 	gradient.set_offset(gradient.get_point_count() - 1, 1.0)
 	gradient.set_color(gradient.get_point_count() - 1, Color(1, 1, 1, 0.0))
 
@@ -142,13 +151,19 @@ static func glow_texture() -> Texture2D:
 	texture.fill = GradientTexture2D.FILL_RADIAL
 	texture.fill_from = Vector2(0.5, 0.5)
 	texture.fill_to = Vector2(1.0, 0.5)
-	texture.width = 128
-	texture.height = 128
+	texture.width = GLOW_TEXELS
+	texture.height = GLOW_TEXELS
 	_glow = texture
 	return _glow
 
 
-## Draws a soft light of `radius` centred on `at`, in `tint`'s colour at
-## `tint`'s alpha. The one way anything in this game emits light.
+## Draws a stepped light of `radius` centred on `at`, in `tint`'s colour and
+## alpha. Both the centre and the radius are snapped to the art grid, so the
+## rings land on whole pixels rather than smearing across them.
 static func draw_glow(on: CanvasItem, at: Vector2, radius: float, tint: Color) -> void:
-	on.draw_texture_rect(glow_texture(), Rect2(at - Vector2(radius, radius), Vector2(radius, radius) * 2.0), false, tint)
+	var grid := float(ART_PIXEL)
+	# A whole number of texels per art pixel keeps the steps even.
+	var texel := maxf(roundf(radius * 2.0 / float(GLOW_TEXELS) / grid), 1.0) * grid
+	var size := texel * float(GLOW_TEXELS)
+	var centre := (at / grid).round() * grid
+	on.draw_texture_rect(glow_texture(), Rect2(centre - Vector2(size, size) * 0.5, Vector2(size, size)), false, tint)

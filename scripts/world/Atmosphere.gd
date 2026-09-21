@@ -43,19 +43,25 @@ static func _vignette() -> TextureRect:
 	var gradient := Gradient.new()
 	gradient.set_offset(0, 0.50)
 	gradient.set_color(0, Color(JunglePalette.VIGNETTE, 0.0))
-	gradient.set_offset(1, 1.0)
-	gradient.set_color(1, Color(JunglePalette.VIGNETTE, 0.40))
+	gradient.add_point(0.72, Color(JunglePalette.VIGNETTE, 0.14))
+	gradient.add_point(0.88, Color(JunglePalette.VIGNETTE, 0.28))
+	gradient.set_offset(gradient.get_point_count() - 1, 1.0)
+	gradient.set_color(gradient.get_point_count() - 1, Color(JunglePalette.VIGNETTE, 0.40))
 
 	var texture := GradientTexture2D.new()
 	texture.gradient = gradient
 	texture.fill = GradientTexture2D.FILL_RADIAL
 	texture.fill_from = Vector2(0.5, 0.5)
 	texture.fill_to = Vector2(1.0, 0.5)
+	# Fine enough that its steps are a couple of art pixels, coarse enough
+	# that it is not a smooth gradient. At 32 the steps were forty screen
+	# pixels wide and the vignette read as a giant arch drawn over the sky.
 	texture.width = 256
 	texture.height = 256
 
 	var rect := TextureRect.new()
 	rect.texture = texture
+	rect.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	rect.stretch_mode = TextureRect.STRETCH_SCALE
 	rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	rect.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)

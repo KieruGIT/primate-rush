@@ -21,10 +21,52 @@ the side, in daylight under a thick canopy.
 | Tile grid | 18 × 18 art pixels (36 × 36 world) |
 | Filtering | `TEXTURE_FILTER_NEAREST`, everywhere |
 | Zoom factors | whole numbers only |
+| Canvas texture filter | `nearest`, set project-wide |
+| Window scale mode | `integer` |
 
 A fractional scale, a rotated sprite, or an unsnapped position produces
 uneven pixels, and there is no fixing that downstream. Positions that come
-out of maths get snapped: `(p / SCALE).round() * SCALE`.
+out of maths get snapped: `LevelSkin.snap()` / `LevelSkin.snap_rect()`.
+
+### 1b. Pixel perfection is measured, not eyeballed
+
+`tools/PixelAudit.tscn` counts what share of horizontal colour edges in a
+frame land on the art grid. Run it on any art change:
+
+```
+godot --headless res://tools/PixelAudit.tscn -- --images=shot.png
+```
+
+A clean frame scores 90%+ at block 2. **50% is chance** — it means there is
+no pixel grid at all. Below 50% means a systematic sub-pixel offset. The
+remaining few percent in a real frame is the soft lighting, which is allowed
+to step finer than the grid.
+
+Five things broke this, none of them visible in a diff, all of them found by
+measuring rather than by looking:
+
+1. **Fractional camera zoom.** The arena shipped `camera_zoom = 0.78`, so
+   every art pixel was 1.56 screen pixels — alternately one and two wide.
+   Whole numbers only; `Main.gd` now rounds it.
+2. **Unsnapped camera position.** A camera at a fractional world position
+   shifts the whole frame by part of a pixel. The 2x shot scored *below*
+   chance until the camera was snapped.
+3. **Off-grid level geometry.** Maps are authored in whole world pixels, but
+   an art pixel is two of them, so a platform centred on an odd coordinate
+   starts on an odd one. `snap_rect()` in `_collect` fixed the terrain from
+   ~73% to 100%.
+4. **`Parallax2D`.** It offsets a layer by `-camera * scroll_scale`
+   internally; 0.14 times anything is a fraction, and that offset cannot be
+   rounded from outside. The backdrop sat exactly one pixel off - 59% of its
+   edges on odd columns. `LevelSkin.SnappedParallax` positions itself
+   instead, which took the backdrop from 41% to 100%.
+5. **Smooth gradients.** A 4 px sky gradient stretched to 1280, and a smooth
+   radial vignette, put a colour boundary on nearly every column. Light is
+   drawn from a small stepped ramp at NEAREST instead.
+
+Whole frame, before and after: **73% → 91%**. The backdrop alone: 41% → 100%.
+Half the "edges" in the original frame were smear artefacts that no longer
+exist.
 
 **Never use Godot's vector draw calls for art.** `draw_circle`,
 `draw_colored_polygon` and `draw_line` antialias. One antialiased curve
@@ -171,6 +213,7 @@ legs, long arms, big hands.
 - gradients as a substitute for shading
 - generic mobile-game UI, glassmorphism, rounded SaaS panels
 - glow used as decoration rather than as a light source
+- a smooth gradient anywhere, including sky, vignette and light
 - background detail that competes with a platform edge
 - two pixel sizes in one frame
 - a new colour that is not in `JunglePalette`
@@ -201,6 +244,7 @@ The art is verified by screenshot, not by reading the diff:
 
 ```
 python3 tools/art/preview.py                                    # look at the pixels
+godot --headless res://tools/PixelAudit.tscn -- --images=shot.png   # measure the grid
 godot --headless --fixed-fps 60 res://tools/Smoke.tscn          # nothing throws
 xvfb-run godot --rendering-driver opengl3 res://tools/CaptureUi.tscn -- \
     --out=/tmp/shots/ --shots=game_a,game_b,overview_a          # look at it

@@ -76,7 +76,7 @@ func _collect(map: Node) -> void:
 			if String(col.name).begins_with("ColBound"):
 				continue
 			var size: Vector2 = (col.shape as RectangleShape2D).size
-			var rect := Rect2(to_local(col.global_position) - size * 0.5, size)
+			var rect := snap_rect(Rect2(to_local(col.global_position) - size * 0.5, size))
 			_solids.append(rect)
 			if rect.size.y >= rect.size.x * 3.0:
 				_columns.append(rect)
@@ -95,6 +95,25 @@ func _collect(map: Node) -> void:
 	for rect in _thick:
 		lowest_top = maxf(lowest_top, rect.position.y)
 	_water_y = (lowest_top if lowest_top > -INF else _bounds.end.y) + 260.0
+
+
+## Rounds a rectangle onto the art grid.
+##
+## Maps are authored in whole world pixels, but an art pixel is SCALE of
+## those, so a platform centred on an odd coordinate starts on an odd one -
+## and then every tile edge along it lands between two screen pixels. Half a
+## world pixel is nothing to a collision box and everything to a tile.
+static func snap_rect(rect: Rect2) -> Rect2:
+	var grid := float(SCALE)
+	var start := (rect.position / grid).round() * grid
+	var stop := (rect.end / grid).round() * grid
+	return Rect2(start, stop - start)
+
+
+## Rounds a position onto the art grid.
+static func snap(at: Vector2) -> Vector2:
+	var grid := float(SCALE)
+	return (at / grid).round() * grid
 
 
 func _hide_graybox(map: Node) -> void:
@@ -183,10 +202,7 @@ func _scatter_grass(rect: Rect2) -> void:
 		var lean := -1.0 if rng.randf() < 0.5 else 1.0
 		for b in blades:
 			var height := float(rng.randi_range(2, 5) * SCALE)
-			var at := Vector2(
-				floorf((x + float(b * SCALE)) / float(SCALE)) * float(SCALE),
-				rect.position.y
-			)
+			var at := snap(Vector2(x + float(b * SCALE), rect.position.y))
 			# A blade is a stepped column, two art pixels wide, leaning one
 			# pixel at the tip. Never a line: a line would antialias.
 			draw_rect(Rect2(at.x, at.y - height, float(SCALE), height), JunglePalette.GRASS_DARK)
@@ -209,7 +225,7 @@ func _scatter_soil(rect: Rect2, bottom: float) -> void:
 			rng.randf_range(top + 8.0, maxf(bottom - 14.0, top + 10.0))
 		)
 		# Snapped to the art grid, like every other pixel in the level.
-		at = (at / float(SCALE)).floor() * float(SCALE)
+		at = snap(at)
 		var fade := clampf(1.0 - (at.y - top) / maxf(bottom - top, 1.0), 0.25, 1.0)
 		if rng.randf() < 0.62:
 			_pebble(at, rng.randi_range(2, 4) * SCALE, fade)
@@ -387,7 +403,7 @@ func _light_ground(rect: Rect2, rng: RandomNumberGenerator) -> void:
 	while x < rect.end.x - 60.0:
 		var torch := Torch.new()
 		torch.name = "Torch%d" % get_child_count()
-		torch.position = Vector2(x, rect.position.y)
+		torch.position = snap(Vector2(x, rect.position.y))
 		torch.phase = rng.randf_range(0.0, 6.0)
 		torch.reach = rng.randf_range(150.0, 200.0)
 		add_child(torch)
@@ -397,7 +413,7 @@ func _light_ground(rect: Rect2, rng: RandomNumberGenerator) -> void:
 func _add_tree_climbable(foot: Vector2, height: float, width: float) -> void:
 	var climbable := CLIMBABLE_SCENE.instantiate() as Climbable
 	climbable.name = "TreeClimbable%d" % get_child_count()
-	climbable.position = foot - Vector2(0.0, height * 0.5)
+	climbable.position = snap(foot - Vector2(0.0, height * 0.5))
 	climbable.size = Vector2(width, height)
 	climbable.draw_debug_face = false
 	add_child(climbable)
@@ -440,7 +456,7 @@ func _prop(kind: StringName, at: Vector2, flip: bool, anchor: float = 0.5) -> vo
 	var size := Vector2(texture.get_size()) * float(SCALE)
 	var top_left := at - Vector2(size.x * 0.5, size.y * anchor)
 	# Snapped to the art grid: half a pixel of offset is a blurred sprite.
-	top_left = (top_left / float(SCALE)).round() * float(SCALE)
+	top_left = snap(top_left)
 	var region := Rect2(Vector2.ZERO, texture.get_size())
 	if flip:
 		region.position.x = texture.get_size().x
@@ -450,11 +466,16 @@ func _prop(kind: StringName, at: Vector2, flip: bool, anchor: float = 0.5) -> vo
 
 func _draw_climb_marks(foot: Vector2, height: float) -> void:
 	# A few bright ivy hooks teach the player that the trunk is gameplay.
+	# Stepped blocks, not lines. draw_line takes float endpoints and puts a
+	# diagonal across the pixel grid; a climb mark is meant to read as the
+	# same art as the tile it is on.
 	var green := Color(JunglePalette.LEAF_LIGHT, 0.95)
+	var step := float(SCALE)
 	var y := foot.y - 24.0
 	while y > foot.y - height:
-		draw_line(Vector2(foot.x - 7.0, y), Vector2(foot.x + 6.0, y - 8.0), green, 3.0)
-		draw_circle(Vector2(foot.x + 8.0, y - 9.0), 3.5, green.lightened(0.18))
+		for i in 4:
+			draw_rect(Rect2(snap(Vector2(foot.x - 6.0 + i * step * 1.5, y - i * step)), Vector2(step * 2.0, step)), green)
+		draw_rect(Rect2(snap(Vector2(foot.x + 6.0, y - step * 4.0)), Vector2(step * 2.0, step * 2.0)), green.lightened(0.18))
 		y -= 30.0
 
 
@@ -514,13 +535,51 @@ func _camera_zoom() -> float:
 ## the sprite's own top edge is worked back from it.
 func _band(kind: StringName, scroll: Vector2, canopy_y: float, z: int) -> void:
 	var texture := JungleBackdrop.layer(kind, seed_value)
-	var sprite := Sprite2D.new()
-	sprite.texture = texture
-	sprite.centered = false
-	sprite.scale = Vector2.ONE * float(JungleBackdrop.ZOOM)
-	sprite.position = Vector2(0.0, canopy_y - float(JungleBackdrop.canopy_line(kind) * JungleBackdrop.ZOOM))
-	sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-	_parallax(scroll, float(JungleBackdrop.WIDTH * JungleBackdrop.ZOOM), z).add_child(sprite)
+	var span := float(JungleBackdrop.WIDTH * JungleBackdrop.ZOOM)
+	var plane := SnappedParallax.new()
+	plane.scroll_scale = scroll
+	plane.span = span
+	plane.z_index = z
+	plane.z_as_relative = false
+	add_child(plane)
+	# Four copies side by side: enough to cover a 1280 screen at any offset,
+	# once the plane has wrapped itself to a whole multiple of the span.
+	var top := canopy_y - float(JungleBackdrop.canopy_line(kind) * JungleBackdrop.ZOOM)
+	for i in 4:
+		var sprite := Sprite2D.new()
+		sprite.texture = texture
+		sprite.centered = false
+		sprite.scale = Vector2.ONE * float(JungleBackdrop.ZOOM)
+		sprite.position = snap(Vector2((i - 1) * span, top))
+		sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		plane.add_child(sprite)
+
+
+## A parallax plane that lands on the art grid.
+##
+## This positions itself rather than using Parallax2D. Parallax2D offsets a
+## layer by -camera * scroll_scale internally, and 0.14 times any camera
+## position is a fraction; that offset cannot be rounded from outside, and
+## feeding a correction back through scroll_offset does not reach it.
+## Measured on a frame, the backdrop sat exactly one screen pixel off the
+## grid - 59% of its edges on odd columns - while the terrain in the same
+## shot measured 100%.
+##
+## A layer at depth d belongs at camera * (1 - scroll_scale), which puts it
+## at -camera * scroll_scale relative to the camera. That is one line, it
+## rounds cleanly, and wrapping to a whole multiple of the span keeps the
+## tiled copies on the grid too.
+class SnappedParallax extends Node2D:
+	var scroll_scale: Vector2 = Vector2.ONE
+	var span: float = 1280.0
+
+	func _process(_delta: float) -> void:
+		var camera := get_viewport().get_camera_2d()
+		if camera == null:
+			return
+		var base := camera.get_screen_center_position() * (Vector2.ONE - scroll_scale)
+		base.x -= fposmod(base.x, span)
+		position = LevelSkin.snap(base)
 
 
 ## The air behind everything. A flat wash under the baked layers: the sky
@@ -536,30 +595,19 @@ func _sky() -> TextureRect:
 	var texture := GradientTexture2D.new()
 	texture.gradient = gradient
 	texture.fill_to = Vector2(0.0, 1.0)
-	texture.width = 4
-	texture.height = 256
+	texture.width = 1
+	texture.height = 64
 
 	var sky := TextureRect.new()
 	sky.texture = texture
+	# A 4 px gradient stretched across 1280 with the default filter is a
+	# smooth horizontal ramp, which puts a colour boundary on almost every
+	# column - half of them odd. NEAREST turns it back into four flat bands.
+	sky.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	sky.stretch_mode = TextureRect.STRETCH_SCALE
 	sky.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	sky.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	return sky
-
-
-func _parallax(scroll: Vector2, repeat: float, z: int) -> Parallax2D:
-	var layer := Parallax2D.new()
-	layer.scroll_scale = scroll
-	layer.repeat_size = Vector2(repeat, 0.0)
-	# Enough copies to cover the longest level at the widest camera. Four was
-	# not: a zoomed-out view ran off the end of the backdrop and showed the
-	# flat sky colour behind it, as a rectangle, in the middle of the jungle.
-	layer.repeat_times = 16
-	layer.z_index = z
-	layer.z_as_relative = false
-	layer.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-	add_child(layer)
-	return layer
 
 
 ## Hanging ivy for a climbable face: a few strands, a leaf every so often,

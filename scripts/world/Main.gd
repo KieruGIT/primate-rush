@@ -175,7 +175,10 @@ func _spawn_player(id: int, monkey_id: StringName, slot: int, hat_id: StringName
 	player.setup(GameConfig.get_monkey(monkey_id), id, id == _local_id, GameConfig.tint_for_index(slot), hat_id)
 	player.position = _spawn_position(slot)
 	if map != null and player.camera != null:
-		player.camera.zoom = Vector2.ONE * map.camera_zoom
+		# Whole numbers only. A zoom of 0.78 puts 1.56 screen pixels on each
+		# art pixel, so every pixel in the game is alternately one and two
+		# wide - the single loudest way for pixel art to look wrong.
+		player.camera.zoom = Vector2.ONE * maxf(roundf(map.camera_zoom), 1.0)
 	_player_root.add_child(player)
 	players[id] = player
 	if id == _local_id:
