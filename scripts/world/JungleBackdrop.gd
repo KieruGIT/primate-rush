@@ -11,6 +11,11 @@ extends RefCounted
 # nothing here draws to the screen - each layer is rasterised through
 # PixelCanvas and handed to a Parallax2D at NEAREST and a whole-number zoom.
 #
+# The foliage itself is the hand-drawn crown from JungleFoliageArt, the same
+# one the foreground trees use, washed toward the haze by however far back
+# the layer sits. One drawing, four distances - which is also why the near
+# layer and the trees in front of it never disagree about what a leaf is.
+#
 # The layers obey the art bible's hierarchy, and it is the hierarchy rather
 # than the detail that makes a background work: back layers lose saturation
 # and contrast toward the haze, front layers gain darkness, and *none* of
@@ -59,6 +64,12 @@ static func canopy_line(kind: StringName) -> int:
 
 ## An ImageTexture for one layer. `kind` is &"far", &"mid" or &"near"; they
 ## are meant to be stacked in that order.
+## Stamps one authored crown, centred on (x, y), washed toward `blend_to`.
+static func _crown(canvas: PixelCanvas, x: int, y: int, art: Array, blend_to: Color, amount: float) -> void:
+	var w := String(art[0]).length()
+	canvas.stamp_art(x - w / 2, y - art.size() / 2, art, JungleFoliageArt.ink, blend_to, amount)
+
+
 static func layer(kind: StringName, seed_value: int) -> ImageTexture:
 	var key := "%s:%d" % [kind, seed_value]
 	if _cache.has(key):
@@ -94,10 +105,10 @@ static func _paint_far(canvas: PixelCanvas, rng: RandomNumberGenerator) -> void:
 		var y := base + rng.randi_range(-16, 12)
 		trunks.append([x, y, radius])
 		if rng.randf() < 0.35:
-			canvas.trunk(x, y, HEIGHT, 3, JunglePalette.at_distance(JunglePalette.BARK, 0.72).lerp(tint, 0.7), tint)
+			canvas.trunk(x, y, HEIGHT, 3, JunglePalette.at_distance(JunglePalette.BARK, 0.72).lerp(tint, 0.7), tint, false)
 		x += int(radius * rng.randf_range(0.85, 1.2))
 	for entry in trunks:
-		canvas.crown(entry[0], entry[1], entry[2], tint, light, 0.16, rng)
+		_crown(canvas, entry[0], entry[1], JungleFoliageArt.CROWN_SMALL, JunglePalette.HAZE, 0.62)
 	canvas.fill_under_canopy(far_crowns + 40, tint)
 	for i in 3:
 		canvas.sunshaft(rng.randi_range(40, WIDTH - 40), rng.randi_range(50, 96), rng.randf_range(0.10, 0.18), JunglePalette.SUNSHAFT)
@@ -119,11 +130,11 @@ static func _paint_mid(canvas: PixelCanvas, rng: RandomNumberGenerator) -> void:
 	while x < WIDTH + 16:
 		var radius := rng.randi_range(26, 46)
 		var y := base + rng.randi_range(-24, 16)
-		canvas.trunk(x, y, HEIGHT, rng.randi_range(5, 9), bark, tint)
+		canvas.trunk(x, y, HEIGHT, rng.randi_range(5, 9), bark, tint, false)
 		trees.append([x, y, radius])
 		x += int(radius * rng.randf_range(0.80, 1.12))
 	for entry in trees:
-		canvas.crown(entry[0], entry[1], entry[2], tint, light, 0.40, rng)
+		_crown(canvas, entry[0], entry[1], JungleFoliageArt.CROWN_BIG, JunglePalette.HAZE, 0.26)
 	# Vines hang out of the crowns, never out of open sky.
 	for entry in trees:
 		if rng.randf() < 0.45:
@@ -140,9 +151,8 @@ static func _paint_near(canvas: PixelCanvas, rng: RandomNumberGenerator) -> void
 	var light := JunglePalette.CANOPY_NEAR
 	var x := -30
 	while x < WIDTH + 30:
-		var radius := rng.randi_range(30, 54)
-		canvas.crown(x, canopy_line(&"near") + rng.randi_range(-30, 4), radius, tint, light, 0.22, rng)
-		x += int(radius * rng.randf_range(0.66, 0.96))
+		_crown(canvas, x, canopy_line(&"near") + rng.randi_range(-6, 18), JungleFoliageArt.CROWN_BIG, tint, 0.82)
+		x += rng.randi_range(34, 50)
 	for i in 11:
 		canvas.frond(rng.randi_range(0, WIDTH), rng.randi_range(8, 44), rng.randi_range(26, 74), tint, light, rng)
 	for i in 7:
@@ -151,6 +161,5 @@ static func _paint_near(canvas: PixelCanvas, rng: RandomNumberGenerator) -> void
 	# never so tall it reaches a platform the player has to read.
 	var u := -20
 	while u < WIDTH + 20:
-		var radius := rng.randi_range(22, 40)
-		canvas.crown(u, HEIGHT - rng.randi_range(0, 18), radius, tint, light, 0.18, rng)
-		u += int(radius * rng.randf_range(0.7, 1.0))
+		_crown(canvas, u, HEIGHT - rng.randi_range(0, 20), JungleFoliageArt.CROWN_SMALL, tint, 0.78)
+		u += rng.randi_range(26, 40)

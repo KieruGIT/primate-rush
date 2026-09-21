@@ -28,11 +28,53 @@ out of maths get snapped: `(p / SCALE).round() * SCALE`.
 
 **Never use Godot's vector draw calls for art.** `draw_circle`,
 `draw_colored_polygon` and `draw_line` antialias. One antialiased curve
-behind a hard-edged tile reads instantly as two different pictures. Art is
-rasterised through `PixelCanvas` into an `Image` and drawn as a texture.
+behind a hard-edged tile reads instantly as two different pictures.
 
 The exceptions, and they are the only ones: soft light (`JunglePalette.draw_glow`)
 and flat colour fills that sit behind everything.
+
+---
+
+## 1a. Art is drawn, not generated
+
+This is the rule that matters most, and it was learned the hard way.
+
+Anything with a **recognisable form** — a tile, a leaf crown, a rock, a
+character — is authored pixel by pixel as a character grid, exactly like
+`MonkeySprite.HEAD`:
+
+```gdscript
+const CLUMP := [
+    "..HHHH..",
+    ".HHHHHHL",
+    "HHLLLLLL",
+    "LLLLLLLD",
+]
+```
+
+It lives in `JungleTileArt` or `JungleFoliageArt`, and **every pixel is
+placed, not rolled.** Scattered single pixels read as static; a cluster with
+a lit top and a dark underside reads as rock. A seeded RNG cannot tell the
+difference, so it must not be the thing deciding.
+
+Only genuinely mechanical work stays procedural: a trunk of uniform bark, a
+vine that hangs, a wash of light, laying drawn pixels into an atlas.
+
+**Authoring loop.** Do not iterate through the game — it is far too slow to
+see pixels that way. Use `tools/art/` (a dependency-free PNG writer): edit
+the grid, render a zoomed sheet, *look at it*, fix it. Only then wire it in
+and take a gameplay screenshot.
+
+**Reuse one drawing at every depth.** `PixelCanvas.stamp_art` takes a drawn
+grid and washes it toward the haze, so the same crown serves a foreground
+tree and a far parallax layer. Drawing it twice is how the foreground and the
+background end up disagreeing about what a leaf is.
+
+**Vary, do not randomise.** A tile repeated forty times is visibly forty
+copies. The fix is four hand-drawn variants picked by a hash of grid
+position — deterministic, so every machine in a match draws the same ground,
+and not a straight cycle, which puts the same tile down every fourth column
+in a visible diagonal.
 
 ---
 
@@ -141,7 +183,9 @@ legs, long arms, big hands.
 |---|---|
 | `scripts/world/JunglePalette.gd` | every colour, the haze rule, the glow |
 | `scripts/world/PixelCanvas.gd` | the rasteriser and the jungle shapes |
-| `scripts/world/JungleTiles.gd` | terrain atlas and props |
+| `scripts/world/JungleTileArt.gd` | **the terrain pixels, drawn by hand** |
+| `scripts/world/JungleFoliageArt.gd` | **the foliage pixels, drawn by hand** |
+| `scripts/world/JungleTiles.gd` | laying that art into an atlas |
 | `scripts/world/JungleBackdrop.gd` | the three parallax layers |
 | `scripts/world/LevelSkin.gd` | dressing a gray-box map with all of it |
 | `scripts/ui/UiTheme.gd` | the menu palette |
@@ -156,6 +200,7 @@ Add a colour to `JunglePalette` or it does not exist. Two files each owning
 The art is verified by screenshot, not by reading the diff:
 
 ```
+python3 tools/art/preview.py                                    # look at the pixels
 godot --headless --fixed-fps 60 res://tools/Smoke.tscn          # nothing throws
 xvfb-run godot --rendering-driver opengl3 res://tools/CaptureUi.tscn -- \
     --out=/tmp/shots/ --shots=game_a,game_b,overview_a          # look at it

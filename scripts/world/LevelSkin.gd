@@ -164,7 +164,7 @@ func _draw_ground(rect: Rect2) -> void:
 	var depth := 1
 	while y < bottom:
 		var shade := Color.WHITE.lerp(JunglePalette.DEPTH_TINT, clampf(depth * 0.11, 0.0, 0.7))
-		_row(JungleTiles.DIRT, rect.position.x, rect.size.x, y, minf(TILE, bottom - y), shade)
+		_row(JungleTiles.DIRT, rect.position.x, rect.size.x, y, minf(TILE, bottom - y), shade, JungleTiles.DIRT_VARIANTS)
 		y += TILE
 		depth += 1
 	_scatter_soil(rect, bottom)
@@ -262,7 +262,7 @@ func _draw_ledge(rect: Rect2) -> void:
 
 ## A three-slice row: left cap, repeated middle, right cap. Narrower than two
 ## tiles, the caps are cut and butted together so both outlines survive.
-func _row(tiles: Array[int], x: float, width: float, y: float, height: float = TILE, shade: Color = Color.WHITE) -> void:
+func _row(tiles: Array[int], x: float, width: float, y: float, height: float = TILE, shade: Color = Color.WHITE, pool: Array[int] = []) -> void:
 	var src_h := height / SCALE
 	if width < TILE * 2:
 		var left := floorf(width * 0.5)
@@ -275,7 +275,16 @@ func _row(tiles: Array[int], x: float, width: float, y: float, height: float = T
 	var stop := x + width - TILE
 	while cursor < stop:
 		var w := minf(TILE, stop - cursor)
-		_blit(tiles[1], 0.0, w / SCALE, src_h, Vector2(cursor, y), shade)
+		# Middles come from `pool` when one is given, chosen by a hash of the
+		# tile's own grid position. Deterministic, so every machine in a match
+		# draws the same ground, and not a straight cycle, which would put the
+		# same tile down every fourth column in a visible diagonal.
+		var tile: int = tiles[1]
+		if not pool.is_empty():
+			var col := int(roundf((cursor - x) / TILE))
+			var line := int(roundf(y / TILE))
+			tile = pool[posmod(col * 7 + line * 13, pool.size())]
+		_blit(tile, 0.0, w / SCALE, src_h, Vector2(cursor, y), shade)
 		cursor += TILE
 	_blit(tiles[2], 0.0, SRC, src_h, Vector2(stop, y), shade)
 
@@ -426,6 +435,8 @@ func _trunk_column(foot: Vector2, height: float) -> void:
 ## `anchor` 0 hangs it by its middle, 1 stands it on its bottom edge.
 func _prop(kind: StringName, at: Vector2, flip: bool, anchor: float = 0.5) -> void:
 	var texture := JungleTiles.prop(kind)
+	if texture == null:
+		return
 	var size := Vector2(texture.get_size()) * float(SCALE)
 	var top_left := at - Vector2(size.x * 0.5, size.y * anchor)
 	# Snapped to the art grid: half a pixel of offset is a blurred sprite.
