@@ -35,7 +35,12 @@ const COLUMNS: int = JungleTiles.COLUMNS
 const TORCH_SPACING := Vector2(420.0, 760.0)
 ## Grab-tree branch reach, world pixels.
 const BRANCH_LENGTH: float = 96.0
-const PANORAMA := "res://assets/environment/approved/jungle-panorama-px.png"
+## Low-detail branch: levels are painted in the Primate Rush mock style
+## (scripts/world/MockSkin.gd) instead of the jungle tile art.
+const LOW_DETAIL: bool = true
+const Mock = preload("res://scripts/world/MockSkin.gd")
+const MockLayers = preload("res://scripts/world/MockLayers.gd")
+const PANORAMA := "res://assets/environment/simple/backdrop-px.png"
 
 ## Seed for decoration placement, so every machine in a match - and every
 ## run of the capture tool - grows the same trees in the same places.
@@ -142,6 +147,17 @@ func _draw() -> void:
 		if bool(item[3]):
 			_draw_decor(item)
 	_draw_water()
+	if LOW_DETAIL:
+		for rect in _thick:
+			Mock.ground(self, rect)
+		for rect in _columns:
+			Mock.column(self, rect, rect.end.y if _rests_on_ground(rect) else maxf(rect.end.y, _water_y + TILE))
+		for i in _thin.size():
+			Mock.ledge(self, _thin[i], i)
+		for item in _decor:
+			if not bool(item[3]):
+				_draw_decor(item)
+		return
 	# Projected side/bottom faces sit behind the playable collision surface.
 	# They do not change the map, but stop platforms reading as paper cutouts.
 	for rect in _solids:
@@ -402,21 +418,51 @@ func _plan_decor() -> void:
 				_decor.append([&"tree", foot, rng.randf() < 0.5, true, side, height])
 				_add_tree_climbable(foot, height, TILE * 0.8)
 				_add_branch_climbable(foot, height, side)
+				# The leafy crown too: anything you can see, you can grab.
+				_add_grab("Crown", foot - Vector2(0.0, height + TILE * 0.4), Vector2(TILE * 2.4, TILE * 1.4))
 				x += rng.randf_range(220.0, 340.0)
 			elif roll < 0.50:
 				var foot := Vector2(x, rect.position.y)
 				_decor.append([&"palm", foot, rng.randf() < 0.5, true])
 				_add_tree_climbable(foot, TILE * 5.8, TILE * 0.7)
+				_add_grab("Crown", foot - Vector2(0.0, TILE * 5.9), Vector2(TILE * 2.2, TILE * 1.2))
 				x += rng.randf_range(160.0, 260.0)
 			else:
 				# Undergrowth sits in front of the player's feet, so it is
 				# drawn late and never hides a platform edge.
 				_decor.append([&"fern" if rng.randf() < 0.70 else &"shrub", Vector2(x, rect.position.y), rng.randf() < 0.5, false])
+				_add_grab("Bush", Vector2(x, rect.position.y - 16.0), Vector2(44.0, 32.0))
 				x += rng.randf_range(90.0, 200.0)
 	for rect in _thin:
 		if rect.size.x >= 180.0 and rng.randf() < 0.6:
 			var at := Vector2(rng.randf_range(rect.position.x + 30.0, rect.end.x - 60.0), rect.position.y)
 			_decor.append([&"fern", at, rng.randf() < 0.5, false])
+	_add_level_grabs()
+
+
+## Everything else in the play layer becomes a hand-hold: the edge of every
+## ledge and the lip of every cliff (grab it from below or beside and swing
+## round), and the ropes a hanging plank hangs from. The arm's rules still
+## apply - it reaches up, never down, and not through solid rock.
+func _add_level_grabs() -> void:
+	for i in _thin.size():
+		var rect: Rect2 = _thin[i]
+		_add_grab("Ledge", rect.get_center(), rect.size + Vector2(8.0, 8.0))
+		if LOW_DETAIL and i % 3 == 2:
+			# Same index rule MockSkin.ledge uses to hang a plank on ropes.
+			for rx in [rect.position.x + 14.0, rect.end.x - 14.0]:
+				_add_grab("Rope", Vector2(rx, rect.position.y - 90.0), Vector2(16.0, 180.0))
+	for rect in _thick:
+		_add_grab("Lip", Vector2(rect.get_center().x, rect.position.y + 10.0), Vector2(rect.size.x, 20.0))
+
+
+func _add_grab(kind: String, center: Vector2, size: Vector2) -> void:
+	var climbable := CLIMBABLE_SCENE.instantiate() as Climbable
+	climbable.name = "%sGrab%d" % [kind, get_child_count()]
+	climbable.position = snap(center)
+	climbable.size = size
+	climbable.draw_debug_face = false
+	add_child(climbable)
 
 
 ## Torches at intervals along a ground. Warm accents on a shaded jungle
@@ -431,6 +477,7 @@ func _light_ground(rect: Rect2, rng: RandomNumberGenerator) -> void:
 		torch.phase = rng.randf_range(0.0, 6.0)
 		torch.reach = rng.randf_range(150.0, 200.0)
 		add_child(torch)
+		_add_grab("Torch", Vector2(x, rect.position.y - 40.0), Vector2(24.0, 80.0))
 		x += rng.randf_range(TORCH_SPACING.x, TORCH_SPACING.y)
 
 
@@ -476,6 +523,17 @@ func _draw_decor(item: Array) -> void:
 	var kind: StringName = item[0]
 	var foot: Vector2 = item[1]
 	var flip: bool = bool(item[2])
+	if LOW_DETAIL:
+		match kind:
+			&"tree":
+				var height: float = float(item[5]) if item.size() > 5 else TILE * 3.0
+				var side: float = float(item[4]) if item.size() > 4 else 0.0
+				Mock.tree(self, foot, height, side, BRANCH_LENGTH, foot.y - height + TILE * 1.5)
+			&"palm":
+				Mock.tree(self, foot, TILE * 5.5, 0.0, 0.0, 0.0)
+			_:
+				Mock.bush(self, foot, kind == &"shrub")
+		return
 	match kind:
 		&"tree":
 			var height: float = float(item[5]) if item.size() > 5 else TILE * 3.0
@@ -569,7 +627,34 @@ func _build_backdrop() -> void:
 		# The painted panorama already carries the middle distance; the teal
 		# procedural mid layer only fights its night palette.
 		_band(&"mid", Vector2(0.34, 0.0), eye - reach * 1.10, -24)
+	if LOW_DETAIL:
+		_mock_layers(eye)
+		return
 	_band(&"near", Vector2(0.62, 0.0), eye - reach * 1.28, -18)
+
+
+## Mock "Detailed pass" parallax: dark jungle silhouettes sliding at about
+## a third of the camera, and a leaf-and-vine canopy frame over the top of
+## the screen sliding at nearly the camera's speed. Decoration only.
+func _mock_layers(eye: float) -> void:
+	var plane := SnappedParallax.new()
+	plane.scroll_scale = Vector2(0.35, 0.0)
+	plane.span = 1600.0
+	plane.anchor_y = eye
+	plane.z_index = -24
+	plane.z_as_relative = false
+	add_child(plane)
+	var trees := MockLayers.Silhouettes.new()
+	trees.span = 1600.0
+	trees.ground_y = eye + 140.0
+	trees.seed_value = seed_value
+	plane.add_child(trees)
+	var frame := CanvasLayer.new()
+	frame.layer = 1
+	add_child(frame)
+	var canopy := MockLayers.Canopy.new()
+	canopy.seed_value = seed_value
+	frame.add_child(canopy)
 
 
 ## Eye level: the spawn point if the map declares one, since that is where

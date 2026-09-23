@@ -21,7 +21,7 @@ const GAP_PROBE: float = 64.0
 const GAP_DEPTH: float = 140.0
 ## Beyond this, a bot ignores a player and goes back to the objective.
 const AGGRO_RANGE: float = 320.0
-const ATTACK_RANGE: float = 78.0
+const ATTACK_RANGE: float = 115.0
 
 ## Lower is sloppier. Scales reaction delays rather than movement speed, so
 ## an easy bot is slow to react, not visibly crippled. A bot that ran slower
@@ -90,13 +90,13 @@ func think(player: Player, arena: Node, delta: float) -> InputFrame:
 		_jump_hold = 0.24
 		frame.jump_held = true
 	elif player.state == Player.State.SWING:
-		# The button is the grip: keep holding until it is time to let go.
-		frame.jump_held = not _should_release(player, to_target)
-		if not frame.jump_held and not player.swing_on_trunk:
+		# The grab button is the grip: keep holding until it is time to let go.
+		frame.grab_held = not _should_release(player, to_target)
+		if not frame.grab_held and not player.swing_on_trunk:
 			_left_vine = player.get(&"_swing_node") as Node2D
 			_no_grab_time = 0.6
 	elif not player.is_on_floor() and _wants_grab(player, to_target):
-		frame.jump_held = true
+		frame.grab_held = true
 
 	var victim := _nearest_opponent(player, arena)
 	if victim != null and _attack_cooldown <= 0.0:
@@ -386,8 +386,8 @@ func _drop_to(player: Player, to_target: Vector2) -> bool:
 	return to_target.y > 70.0 and absf(to_target.x) < 120.0 		and _ray(player, player.global_position, player.global_position + Vector2(0.0, 500.0))
 
 
-## Grabbing is jump held in the air. A bot holds it when there is a vine in
-## reach, or when the target is above and a trunk is how to get there.
+## Grabbing is the grab button held in the air. A bot holds it when there is
+## a vine in reach, or when the target is above and a trunk is how to get there.
 ## Holding for every whole flight would grab each pillar it passes.
 func _wants_grab(player: Player, to_target: Vector2) -> bool:
 	for area in player.vine_sensor.get_overlapping_areas():
@@ -415,18 +415,21 @@ func _recover(player: Player) -> InputFrame:
 	var home := Vector2(-signf(player.global_position.x), -0.8).normalized()
 	frame.move = home
 	frame.sprint_held = true
-	# Held, so the double jump rises its full height and grabs any trunk
-	# or vine it reaches on the way back.
+	# Held, so the double jump rises its full height, and grab held so it
+	# takes any trunk, ledge or vine it reaches on the way back.
 	frame.jump_held = true
+	frame.grab_held = true
 	if not _recovery_jumped and player.velocity.y > -100.0:
 		frame.press(InputFrame.Action.JUMP)
 		_recovery_jumped = true
 	return frame
 
 
+## Only solid rock is a ceiling: a one-way platform overhead is jumped
+## straight through.
 func _ceiling(player: Player) -> bool:
 	var head := player.global_position + Vector2(0.0, -30.0)
-	return _ray(player, head, head + Vector2(0.0, -110.0))
+	return _ray(player, head, head + Vector2(0.0, -110.0), GameConfig.LAYER_WORLD)
 
 
 func _near_pad(player: Player) -> bool:
@@ -459,9 +462,10 @@ func _gap_ahead(player: Player) -> bool:
 	return not _ray(player, edge, edge + Vector2(0.0, GAP_DEPTH))
 
 
-func _ray(player: Player, from: Vector2, to: Vector2) -> bool:
+## Ground probes see platforms too, so a ledge is not mistaken for a gap.
+func _ray(player: Player, from: Vector2, to: Vector2, mask: int = GameConfig.LAYER_SOLID) -> bool:
 	var space := player.get_world_2d().direct_space_state
-	var query := PhysicsRayQueryParameters2D.create(from, to, GameConfig.LAYER_WORLD, [player.get_rid()])
+	var query := PhysicsRayQueryParameters2D.create(from, to, mask, [player.get_rid()])
 	return not space.intersect_ray(query).is_empty()
 
 

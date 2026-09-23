@@ -93,9 +93,9 @@ const ANIMS: Dictionary = {
 	&"cheer": {"frames": [&"cheer_0", &"cheer_1", &"cheer_2", &"cheer_3"], "fps": 7.0, "loop": true},
 }
 const HEIGHTS: Dictionary = {
-	&"macaque": 46,
-	&"gorilla": 50,
-	&"gibbon": 46,
-	&"orangutan": 50,
-	&"capuchin": 44,
+	&"macaque": 30,
+	&"gorilla": 48,
+	&"gibbon": 54,
+	&"orangutan": 54,
+	&"capuchin": 39,
 }

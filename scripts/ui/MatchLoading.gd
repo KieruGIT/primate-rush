@@ -30,6 +30,7 @@ var _map_resource: Resource = null
 
 
 func _ready() -> void:
+	UiTheme.ensure(self)
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	var backdrop := MenuBackdrop.new()
 	backdrop.animate = false

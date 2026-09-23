@@ -19,7 +19,9 @@ static func hand_pixels(species: StringName, grip: bool) -> float:
 	return float(hands[1] if grip else hands[0])
 
 
-static func draw_arm(canvas: CanvasItem, species: StringName, shoulder: Vector2, hand: Vector2, grip: bool = true, facing: int = 1, tint: Color = Color.WHITE, hand_scale: float = 1.0) -> void:
+## thickness scales the shaft across its width (the punch arm is drawn
+## chunkier than the grab arm); hand_scale scales the hand both ways.
+static func draw_arm(canvas: CanvasItem, species: StringName, shoulder: Vector2, hand: Vector2, grip: bool = true, facing: int = 1, tint: Color = Color.WHITE, hand_scale: float = 1.0, thickness: float = 1.0) -> void:
 	var texture := texture_for(species, grip)
 	var delta := hand - shoulder
 	var length := delta.length()
@@ -27,10 +29,10 @@ static func draw_arm(canvas: CanvasItem, species: StringName, shoulder: Vector2,
 		return
 	var source := texture.get_size()
 	var hand_source := minf(hand_pixels(species, grip), source.x - 2.0)
-	var px := MonkeySprite.PIXEL
+	var px := MonkeySprite.pixel_for(species)
 	var hand_width := hand_source * px * hand_scale
-	var height := source.y * px
-	var hand_height := height * hand_scale
+	var height := source.y * px * thickness
+	var hand_height := source.y * px * hand_scale
 	var shaft := maxf(length - hand_width, 0.0)
 	canvas.draw_set_transform(shoulder, delta.angle(), Vector2(1.0, -1.0 if facing < 0 else 1.0))
 	if shaft > 0.0:

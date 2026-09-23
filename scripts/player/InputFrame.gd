@@ -14,14 +14,19 @@ extends RefCounted
 # one physics tick still produce two actions.
 # ============================================================
 
-# DASH is appended, never inserted: actions travel as ints over the wire.
-enum Action { JUMP, ATTACK, SKILL, DASH }
+# DASH and GRAB are appended, never inserted: actions travel as ints over
+# the wire.
+enum Action { JUMP, ATTACK, SKILL, DASH, GRAB }
 
 var move: Vector2 = Vector2.ZERO
 var jump_held: bool = false
 ## Held, like jump. Shift on a keyboard; the stick pushed to its rim on a
 ## phone, so a thumb never has to find a fourth thing to hold.
 var sprint_held: bool = false
+## The grip. Its own button now, separate from jump: hold it to take hold of
+## whatever is in reach and swing, let go to release. Jump while hanging
+## leaps off instead.
+var grab_held: bool = false
 
 var _pending: Dictionary = {}
 
@@ -63,6 +68,6 @@ func button_counts() -> Dictionary:
 func apply_button_counts(counts: Dictionary) -> void:
 	for button in counts.keys():
 		var id := int(button)
-		if id < 0 or id > InputFrame.Action.DASH:
+		if id < 0 or id > InputFrame.Action.GRAB:
 			continue
 		_pending[id] = int(_pending.get(id, 0)) + clampi(int(counts[button]), 0, 8)

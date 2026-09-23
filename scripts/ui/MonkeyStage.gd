@@ -35,7 +35,9 @@ func set_monkey(id: StringName, locked: bool = false) -> void:
 		add_child(_sprite)
 	# Menus show the monkey facing you.
 	_sprite.setup(id, true)
-	_sprite.scale = Vector2.ONE * pixel_scale
+	# Low-detail art is already 3 atlas px per art px, so menus use a third
+	# of the scale (whole numbers only) to keep the chunky pixels mock-sized.
+	_sprite.scale = Vector2.ONE * float(maxi(1, roundi(pixel_scale / 2.0))) * float(MonkeySprite.MENU_SIZE.get(id, 1.0))
 	# A locked monkey is a muted silhouette, but it must still read on the shop
 	# card: showing the shape is the purchase pitch. Near-black disappeared into
 	# the glass panel on dim phone screens and looked like a missing asset.

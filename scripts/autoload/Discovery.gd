@@ -22,7 +22,7 @@ const HOST_TIMEOUT: float = 4.0
 ## Guards against parsing whatever else happens to be broadcasting.
 const MAGIC: String = "monkey-lan-1"
 
-var hosts: Dictionary = {}     # ip -> {"port": int, "players": int, "map": String, "mode": String, "seen": float}
+var hosts: Dictionary = {}     # ip -> {"port", "players", "map", "mode", "mode_id", "queue", "open", "seen"}
 
 var _beacon: PacketPeerUDP = null
 var _listener: PacketPeerUDP = null
@@ -40,9 +40,12 @@ func _process(delta: float) -> void:
 		_prune()
 
 
-## Called by the host once it is listening for players.
-func start_advertising() -> void:
-	stop_listening()
+## Called by the host once it is listening for players. Matchmaking keeps
+## listening while it advertises, so two searchers that both opened a room
+## can still find each other and merge.
+func start_advertising(keep_listening: bool = false) -> void:
+	if not keep_listening:
+		stop_listening()
 	if _beacon != null:
 		return
 	_beacon = PacketPeerUDP.new()
@@ -92,6 +95,9 @@ func _send_beacon() -> void:
 		"players": Net.roster.size(),
 		"map": GameConfig.MAP_NAMES.get(Net.map_id, String(Net.map_id)),
 		"mode": GameConfig.MODE_NAMES.get(Net.mode, "?"),
+		"mode_id": Net.mode,
+		"queue": Net.queue,
+		"open": Net.searching and Net.roster.size() < GameConfig.NET_MAX_PLAYERS,
 	}
 	_beacon.put_packet(JSON.stringify(payload).to_utf8_buffer())
 
@@ -101,6 +107,10 @@ func _drain() -> void:
 	while _listener.get_available_packet_count() > 0:
 		var packet := _listener.get_packet()
 		var ip := _listener.get_packet_ip()
+		if _is_own_address(ip):
+			# Our own beacon, heard because matchmaking listens while it
+			# advertises. Never offer a room to the machine hosting it.
+			continue
 		var parsed: Variant = JSON.parse_string(packet.get_string_from_utf8())
 		if not (parsed is Dictionary) or str((parsed as Dictionary).get("magic", "")) != MAGIC:
 			continue
@@ -111,6 +121,9 @@ func _drain() -> void:
 			"players": int(entry.get("players", 0)),
 			"map": str(entry.get("map", "?")),
 			"mode": str(entry.get("mode", "?")),
+			"mode_id": int(entry.get("mode_id", -1)),
+			"queue": int(entry.get("queue", -1)),
+			"open": bool(entry.get("open", false)),
 			"seen": _now(),
 		}
 		# Only a new host redraws the list. A beacon every second from a host
@@ -130,6 +143,43 @@ func _prune() -> void:
 		hosts.erase(ip)
 	if not stale.is_empty():
 		hosts_changed.emit()
+
+
+## An open matchmaking room for this queue and mode, or "" if none is heard.
+## Lowest address first, so every searcher on the network agrees on which
+## room to merge into.
+func open_room(queue: int, mode: int) -> String:
+	var best := ""
+	for ip in hosts.keys():
+		var entry: Dictionary = hosts[ip]
+		if not bool(entry.get("open", false)):
+			continue
+		if int(entry.get("queue", -1)) != queue or int(entry.get("mode_id", -1)) != mode:
+			continue
+		if best.is_empty() or address_less(String(ip), best):
+			best = String(ip)
+	return best
+
+
+func is_listening() -> bool:
+	return _listener != null
+
+
+func _is_own_address(ip: String) -> bool:
+	if ip.begins_with("127."):
+		return true
+	return IP.get_local_addresses().has(ip)
+
+
+func address_less(a: String, b: String) -> bool:
+	var pa := a.split(".")
+	var pb := b.split(".")
+	if pa.size() != 4 or pb.size() != 4:
+		return a < b
+	for i in 4:
+		if int(pa[i]) != int(pb[i]):
+			return int(pa[i]) < int(pb[i])
+	return false
 
 
 func _now() -> float:

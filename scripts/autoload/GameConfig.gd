@@ -18,6 +18,13 @@ const LAYER_HURTBOX: int = 1 << 3
 const LAYER_CLIMBABLE: int = 1 << 4
 const LAYER_VINE: int = 1 << 5
 const LAYER_PICKUP: int = 1 << 6
+## Thin ledges. One-way: jump up through them from below, stand on top, and
+## hold down to drop back through. Own layer so a drop can switch just these
+## off for a moment without letting the monkey fall through the ground.
+const LAYER_PLATFORM: int = 1 << 7
+## Anything you can stand on. Ground probes (shadows, bot gap checks) use
+## this; things that only solid rock should stop (arm reach) use LAYER_WORLD.
+const LAYER_SOLID: int = LAYER_WORLD | LAYER_PLATFORM
 
 # --- Base movement tuning. MonkeyStats multiplies these. ---
 # A stat of 1.0 means "exactly these numbers", which makes the macaque the
@@ -40,6 +47,69 @@ const MODE_NAMES: Dictionary = {
 	Mode.HOARD: "Banana Hoard",
 	Mode.SLAP: "2v2 Slap",
 }
+
+## Matchmaking queues. Both look for real players on the network first and
+## fill whatever seats are still empty with AI when the search runs out.
+##   CLASSIC  your own setup: mode, map, AI count and difficulty
+##   RANKED   fixed rules (full field, fierce AI, no free play) and every
+##            match moves your rank points up or down
+# Appended, never inserted: the queue travels over the wire as an int.
+enum Queue { CLASSIC, RANKED }
+
+const QUEUE_NAMES: Dictionary = {
+	Queue.CLASSIC: "Classic",
+	Queue.RANKED: "Ranked",
+}
+
+## Modes a ranked match can be. Free play has no winner to rank.
+const RANKED_MODES: Array = [Mode.RACE, Mode.HOARD, Mode.SLAP]
+
+## Seconds spent listening for an open room before opening our own, and then
+## seconds our own room waits for players before AI fills it. The listen
+## window is jittered per search so two phones that press PLAY in the same
+## second do not both give up and both host.
+const MATCH_LISTEN_SECONDS: Vector2 = Vector2(2.0, 3.5)
+const MATCH_WAIT_SECONDS: float = 10.0
+
+## Rank tiers by rank points. Each tier is split into III, II, I.
+const RANK_TIERS: Array = [
+	["BRONZE", 0], ["SILVER", 300], ["GOLD", 700], ["JUNGLE", 1200], ["APEX", 1800],
+]
+
+
+func rank_for(rp: int) -> Dictionary:
+	var tier := 0
+	for index in RANK_TIERS.size():
+		if rp >= int(RANK_TIERS[index][1]):
+			tier = index
+	var low := int(RANK_TIERS[tier][1])
+	var last := tier == RANK_TIERS.size() - 1
+	if last:
+		return {"name": String(RANK_TIERS[tier][0]), "progress": 1.0, "next": -1}
+	var high := int(RANK_TIERS[tier + 1][1])
+	var step := float(high - low) / 3.0
+	var division := clampi(int(float(rp - low) / step), 0, 2)
+	var next := low + int(round(step * float(division + 1)))
+	var from := low + int(round(step * float(division)))
+	return {
+		"name": "%s %s" % [RANK_TIERS[tier][0], ["III", "II", "I"][division]],
+		"progress": clampf(float(rp - from) / maxf(float(next - from), 1.0), 0.0, 1.0),
+		"next": next,
+	}
+
+
+## Rank points for one finished ranked match. First place in a full field is
+## +30 and last is -15; 2v2 is a straight win, loss or draw.
+func ranked_delta(mode: int, place: int, field: int, row: Dictionary) -> int:
+	if mode == Mode.SLAP:
+		if bool(row.get("draw", false)):
+			return 0
+		return 25 if bool(row.get("won", false)) else -12
+	if field <= 1 or place <= 0:
+		return 0
+	var t := float(place - 1) / float(field - 1)
+	return int(round(lerpf(30.0, -15.0, t)))
+
 
 const MAP_PATHS: Dictionary = {
 	&"map_a": "res://scenes/maps/MapA.tscn",

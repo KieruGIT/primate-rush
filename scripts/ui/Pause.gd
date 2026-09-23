@@ -22,6 +22,7 @@ extends CanvasLayer
 
 func _ready() -> void:
 	layer = 15
+	UiTheme.ensure(self)
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	_resume.pressed.connect(resume)
 	_leave.pressed.connect(_on_leave)

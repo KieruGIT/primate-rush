@@ -3,13 +3,18 @@ extends Control
 # ============================================================
 # MENU - the home screen and everything one tap away from it.
 #
+# Low-detail branch: Title, Lobby and Hero select follow the Primate Rush
+# mock boards (title screen, solo lobby, hero select).
+#
 # Built like a phone game, not a settings page. Home is your monkey, big,
 # on a stage, with the PLAY button where a right thumb rests and the match
 # it will start written on the card above it. Everything else is a page you
 # visit and come back from:
 #
 #   MONKEYS  swipe through the roster with arrows, pick one, pick a hat
-#   PLAY     mode, then map, then opponents - one choice per step
+#   PLAY     CLASSIC or RANKED: searches the network for players first and
+#            fills the empty seats with AI when nobody turns up
+#   SETUP    (the match card) mode, then map, then opponents
 #   PARTY    host or join a room; seats nobody takes are filled with AI
 #   SHOP     the premium unlock
 #
@@ -22,14 +27,18 @@ enum Page { HOME, MONKEYS, PLAY, PARTY, SHOP, SETTINGS }
 
 ## What every key does, in the order a new player needs them.
 const KEYS: Array = [
-	["A  D", "Move"], ["SPACE", "Jump. Hold on a wall to climb"], ["W  S", "Climb up / down"],
-	["SHIFT", "Sprint"], ["L  or  CTRL", "Dash  (any direction, once in the air)"],
-	["LEFT CLICK  or  J", "Slap"], ["E  or  K", "Monkey skill"], ["ESC", "Pause"],
+	["A  D", "Move"], ["SPACE", "Jump. Press again in the air to double jump"],
+	["L  or  RIGHT CLICK", "Grab and swing: hold to hang on, let go to release"],
+	["W  S", "Climb up / down, pull the arm in / out"],
+	["S  or  DOWN", "Drop through a platform. Slide when running fast"],
+	["LEFT CLICK  or  J", "Punch"], ["E  or  K", "Monkey skill"], ["ESC", "Pause"],
 ]
 const TOUCH: Array = [
 	["LEFT THUMB", "Drag anywhere on the left half: move and climb"],
-	["STICK TO THE EDGE", "Sprint"], ["JUMP", "Jump; hold on a wall to climb; jump into a vine to grab it"],
-	["SLAP", "Slap"], ["DASH", "Dash the way the stick points"], ["SKILL", "Monkey skill"],
+	["STICK DOWN", "Drop through a platform"],
+	["JUMP", "Jump; press again in the air to double jump"],
+	["SWING", "Hold to grab anything in reach and swing"],
+	["PUNCH", "Punch"], ["SKILL", "Monkey skill (the ring shows the cooldown)"],
 ]
 
 const STAT_AXES: Array = [
@@ -60,6 +69,22 @@ const SKILL_BLURBS: Dictionary = {
 	GameConfig.BotSkill.FIERCE: "Reacts fast and goes for the leader.",
 }
 
+## Mock names for the modes on the title card and lobby.
+const MOCK_MODE_NAMES: Dictionary = {
+	GameConfig.Mode.HOARD: "BANANA RUSH",
+	GameConfig.Mode.RACE: "RACE",
+	GameConfig.Mode.SLAP: "2V2 SLAP",
+	GameConfig.Mode.FREE_PLAY: "FREE PLAY",
+}
+const MOCK_MODE_SHORT: Dictionary = {
+	GameConfig.Mode.HOARD: "BANANA",
+	GameConfig.Mode.RACE: "RACE",
+	GameConfig.Mode.SLAP: "2V2",
+	GameConfig.Mode.FREE_PLAY: "FREE",
+}
+const MockGround = preload("res://scripts/ui/MockGround.gd")
+const Matchmaker = preload("res://scripts/ui/Matchmaker.gd")
+
 var _pages: Dictionary = {}
 var _page: int = Page.HOME
 var _toast: Label
@@ -77,6 +102,35 @@ var _level_badge: Label
 var _xp_bar: ProgressBar
 var _banana_count: Label
 var _shop_badge: Control
+var _rank_name: Label
+var _setup_card: Button
+var _setup_tag: Label
+var _lineup: HBoxContainer
+var _lineup_stages: Dictionary = {}
+var _lineup_markers: Dictionary = {}
+var _lineup_state: Dictionary = {}
+var _hero_cards: Dictionary = {}
+var _hero_stages: Dictionary = {}
+var _lobby_title: Label
+var _lobby_sub: Label
+var _seat_grid: GridContainer
+var _mode_buttons: Dictionary = {}
+var _map_row: HBoxContainer
+var _fill_toggle: Button
+var _fill_note: Label
+var _skill_buttons: Dictionary = {}
+var _skill_note: Label
+var _start_button: Button
+
+# Matchmaking
+var _mm: Node = null
+var _queue_buttons: Dictionary = {}
+var _search_layer: Control
+var _search_title: Label
+var _search_line: Label
+var _search_timer: Label
+var _search_status: Label
+var _search_seats: HBoxContainer
 
 # Monkeys
 var _view_index: int = 0
@@ -103,6 +157,7 @@ var _public_address: String = ""
 
 
 func _ready() -> void:
+	UiTheme.ensure(self)
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(MenuBackdrop.new())
 	if not GameConfig.is_unlocked(Net.local_monkey):
@@ -116,6 +171,13 @@ func _ready() -> void:
 	_pages[Page.SETTINGS] = _build_settings()
 	for page in _pages.values():
 		add_child(page)
+
+	_mm = Matchmaker.new()
+	_mm.name = "Matchmaker"
+	add_child(_mm)
+	_mm.connect(&"changed", _refresh_search)
+	_search_layer = _build_search()
+	add_child(_search_layer)
 
 	_toast = _label("", &"Display", 20)
 	_toast.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
@@ -173,6 +235,9 @@ func _show(page: int, animate: bool = true) -> void:
 ## Android back and Escape: one page up, never out of the app from a page.
 func _go_back() -> void:
 	if not is_visible_in_tree():
+		return
+	if _mm != null and _mm.call(&"is_active"):
+		_cancel_search()
 		return
 	if _page == Page.PLAY and _step > 0:
 		_set_step(_step - 1)
@@ -249,10 +314,10 @@ func _build_home() -> Control:
 	chip_text.add_child(name_row)
 	# Level badge: a star-yellow number, the first thing a returning player
 	# looks for.
-	_level_badge = _label("LV 1", &"Display", 20)
+	_level_badge = _label("LV 1", &"Display", 14)
 	_level_badge.add_theme_color_override(&"font_color", UiTheme.BANANA)
 	name_row.add_child(_level_badge)
-	name_row.add_child(_label("PLAYER", &"Display", 22))
+	name_row.add_child(_label("PLAYER", &"Display", 14))
 	_xp_bar = ProgressBar.new()
 	_xp_bar.show_percentage = false
 	_xp_bar.custom_minimum_size = Vector2(150, 10)
@@ -283,7 +348,7 @@ func _build_home() -> Control:
 	banana.kind = &"banana"
 	banana.custom_minimum_size = Vector2(34, 34)
 	wallet_row.add_child(banana)
-	_banana_count = _label("0", &"Display", 24)
+	_banana_count = _label("0", &"Display", 16)
 	wallet_row.add_child(_banana_count)
 	corner.add_child(wallet)
 	var cog := _button("", &"QuietButton", Vector2(66, 66), _show.bind(Page.SETTINGS))
@@ -291,7 +356,7 @@ func _build_home() -> Control:
 	corner.add_child(cog)
 
 	# Title, top centre.
-	var title := _label("MONKEY SLAP", &"DisplayBig", 52)
+	var title := _label("PRIMATE RUSH", &"DisplayBig", 40)
 	title.set_anchors_preset(Control.PRESET_CENTER_TOP)
 	title.grow_horizontal = Control.GROW_DIRECTION_BOTH
 	title.offset_top = 14.0
@@ -336,7 +401,7 @@ func _build_home() -> Control:
 	_home_stage.custom_minimum_size = Vector2(300, 320)
 	stage_row.add_child(_home_stage)
 	stage_row.add_child(_arrow(">", _cycle_home.bind(1)))
-	_home_name = _label("", &"Display", 38)
+	_home_name = _label("", &"Display", 26)
 	_home_name.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	centre.add_child(_home_name)
 	_home_skill = _label("", &"Subheading", 16)
@@ -361,6 +426,15 @@ func _build_home() -> Control:
 	play_column.offset_bottom = -22.0
 	play_column.add_theme_constant_override(&"separation", 10)
 	root.add_child(play_column)
+	var queue_row := HBoxContainer.new()
+	queue_row.add_theme_constant_override(&"separation", 8)
+	play_column.add_child(queue_row)
+	for q in [GameConfig.Queue.CLASSIC, GameConfig.Queue.RANKED]:
+		var qb := _button(String(GameConfig.QUEUE_NAMES[q]).to_upper(), &"ChoiceButton", Vector2(0, 58), _set_queue.bind(q))
+		qb.toggle_mode = true
+		qb.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		queue_row.add_child(qb)
+		_queue_buttons[q] = qb
 	_mode_card = _button("", &"TileButton", Vector2(360, 104), _open_play_setup)
 	var card_row := HBoxContainer.new()
 	card_row.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -377,7 +451,7 @@ func _build_home() -> Control:
 	card_text.alignment = BoxContainer.ALIGNMENT_CENTER
 	card_text.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	card_row.add_child(card_text)
-	var card_mode := _label("", &"Display", 28)
+	var card_mode := _label("", &"Display", 17)
 	card_mode.name = "CardMode"
 	card_text.add_child(card_mode)
 	var card_detail := _label("", &"Subheading", 15)
@@ -397,6 +471,36 @@ func _build_home() -> Control:
 	return root
 
 
+func _xp(min_size: Vector2) -> ProgressBar:
+	var bar := ProgressBar.new()
+	bar.show_percentage = false
+	bar.custom_minimum_size = min_size
+	bar.max_value = 1.0
+	var back := StyleBoxFlat.new()
+	back.bg_color = UiTheme.NAVY_BTN
+	bar.add_theme_stylebox_override(&"background", back)
+	var fill := StyleBoxFlat.new()
+	fill.bg_color = UiTheme.BANANA
+	bar.add_theme_stylebox_override(&"fill", fill)
+	return bar
+
+
+## Rank from level: three divisions per tier, like the mock's BRONZE II.
+func _rank_for(level: int) -> String:
+	var tiers := ["BRONZE", "SILVER", "GOLD", "JUNGLE"]
+	var tier := mini((level - 1) / 3, tiers.size() - 1)
+	var division := 3 - ((level - 1) % 3)
+	return "%s %s" % [tiers[tier], ["I", "II", "III"][division - 1]]
+
+
+func _pick_lineup(id: StringName) -> void:
+	if not GameConfig.is_unlocked(id):
+		_deny("%s comes with the premium unlock." % GameConfig.get_monkey(id).display_name)
+		return
+	Sfx.play(&"ui_select")
+	_pick_monkey(id)
+
+
 func _nav_button(text: String, icon: StringName, variation: StringName, on_pressed: Callable) -> Button:
 	var button := _button("", variation, Vector2(236, 76), on_pressed)
 	var row := HBoxContainer.new()
@@ -411,7 +515,7 @@ func _nav_button(text: String, icon: StringName, variation: StringName, on_press
 	glyph.custom_minimum_size = Vector2(44, 0)
 	glyph.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	row.add_child(glyph)
-	var label := _label(text, &"Display", 21)
+	var label := _label(text, &"Display", 15)
 	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	label.size_flags_vertical = Control.SIZE_FILL
 	row.add_child(label)
@@ -459,13 +563,117 @@ func _open_play_setup() -> void:
 ## Solo is a match with nobody else in it: same roster, same spawn, AI
 ## seats filled in. A host starts for everyone; a client waits.
 func _on_play() -> void:
-	if not Net.is_online():
-		Net.leave()
-		Net.start_match()
-	elif Net.is_host():
-		Net.start_match()
-	else:
+	if Net.is_online() and not Net.is_host():
 		_deny("Waiting for the host to start.")
+		return
+	if Net.is_host() and _mm.call(&"people") > 1:
+		# A party with friends already in it: start for everyone, no search.
+		Net.start_match()
+		return
+	# Solo, or a room with nobody else in it: search the network, then AI.
+	if Net.queue == GameConfig.Queue.RANKED and not GameConfig.RANKED_MODES.has(Net.mode):
+		_set_lobby_mode(GameConfig.Mode.RACE)
+	_mm.call(&"begin")
+	_refresh_search()
+
+
+func _set_queue(q: int) -> void:
+	Sfx.play(&"ui_select")
+	if Net.is_online() and not Net.is_host():
+		_deny("The host picks the match.")
+		_refresh()
+		return
+	Net.set_queue(q)
+	if q == GameConfig.Queue.RANKED and not GameConfig.RANKED_MODES.has(Net.mode):
+		# Free play has nobody to rank against.
+		_set_lobby_mode(GameConfig.Mode.RACE)
+	_refresh()
+
+
+func _cancel_search() -> void:
+	_mm.call(&"cancel")
+	Sfx.play(&"ui_back")
+	_refresh_search()
+	_refresh()
+
+
+# --- Search overlay ------------------------------------------------
+
+func _build_search() -> Control:
+	var layer := Control.new()
+	layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	layer.z_index = 20
+	layer.visible = false
+	var dim := ColorRect.new()
+	dim.color = Color(0.02, 0.03, 0.08, 0.78)
+	dim.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	layer.add_child(dim)
+	var center := CenterContainer.new()
+	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	layer.add_child(center)
+	var card := PanelContainer.new()
+	card.theme_type_variation = &"Glass"
+	card.custom_minimum_size = Vector2(620, 0)
+	center.add_child(card)
+	var box := VBoxContainer.new()
+	box.alignment = BoxContainer.ALIGNMENT_CENTER
+	box.add_theme_constant_override(&"separation", 16)
+	card.add_child(box)
+	_search_title = _centered("SEARCHING", &"DisplayBig", 30)
+	box.add_child(_search_title)
+	_search_line = _centered("", &"Display", 14)
+	_search_line.add_theme_color_override(&"font_color", UiTheme.INK_DIM)
+	box.add_child(_search_line)
+	_search_seats = HBoxContainer.new()
+	_search_seats.alignment = BoxContainer.ALIGNMENT_CENTER
+	_search_seats.add_theme_constant_override(&"separation", 14)
+	box.add_child(_search_seats)
+	_search_timer = _centered("0:10", &"Display", 40)
+	_search_timer.add_theme_color_override(&"font_color", UiTheme.BANANA)
+	box.add_child(_search_timer)
+	_search_status = _centered("", &"Body", 20)
+	box.add_child(_search_status)
+	var cancel_row := HBoxContainer.new()
+	cancel_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	box.add_child(cancel_row)
+	cancel_row.add_child(_button("CANCEL", &"DangerButton", Vector2(240, 72), _cancel_search))
+	return layer
+
+
+func _refresh_search() -> void:
+	if _search_layer == null or _mm == null:
+		return
+	var active: bool = _mm.call(&"is_active")
+	_search_layer.visible = active
+	if not active:
+		return
+	var stage: int = _mm.get(&"stage")
+	var found: int = _mm.call(&"people")
+	_search_title.text = "MATCH FOUND" if stage == 5 else "SEARCHING"
+	var map_name: String = GameConfig.MAP_NAMES.get(Net.map_id, String(Net.map_id))
+	_search_line.text = "%s   %s   %s" % [String(GameConfig.QUEUE_NAMES[Net.queue]).to_upper(), String(MOCK_MODE_NAMES.get(Net.mode, "PLAY")), map_name.to_upper()]
+	var left: float = _mm.get(&"time_left")
+	# A client in someone else's room does not know the host's clock.
+	var joined := stage == 2 or stage == 3
+	_search_timer.text = "..." if joined else "0:%02d" % ceili(left)
+	_search_status.text = "%s\n%d of %d players found. Empty seats are filled with AI." % [String(_mm.get(&"status")), found, GameConfig.NET_MAX_PLAYERS]
+	if _search_seats.get_child_count() != GameConfig.NET_MAX_PLAYERS:
+		for child in _search_seats.get_children():
+			child.queue_free()
+		for i in GameConfig.NET_MAX_PLAYERS:
+			var seat := Panel.new()
+			seat.custom_minimum_size = Vector2(64, 64)
+			_search_seats.add_child(seat)
+	var index := 0
+	for seat in _search_seats.get_children():
+		var box := StyleBoxFlat.new()
+		var filled := index < found
+		box.bg_color = UiTheme.LEAF if filled else UiTheme.PANEL_HI
+		box.border_color = UiTheme.OUTLINE
+		box.set_border_width_all(3)
+		box.anti_aliasing = false
+		(seat as Panel).add_theme_stylebox_override(&"panel", box)
+		index += 1
 
 
 func _refresh_home() -> void:
@@ -498,6 +706,8 @@ func _refresh_home() -> void:
 	(_mode_card.find_child("CardMode", true, false) as Label).text = mode_name.to_upper()
 	(_mode_card.find_child("CardDetail", true, false) as Label).text = map_name.to_upper()
 	(_mode_card.find_child("CardHint", true, false) as Label).text = _opponent_summary().to_upper()
+	for q in _queue_buttons.keys():
+		(_queue_buttons[q] as Button).set_pressed_no_signal(q == Net.queue)
 
 	if not Net.is_online():
 		_play_button.text = "PLAY"
@@ -519,6 +729,10 @@ func _refresh_home() -> void:
 
 
 func _opponent_summary() -> String:
+	if Net.queue == GameConfig.Queue.RANKED:
+		var rp := int(Profile.get_stat("rp", 0))
+		var rank: Dictionary = GameConfig.rank_for(rp)
+		return "%s   %d RP" % [rank["name"], rp]
 	if Net.mode == GameConfig.Mode.SLAP:
 		return "2v2   AI %s" % GameConfig.BOT_SKILL_NAMES[Net.bot_skill]
 	if Net.bot_count <= 0:
@@ -526,133 +740,223 @@ func _opponent_summary() -> String:
 	return "%d AI %s" % [Net.bot_count, GameConfig.BOT_SKILL_NAMES[Net.bot_skill]]
 
 
+func _grouped(value: int) -> String:
+	var text := str(value)
+	var out := ""
+	while text.length() > 3:
+		out = "," + text.substr(text.length() - 3) + out
+		text = text.substr(0, text.length() - 3)
+	return text + out
+
+
 # --- Monkeys -------------------------------------------------------
 
 func _build_monkeys() -> Control:
-	var root := _page_root("MONKEYS")
-	var row := HBoxContainer.new()
-	row.set_anchors_preset(Control.PRESET_FULL_RECT)
-	row.offset_top = 100.0
-	row.offset_left = 30.0
-	row.offset_right = -30.0
-	row.offset_bottom = -24.0
-	row.add_theme_constant_override(&"separation", 24)
-	root.add_child(row)
+	var root := _page_root("")
+	var head := VBoxContainer.new()
+	head.position = Vector2(40, 26)
+	head.add_theme_constant_override(&"separation", 12)
+	head.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	head.add_child(_label("CHOOSE YOUR MONKEY", &"DisplayBig", 34))
+	var sub := _label("Same slap for everyone. Body, stats and skill change.", &"Value", 19)
+	head.add_child(sub)
+	root.add_child(head)
 
-	var left := VBoxContainer.new()
-	left.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	left.alignment = BoxContainer.ALIGNMENT_CENTER
-	row.add_child(left)
-	var stage_row := HBoxContainer.new()
-	stage_row.alignment = BoxContainer.ALIGNMENT_CENTER
-	stage_row.add_theme_constant_override(&"separation", 18)
-	left.add_child(stage_row)
-	stage_row.add_child(_arrow("<", func() -> void: _view_monkey(_view_index - 1), Vector2(84, 110)))
-	_monkey_stage = MonkeyStage.new()
-	_monkey_stage.pixel_scale = 8
-	_monkey_stage.custom_minimum_size = Vector2(320, 390)
-	stage_row.add_child(_monkey_stage)
-	stage_row.add_child(_arrow(">", func() -> void: _view_monkey(_view_index + 1), Vector2(84, 110)))
-	_monkey_dots = HBoxContainer.new()
-	_monkey_dots.alignment = BoxContainer.ALIGNMENT_CENTER
-	_monkey_dots.add_theme_constant_override(&"separation", 10)
-	left.add_child(_monkey_dots)
+	var actions := HBoxContainer.new()
+	actions.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	actions.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+	actions.offset_right = -40.0
+	actions.offset_top = 26.0
+	actions.add_theme_constant_override(&"separation", 12)
+	root.add_child(actions)
+	actions.add_child(_button("BACK", &"NavyButton", Vector2(130, 66), _go_back))
+	_pick_button = _button("CONFIRM", &"PrimaryButton", Vector2(200, 66), _show.bind(Page.HOME))
+	actions.add_child(_pick_button)
 
-	var card := PanelContainer.new()
-	card.theme_type_variation = &"Glass"
-	card.custom_minimum_size = Vector2(520, 0)
-	row.add_child(card)
-	var info := VBoxContainer.new()
-	info.add_theme_constant_override(&"separation", 10)
-	card.add_child(info)
-	_monkey_name = _label("", &"DisplayBig", 52)
-	info.add_child(_monkey_name)
-	_monkey_blurb = _label("", &"Value", 17)
-	_monkey_blurb.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_monkey_blurb.custom_minimum_size = Vector2(480, 0)
-	info.add_child(_monkey_blurb)
-	var grid := GridContainer.new()
-	grid.columns = 2
-	grid.add_theme_constant_override(&"h_separation", 14)
-	grid.add_theme_constant_override(&"v_separation", 8)
-	info.add_child(grid)
-	for axis in STAT_AXES:
-		var caption := _label(String(axis["name"]).to_upper(), &"Subheading", 15)
-		caption.custom_minimum_size = Vector2(90, 0)
-		grid.add_child(caption)
-		var bar := ProgressBar.new()
-		bar.theme_type_variation = &"StatBar"
-		bar.show_percentage = false
-		bar.max_value = STAT_MAX
-		bar.custom_minimum_size = Vector2(0, 16)
-		bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		bar.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-		var fill := StyleBoxFlat.new()
-		fill.bg_color = axis["color"]
-		fill.set_corner_radius_all(6)
-		bar.add_theme_stylebox_override(&"fill", fill)
-		grid.add_child(bar)
-		_stat_bars[axis["field"]] = bar
-	_monkey_skill = _label("", &"Heading", 20)
-	info.add_child(_monkey_skill)
+	var cards := HBoxContainer.new()
+	cards.set_anchors_preset(Control.PRESET_FULL_RECT)
+	cards.offset_left = 40.0
+	cards.offset_right = -40.0
+	cards.offset_top = 128.0
+	cards.offset_bottom = -104.0
+	cards.add_theme_constant_override(&"separation", 14)
+	root.add_child(cards)
+	for id in GameConfig.roster_ids():
+		cards.add_child(_hero_card(id))
 
-	info.add_child(_label("HAT", &"Subheading", 15))
 	var hats := HBoxContainer.new()
-	hats.add_theme_constant_override(&"separation", 8)
-	info.add_child(hats)
+	hats.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
+	hats.offset_left = 40.0
+	hats.offset_right = -40.0
+	hats.offset_top = -84.0
+	hats.offset_bottom = -24.0
+	hats.add_theme_constant_override(&"separation", 10)
+	root.add_child(hats)
+	var hat_label := _label("HAT", &"Display", 16)
+	hat_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	hat_label.size_flags_vertical = Control.SIZE_FILL
+	hat_label.custom_minimum_size = Vector2(76, 0)
+	hats.add_child(hat_label)
 	for id in GameConfig.hat_ids():
-		var hat_button := _button(GameConfig.get_hat(id)["name"], &"ChoiceButton", Vector2(0, 54), _on_hat.bind(id))
+		var hat_button := _button(String(GameConfig.get_hat(id)["name"]).to_upper(), &"ChoiceButton", Vector2(0, 58), _on_hat.bind(id))
 		hat_button.toggle_mode = true
 		hat_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		hats.add_child(hat_button)
 		_hat_buttons[id] = hat_button
-
-	var spacer := Control.new()
-	spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	info.add_child(spacer)
-	_pick_button = _button("SELECT", &"GoButton", Vector2(0, 84), _on_pick_viewed)
-	info.add_child(_pick_button)
 	return root
 
 
-func _view_monkey(index: int) -> void:
-	var ids := GameConfig.roster_ids()
-	_view_index = posmod(index, ids.size())
-	var id: StringName = ids[_view_index]
+## One hero-select card, as in the mock: monkey on a grass strip, name and
+## role, blurb, speed / power / climb pips, and the Skill 1 box.
+func _hero_card(id: StringName) -> Button:
 	var stats := GameConfig.get_monkey(id)
-	var unlocked := GameConfig.is_unlocked(id)
-	_monkey_stage.set_monkey(id, not unlocked)
-	_monkey_name.text = stats.display_name.to_upper()
-	_monkey_blurb.text = stats.blurb
-	for field in _stat_bars.keys():
-		var bar := _stat_bars[field] as ProgressBar
-		var tween := create_tween()
-		tween.tween_property(bar, "value", clampf(float(stats.get(field)), 0.0, STAT_MAX), 0.25).set_ease(Tween.EASE_OUT)
-	_monkey_skill.text = "SKILL   %s" % _skill_name(stats)
-	for child in _monkey_dots.get_children():
-		child.queue_free()
-	for i in ids.size():
-		var dot := ColorRect.new()
-		dot.custom_minimum_size = Vector2(28 if i == _view_index else 12, 12)
-		dot.color = UiTheme.BANANA if i == _view_index else Color(1, 1, 1, 0.35)
-		_monkey_dots.add_child(dot)
+	var card := _tile(id == Net.local_monkey, Vector2(0, 0))
+	card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	card.size_flags_vertical = Control.SIZE_FILL
+	card.pressed.connect(_on_hero_card.bind(id))
+	var margin := MarginContainer.new()
+	margin.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	margin.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	for side in [&"margin_left", &"margin_right", &"margin_top", &"margin_bottom"]:
+		margin.add_theme_constant_override(side, 12)
+	card.add_child(margin)
+	var box := VBoxContainer.new()
+	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	box.add_theme_constant_override(&"separation", 8)
+	margin.add_child(box)
+
+	var top := Control.new()
+	top.custom_minimum_size = Vector2(0, 176)
+	top.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	box.add_child(top)
+	var sky := ColorRect.new()
+	sky.color = UiTheme.PANEL_HI
+	sky.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	sky.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	top.add_child(sky)
+	var stage := MonkeyStage.new()
+	stage.pixel_scale = 4
+	stage.pedestal = false
+	stage.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	stage.offset_bottom = -10.0
+	top.add_child(stage)
+	stage.set_monkey(id, not GameConfig.is_unlocked(id))
+	var grass := ColorRect.new()
+	grass.color = Color8(79, 154, 58)
+	grass.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE)
+	grass.offset_top = -10.0
+	grass.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	top.add_child(grass)
+	_hero_stages[id] = stage
+
+	var name_row := HBoxContainer.new()
+	name_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	box.add_child(name_row)
+	var name_label := _label(stats.display_name.to_upper(), &"Display", 13)
+	name_label.add_theme_constant_override(&"shadow_offset_x", 0)
+	name_label.add_theme_constant_override(&"shadow_offset_y", 0)
+	name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	name_row.add_child(name_label)
+	var role: Array = _role_of(stats)
+	var role_label := _label(role[0], &"Display", 9)
+	role_label.add_theme_color_override(&"font_color", role[1])
+	role_label.add_theme_constant_override(&"shadow_offset_x", 0)
+	role_label.add_theme_constant_override(&"shadow_offset_y", 0)
+	role_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	role_label.size_flags_vertical = Control.SIZE_FILL
+	name_row.add_child(role_label)
+
+	var blurb := _label(stats.blurb, &"Value", 15)
+	var body_font := UiTheme._font(UiTheme.FONT_BODY)
+	if body_font != null:
+		blurb.add_theme_font_override(&"font", body_font)
+	blurb.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	blurb.max_lines_visible = 4
+	blurb.custom_minimum_size = Vector2(0, 80)
+	box.add_child(blurb)
+
+	for pip in [["SPEED", "speed", Color8(126, 217, 87)], ["POWER", "power", Color8(255, 107, 90)], ["CLIMB", "climb", Color8(90, 180, 255)]]:
+		var line := HBoxContainer.new()
+		line.add_theme_constant_override(&"separation", 5)
+		line.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		var caption := _label(pip[0], &"Display", 9)
+		caption.add_theme_color_override(&"font_color", UiTheme.INK_DIM)
+		caption.add_theme_constant_override(&"shadow_offset_x", 0)
+		caption.add_theme_constant_override(&"shadow_offset_y", 0)
+		caption.custom_minimum_size = Vector2(62, 0)
+		caption.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		line.add_child(caption)
+		var filled := clampi(roundi(float(stats.get(pip[1])) / STAT_MAX * 5.0), 1, 5)
+		for i in 5:
+			var cell := ColorRect.new()
+			cell.custom_minimum_size = Vector2(0, 12)
+			cell.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			cell.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+			cell.color = pip[2] if i < filled else UiTheme.NAVY_BTN
+			cell.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			line.add_child(cell)
+		box.add_child(line)
+
+	var spacer := Control.new()
+	spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	spacer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	box.add_child(spacer)
+	var skill := PanelContainer.new()
+	skill.theme_type_variation = &"Inset"
+	skill.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var skill_box := VBoxContainer.new()
+	skill_box.add_theme_constant_override(&"separation", 6)
+	skill.add_child(skill_box)
+	var skill_caption := _label("SKILL 1", &"Display", 9)
+	skill_caption.add_theme_color_override(&"font_color", UiTheme.INK_DIM)
+	skill_caption.add_theme_constant_override(&"shadow_offset_x", 0)
+	skill_caption.add_theme_constant_override(&"shadow_offset_y", 0)
+	skill_box.add_child(skill_caption)
+	var skill_name := _label(_skill_name(stats).capitalize(), &"Heading", 19)
+	skill_box.add_child(skill_name)
+	box.add_child(skill)
+	if not GameConfig.is_unlocked(id):
+		role_label.text = "LOCKED"
+		role_label.add_theme_color_override(&"font_color", UiTheme.CORAL)
+	_hero_cards[id] = card
+	return card
+
+
+## A one-word role from the stats, like the mock's HEAVY / SWINGER / THIEF.
+func _role_of(stats: MonkeyStats) -> Array:
+	if stats.skill_id == &"snatch":
+		return ["THIEF", UiTheme.INK_DIM]
+	var axes := {"HEAVY": maxf(stats.weight, stats.power), "QUICK": stats.speed, "CLIMBER": stats.climb, "SWINGER": stats.swing}
+	var best := "ALL-ROUND"
+	var top := 1.15
+	for key in axes.keys():
+		if float(axes[key]) > top:
+			top = float(axes[key])
+			best = key
+	var colour: Color = UiTheme.BANANA if best == "HEAVY" else UiTheme.INK_DIM
+	return [best, colour]
+
+
+func _on_hero_card(id: StringName) -> void:
+	if not GameConfig.is_unlocked(id):
+		_deny("%s comes with the premium unlock." % GameConfig.get_monkey(id).display_name)
+		_refresh_pick_button()
+		return
+	_pick_monkey(id)
+	var stage: MonkeyStage = _hero_stages.get(id)
+	if stage != null:
+		stage.cheer()
+	Sfx.play(&"ui_select")
+	_refresh_pick_button()
+
+
+func _view_monkey(_index: int) -> void:
 	_refresh_pick_button()
 
 
 func _refresh_pick_button() -> void:
-	var id: StringName = GameConfig.roster_ids()[_view_index]
-	if not GameConfig.is_unlocked(id):
-		_pick_button.text = "UNLOCK IN SHOP"
-		_pick_button.theme_type_variation = &"PrimaryButton"
-		_pick_button.disabled = false
-	elif id == Net.local_monkey:
-		_pick_button.text = "SELECTED"
-		_pick_button.theme_type_variation = &"GoButton"
-		_pick_button.disabled = true
-	else:
-		_pick_button.text = "SELECT"
-		_pick_button.theme_type_variation = &"GoButton"
-		_pick_button.disabled = false
+	for id in _hero_cards.keys():
+		(_hero_cards[id] as Button).button_pressed = id == Net.local_monkey
 	for key in _hat_buttons.keys():
 		var hat_button := _hat_buttons[key] as Button
 		hat_button.button_pressed = key == Net.local_hat
@@ -690,7 +994,7 @@ func _build_play() -> Control:
 	pills.add_theme_constant_override(&"separation", 26)
 	root.add_child(pills)
 	for text in ["1  MODE", "2  MAP", "3  OPPONENTS"]:
-		var pill := _label(text, &"Display", 22)
+		var pill := _label(text, &"Display", 16)
 		pills.add_child(pill)
 		_step_pills.append(pill)
 
@@ -744,6 +1048,159 @@ func _on_next_step() -> void:
 	_set_step(_step + 1)
 
 
+func _small_back() -> Button:
+	var back := _button("BACK", &"NavyButton", Vector2(150, 62), _go_back)
+	back.position = Vector2(30, 22)
+	back.z_index = 10
+	return back
+
+
+func _caption(text: String, colour: Color = UiTheme.INK_DIM) -> Label:
+	var label := _label(text, &"Display", 13)
+	label.add_theme_color_override(&"font_color", colour)
+	label.add_theme_constant_override(&"shadow_offset_x", 0)
+	label.add_theme_constant_override(&"shadow_offset_y", 0)
+	return label
+
+
+func _set_lobby_mode(mode: int) -> void:
+	var maps := GameConfig.maps_for_mode(mode)
+	var map: StringName = Net.map_id if maps.has(Net.map_id) else maps[0]
+	Net.set_match_config(map, mode)
+	Sfx.play(&"ui_select")
+	_refresh_lobby()
+
+
+func _set_lobby_map(id: StringName) -> void:
+	Net.set_match_config(id, Net.mode)
+	Sfx.play(&"ui_select")
+	_refresh_lobby()
+
+
+func _set_lobby_skill(skill: int) -> void:
+	Net.set_bot_skill(skill)
+	Sfx.play(&"ui_select")
+	_refresh_lobby()
+
+
+func _refresh_lobby() -> void:
+	if _seat_grid == null:
+		return
+	var decides := not Net.is_online() or Net.is_host()
+	var slap := Net.mode == GameConfig.Mode.SLAP
+	var map_name: String = GameConfig.MAP_NAMES.get(Net.map_id, String(Net.map_id))
+	_lobby_title.text = MOCK_MODE_NAMES.get(Net.mode, "PLAY")
+	var seats := _lobby_seats()
+	var filled := 0
+	for seat in seats:
+		if not bool(seat["empty"]):
+			filled += 1
+	_lobby_sub.text = "%s · %d MONKEYS · %s" % ["PARTY" if Net.is_online() else "SOLO", filled, map_name.to_upper()]
+	for child in _seat_grid.get_children():
+		child.queue_free()
+	for seat in seats:
+		_seat_grid.add_child(_lobby_seat(seat))
+	for mode in _mode_buttons.keys():
+		var button := _mode_buttons[mode] as Button
+		button.set_pressed_no_signal(mode == Net.mode)
+		button.disabled = not decides
+	for child in _map_row.get_children():
+		child.queue_free()
+	for id in GameConfig.maps_for_mode(Net.mode):
+		var button := _button(String(GameConfig.MAP_NAMES.get(id, id)).to_upper(), &"ChoiceButton", Vector2(0, 46), _set_lobby_map.bind(id))
+		button.toggle_mode = true
+		button.set_pressed_no_signal(id == Net.map_id)
+		button.disabled = not decides
+		button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		button.add_theme_font_size_override(&"font_size", 10)
+		_map_row.add_child(button)
+	_fill_toggle.set_pressed_no_signal(slap or Net.bot_count > 0)
+	_fill_toggle.text = "ON" if _fill_toggle.button_pressed else "OFF"
+	_fill_toggle.disabled = slap or not decides
+	var bots := 3 if slap else Net.bot_count
+	_fill_note.text = "2v2: bots take the empty seats" if slap else ("%d bots join you" % bots if bots > 0 else "Just you on the map")
+	for skill in _skill_buttons.keys():
+		var button := _skill_buttons[skill] as Button
+		button.set_pressed_no_signal(skill == Net.bot_skill)
+		button.disabled = not decides or (not slap and Net.bot_count == 0)
+	_skill_note.text = SKILL_BLURBS.get(Net.bot_skill, "")
+	_start_button.text = "START" if decides else "WAITING..."
+	_start_button.disabled = not decides
+
+
+## Who sits where: you first, then friends in a party, then bots, then
+## empty seats up to the match size.
+func _lobby_seats() -> Array:
+	var seats: Array = []
+	var slap := Net.mode == GameConfig.Mode.SLAP
+	if Net.is_online():
+		var ids := Net.roster.keys()
+		ids.sort_custom(func(a, b) -> bool: return int(Net.roster[a].get("slot", 0)) < int(Net.roster[b].get("slot", 0)))
+		for id in ids:
+			var entry: Dictionary = Net.roster[id]
+			var mine := int(id) == Net.local_id()
+			seats.append({"monkey": entry.get("monkey", &"macaque"), "name": "YOU" if mine else String(entry.get("name", "FRIEND")).to_upper(),
+				"tag": "HOST" if (mine and Net.is_host()) or int(id) == 1 else ("BOT" if bool(entry.get("bot", false)) else "FRIEND"), "you": mine, "empty": false})
+	else:
+		seats.append({"monkey": Net.local_monkey, "name": "YOU", "tag": "HOST", "you": true, "empty": false})
+	var bots := 3 if slap else Net.bot_count
+	var pool: Array[StringName] = []
+	for id in GameConfig.roster_ids():
+		if not GameConfig.PREMIUM_MONKEYS.has(id):
+			pool.append(id)
+	var skill_name := String(["EASY", "NORMAL", "HARD"][int(Net.bot_skill)])
+	var index := 0
+	while seats.size() < GameConfig.NET_MAX_PLAYERS and index < bots:
+		seats.append({"monkey": pool[index % pool.size()], "name": GameConfig.BOT_NAMES[index % GameConfig.BOT_NAMES.size()].to_upper(),
+			"tag": "BOT · %s" % skill_name, "you": false, "empty": false})
+		index += 1
+	while seats.size() < GameConfig.NET_MAX_PLAYERS:
+		seats.append({"monkey": &"", "name": "OPEN SEAT", "tag": "EMPTY", "you": false, "empty": true})
+	return seats
+
+
+func _lobby_seat(seat: Dictionary) -> Control:
+	var card := PanelContainer.new()
+	card.theme_type_variation = &"CardHighlight" if bool(seat["you"]) else &"Glass"
+	card.custom_minimum_size = Vector2(346, 244)
+	card.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var box := VBoxContainer.new()
+	box.alignment = BoxContainer.ALIGNMENT_CENTER
+	box.add_theme_constant_override(&"separation", 8)
+	card.add_child(box)
+	if not bool(seat["empty"]):
+		var stage := MonkeyStage.new()
+		stage.pixel_scale = 4
+		stage.pedestal = false
+		stage.custom_minimum_size = Vector2(0, 146)
+		box.add_child(stage)
+		stage.set_monkey(StringName(seat["monkey"]))
+	else:
+		card.modulate = Color(1, 1, 1, 0.45)
+		var dash := _centered("+", &"DisplayBig", 36)
+		dash.custom_minimum_size = Vector2(0, 146)
+		dash.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		box.add_child(dash)
+	var name_label := _centered(String(seat["name"]), &"Display", 18)
+	box.add_child(name_label)
+	var chip := PanelContainer.new()
+	chip.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	var chip_box := StyleBoxFlat.new()
+	chip_box.bg_color = UiTheme.PANEL_HI
+	chip_box.content_margin_left = 10
+	chip_box.content_margin_right = 10
+	chip_box.content_margin_top = 6
+	chip_box.content_margin_bottom = 6
+	chip.add_theme_stylebox_override(&"panel", chip_box)
+	var tag := _label(String(seat["tag"]), &"Display", 11)
+	tag.add_theme_color_override(&"font_color", UiTheme.BANANA if bool(seat["you"]) else UiTheme.INK_DIM)
+	tag.add_theme_constant_override(&"shadow_offset_x", 0)
+	tag.add_theme_constant_override(&"shadow_offset_y", 0)
+	chip.add_child(tag)
+	box.add_child(chip)
+	return card
+
+
 func _mode_tile(mode: int) -> Button:
 	var tile := _tile(Net.mode == mode, Vector2(280, 400))
 	var box := _tile_box(tile)
@@ -752,13 +1209,16 @@ func _mode_tile(mode: int) -> Button:
 	icon.colour = MODE_COLOURS[mode]
 	icon.custom_minimum_size = Vector2(0, 150)
 	box.add_child(icon)
-	var name_label := _label(String(GameConfig.MODE_NAMES[mode]).to_upper(), &"Display", 26)
+	var name_label := _label(String(GameConfig.MODE_NAMES[mode]).to_upper(), &"Display", 15)
 	name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(name_label)
 	var blurb := _label(MODE_BLURBS[mode], &"Value", 16)
 	blurb.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	blurb.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(blurb)
+	if Net.queue == GameConfig.Queue.RANKED and not GameConfig.RANKED_MODES.has(mode):
+		tile.disabled = true
+		tile.tooltip_text = "Not in ranked"
 	tile.pressed.connect(func() -> void:
 		# Keep the map if this mode can use it, otherwise its first map.
 		var maps := GameConfig.maps_for_mode(mode)
@@ -775,7 +1235,7 @@ func _map_tile(id: StringName) -> Button:
 	preview.custom_minimum_size = Vector2(0, 230)
 	preview.show_map(id)
 	box.add_child(preview)
-	var name_label := _label(String(GameConfig.MAP_NAMES.get(id, id)).to_upper(), &"Display", 28)
+	var name_label := _label(String(GameConfig.MAP_NAMES.get(id, id)).to_upper(), &"Display", 18)
 	name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(name_label)
 	var best := Profile.best_time(id)
@@ -794,11 +1254,11 @@ func _opponent_panel() -> Control:
 	column.alignment = BoxContainer.ALIGNMENT_CENTER
 	if Net.mode == GameConfig.Mode.SLAP:
 		# Teams are fixed at two a side; only how hard the AI plays is open.
-		column.add_child(_label("TEAMS", &"Display", 24))
+		column.add_child(_label("TEAMS", &"Display", 18))
 		column.add_child(_label("YOU + AI PARTNER  VS  2 AI.  FRIENDS IN YOUR PARTY TAKE THE AI SEATS.", &"Value", 17))
 		column.add_child(_skill_row())
 		return column
-	column.add_child(_label("AI OPPONENTS", &"Display", 24))
+	column.add_child(_label("AI OPPONENTS", &"Display", 18))
 	var counts := HBoxContainer.new()
 	counts.add_theme_constant_override(&"separation", 14)
 	column.add_child(counts)
@@ -809,7 +1269,7 @@ func _opponent_panel() -> Control:
 			_set_step(2))
 		button.toggle_mode = true
 		button.button_pressed = Net.bot_count == count
-		button.add_theme_font_size_override(&"font_size", 26)
+		button.add_theme_font_size_override(&"font_size", 18)
 		counts.add_child(button)
 	var note := _label("In a party, seats nobody takes are filled with AI - up to this many.", &"Subheading", 15)
 	column.add_child(note)
@@ -821,7 +1281,7 @@ func _opponent_panel() -> Control:
 func _skill_row() -> Control:
 	var column := VBoxContainer.new()
 	column.add_theme_constant_override(&"separation", 14)
-	column.add_child(_label("DIFFICULTY", &"Display", 24))
+	column.add_child(_label("DIFFICULTY", &"Display", 18))
 	var skills := HBoxContainer.new()
 	skills.add_theme_constant_override(&"separation", 14)
 	column.add_child(skills)
@@ -829,7 +1289,7 @@ func _skill_row() -> Control:
 		var tile := _tile(Net.bot_skill == skill, Vector2(290, 150))
 		tile.disabled = Net.bot_count == 0 and Net.mode != GameConfig.Mode.SLAP
 		var box := _tile_box(tile)
-		var name_label := _label(String(GameConfig.BOT_SKILL_NAMES[skill]).to_upper(), &"Display", 26)
+		var name_label := _label(String(GameConfig.BOT_SKILL_NAMES[skill]).to_upper(), &"Display", 17)
 		name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		box.add_child(name_label)
 		var blurb := _label(SKILL_BLURBS[skill], &"Value", 15)
@@ -1205,7 +1665,7 @@ func _build_settings() -> Control:
 	for pair in TOUCH:
 		right_box.add_child(_key_row(pair[0], pair[1]))
 	right_box.add_child(_label("MOVES", &"Display", 24))
-	var tips := _label("Jump into a vine to swing. Push left and right to pump, jump to let go - release at the bottom for the most speed.\nClimb any wall with ivy on it: hold jump or push up. To wall-jump, push away from the wall and jump. Springs throw you high. Every slap in 2v2 adds to your damage number: the higher it is, the further the next slap sends you.", &"Value", 16)
+	var tips := _label("Hold GRAB near anything - a vine, tree, branch, bush, torch, rope or the edge of a ledge - and the arm takes hold. Push left and right to pump, let go to release at the bottom for the most speed, or press jump to leap off.\nPlatforms: jump up through them from below, hold down to drop back through. Springs throw you high. Every slap in 2v2 adds to your damage number: the higher it is, the further the next slap sends you.", &"Body", 17)
 	tips.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	right_box.add_child(tips)
 	return root
@@ -1227,12 +1687,13 @@ func _key_row(key: String, action: String) -> Control:
 	chip_box.content_margin_right = 12
 	chip.add_theme_stylebox_override(&"panel", chip_box)
 	chip.custom_minimum_size = Vector2(170, 0)
-	var key_label := _label(key, &"Value", 15)
+	var key_label := _label(key, &"Body", 16)
 	key_label.add_theme_color_override(&"font_color", UiTheme.INK_DARK)
 	key_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	chip.add_child(key_label)
 	line.add_child(chip)
-	var what := _label(action.to_upper(), &"Value", 15)
+	var what := _label(action, &"Body", 17)
+	what.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	what.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	what.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	line.add_child(what)
@@ -1248,6 +1709,8 @@ func _refresh() -> void:
 	match _page:
 		Page.MONKEYS:
 			_refresh_pick_button()
+		Page.PLAY:
+			_refresh_lobby()
 		Page.PARTY:
 			_refresh_party()
 		Page.SHOP:
@@ -1378,6 +1841,11 @@ class Glyph extends Control:
 					arc.append(c + Vector2(cos(a) * r * 0.75, sin(a) * r * 0.75 - r * 0.35))
 				draw_polyline(arc, ink, r * 0.5, true)
 				draw_polyline(arc, Color8(255, 214, 40), r * 0.32, true)
+			&"pointer":
+				var tip := PackedVector2Array([Vector2(0, 0), Vector2(size.x, 0), Vector2(size.x * 0.5, size.y)])
+				draw_colored_polygon(tip, ink)
+				var inner := PackedVector2Array([Vector2(4, 3), Vector2(size.x - 4, 3), Vector2(size.x * 0.5, size.y - 5)])
+				draw_colored_polygon(inner, Color8(255, 216, 74))
 			&"badge":
 				draw_circle(c, r, ink)
 				draw_circle(c, r * 0.8, Color8(240, 60, 70))

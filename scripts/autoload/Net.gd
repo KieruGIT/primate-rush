@@ -42,6 +42,12 @@ var mode: int = GameConfig.Mode.RACE
 ## with a negative id, so clients spawn them exactly like people.
 var bot_count: int = GameConfig.DEFAULT_BOTS
 var bot_skill: int = GameConfig.BotSkill.NORMAL
+## Classic or ranked. Synced with the rest of the config so every machine in
+## a ranked match knows to move its own rank points at the end.
+var queue: int = GameConfig.Queue.CLASSIC
+## True while this machine hosts a matchmaking room that still takes players.
+## Advertised in the LAN beacon so searchers only join rooms that are open.
+var searching: bool = false
 var arena: Node = null
 
 var _peer: ENetMultiplayerPeer = null
@@ -104,6 +110,7 @@ func leave() -> void:
 	_peer = null
 	multiplayer.multiplayer_peer = null
 	link = Link.OFFLINE
+	searching = false
 	roster.clear()
 	_remote_inputs.clear()
 	arena = null
@@ -245,24 +252,31 @@ func set_bot_skill(skill: int) -> void:
 	_push_config()
 
 
+func set_queue(new_queue: int) -> void:
+	queue = new_queue
+	_push_config()
+
+
 func _push_config() -> void:
 	config_changed.emit()
 	if is_host():
-		_sync_config.rpc(String(map_id), mode, bot_count, bot_skill)
+		_sync_config.rpc(String(map_id), mode, bot_count, bot_skill, queue)
 
 
 @rpc("authority", "reliable")
-func _sync_config(wire_map: String, wire_mode: int, wire_bots: int, wire_skill: int) -> void:
+func _sync_config(wire_map: String, wire_mode: int, wire_bots: int, wire_skill: int, wire_queue: int = 0) -> void:
 	map_id = StringName(wire_map)
 	mode = wire_mode
 	bot_count = wire_bots
 	bot_skill = wire_skill
+	queue = wire_queue
 	config_changed.emit()
 
 
 ## Works offline too, so solo play and a hosted match take the same path
 ## instead of the lobby having two ways to start the same thing.
 func start_match() -> void:
+	searching = false
 	if not is_online():
 		# Offline still builds a roster, so the arena has one way to spawn a
 		# field instead of a solo path and a networked path that drift.
@@ -276,7 +290,7 @@ func start_match() -> void:
 	_assign_bots()
 	# Config and roster first, and reliably, so a client cannot start loading
 	# a match before it knows the map or who is in it.
-	_sync_config.rpc(String(map_id), mode, bot_count, bot_skill)
+	_sync_config.rpc(String(map_id), mode, bot_count, bot_skill, queue)
 	_broadcast_roster()
 	_start_match.rpc()
 	_start_match()
@@ -288,8 +302,9 @@ func _assign_bots() -> void:
 	_clear_bots()
 	var seats := GameConfig.NET_MAX_PLAYERS - roster.size()
 	var wanted := mini(bot_count, maxi(seats, 0))
-	if mode == GameConfig.Mode.SLAP:
-		# 2v2 is always four. Empty seats are AI whatever the count says.
+	if mode == GameConfig.Mode.SLAP or queue == GameConfig.Queue.RANKED:
+		# 2v2 is always four, and ranked is always a full field. Empty seats
+		# are AI whatever the count says.
 		wanted = maxi(seats, 0)
 	var names := GameConfig.bot_names(wanted)
 	var slot := roster.size()
@@ -348,14 +363,14 @@ func _end_match() -> void:
 func send_local_input(frame: InputFrame) -> void:
 	if link != Link.CLIENT:
 		return
-	_push_axes.rpc_id(1, frame.move, frame.jump_held, frame.sprint_held)
+	_push_axes.rpc_id(1, frame.move, frame.jump_held, frame.sprint_held, frame.grab_held)
 	var buttons := frame.button_counts()
 	if not buttons.is_empty():
 		_push_buttons.rpc_id(1, buttons)
 
 
 @rpc("any_peer", "unreliable_ordered")
-func _push_axes(move: Vector2, jump_held: bool, sprint_held: bool) -> void:
+func _push_axes(move: Vector2, jump_held: bool, sprint_held: bool, grab_held: bool = false) -> void:
 	if not is_host():
 		return
 	var id := multiplayer.get_remote_sender_id()
@@ -366,6 +381,7 @@ func _push_axes(move: Vector2, jump_held: bool, sprint_held: bool) -> void:
 	frame.move = move.limit_length(1.0)
 	frame.jump_held = jump_held
 	frame.sprint_held = sprint_held
+	frame.grab_held = grab_held
 
 
 @rpc("any_peer", "reliable")
@@ -389,6 +405,7 @@ func take_remote_input(peer_id: int) -> InputFrame:
 	out.move = frame.move
 	out.jump_held = frame.jump_held
 	out.sprint_held = frame.sprint_held
+	out.grab_held = frame.grab_held
 	out.merge_buttons(frame)
 	frame.clear_buttons()
 	return out

@@ -55,7 +55,15 @@ const HAND_LENGTH := 26.0
 ## shoulder sits (Player-local). With art present the punch is the authored
 ## arm shot straight out horizontally on the facing side, fist on the end.
 ## Punch fist drawn bigger than the grab hand so a hit reads from afar.
-const PUNCH_FIST_SCALE: float = 2.0  # 4 screen px per art px, stays on a whole-pixel grid
+## The punch is a big stretchy arm, like a cartoon punch: half as long
+## again as the old one (Player.SLAP_REACH), a fatter arm and a bigger fist.
+const PUNCH_FIST_SCALE: float = 1.5
+const PUNCH_ARM_THICKNESS: float = 1.5
+## The arm rises toward the fist rather than going dead flat: it reads as a
+## thrown punch, not a pole being pushed out.
+const PUNCH_RISE: float = deg_to_rad(-12.0)
+## White puff cloud at the fist, bigger when the punch actually lands.
+const PUFF_TIME: float = 0.2
 var species: StringName = &""
 var shoulder_local: Vector2 = Vector2.ZERO
 var _time: float = TOTAL_TIME
@@ -63,6 +71,9 @@ var _direction: float = 1.0
 var _fur := Color(0.53, 0.31, 0.18)
 var _arm: float = 1.0
 var _hold: float = 0.0
+var _puff_age: float = 99.0
+var _puff_big: bool = false
+var _puff_at: Vector2 = Vector2.ZERO
 
 
 func play(direction: int, fur: Color, arm_length: float = 1.0) -> void:
@@ -71,6 +82,8 @@ func play(direction: int, fur: Color, arm_length: float = 1.0) -> void:
 	_arm = arm_length
 	_time = 0.0
 	_hold = 0.0
+	_puff_age = 99.0
+	_puff_big = false
 	visible = true
 	queue_redraw()
 
@@ -81,6 +94,8 @@ func play(direction: int, fur: Color, arm_length: float = 1.0) -> void:
 func impact() -> void:
 	_time = maxf(_time, STRIKE_END)
 	_hold = HITSTOP
+	_puff_age = 0.0
+	_puff_big = true
 	queue_redraw()
 
 
@@ -88,9 +103,13 @@ func impact() -> void:
 # hand animated on render frames drifts off it on any machine whose frame
 # rate is not exactly the tick rate.
 func _physics_process(delta: float) -> void:
-	if _time >= TOTAL_TIME:
+	_puff_age += delta
+	if _time >= TOTAL_TIME and _puff_age >= PUFF_TIME:
 		visible = false
 		return
+	if _time >= STRIKE_END and _puff_age > 90.0:
+		# Full reach: the fist throws a small puff even on a miss.
+		_puff_age = 0.0
 	# Behind the body while the arm is drawn back, in front from the moment
 	# it starts forward: the depth cue that makes the swing read as a swing.
 	z_index = -2 if _time < WINDUP_END else 8
@@ -102,6 +121,8 @@ func _physics_process(delta: float) -> void:
 
 
 func _draw() -> void:
+	if _puff_age < PUFF_TIME:
+		_draw_puff()
 	if _time >= TOTAL_TIME:
 		return
 	if species != &"" and MonkeyArm.texture_for(species, true) != null:
@@ -208,7 +229,36 @@ func _draw_textured() -> void:
 	# No afterimages on the textured arm: overlapping translucent copies
 	# read as blur on pixel art. The speed comes from the 2-frame strike.
 	var reach := lerpf(base, tip, out)
-	MonkeyArm.draw_arm(self, species, shoulder_local, Vector2(reach * _direction, shoulder_local.y), true, int(_direction), Color.WHITE, PUNCH_FIST_SCALE)
+	var dir := Vector2.from_angle(PUNCH_RISE * out)
+	var hand := shoulder_local + Vector2(dir.x * (reach - absf(shoulder_local.x)) * _direction, dir.y * reach)
+	hand.x = maxf(absf(hand.x), base) * _direction
+	_puff_at = hand + Vector2(10.0 * _direction, 0.0)
+	MonkeyArm.draw_arm(self, species, shoulder_local, hand, true, int(_direction), Color.WHITE, PUNCH_FIST_SCALE, PUNCH_ARM_THICKNESS)
+
+
+## A cartoon puff at the fist: chunky white pixel blobs with a soft grey
+## underside, blooming out and thinning away. On the art grid, like the rest.
+func _draw_puff() -> void:
+	var k := clampf(_puff_age / PUFF_TIME, 0.0, 1.0)
+	var grow := (1.6 if _puff_big else 1.0) * (0.6 + k * 0.8)
+	var alpha := 1.0 - k * k
+	var blobs := [[Vector2(0, 0), 9.0], [Vector2(10, -8), 7.0], [Vector2(12, 7), 6.0], [Vector2(-6, -10), 6.0], [Vector2(-8, 9), 5.0], [Vector2(20, -1), 5.0]]
+	var px := 4.0
+	for pass_index in 2:
+		for blob in blobs:
+			var centre: Vector2 = _puff_at + (blob[0] as Vector2) * grow * Vector2(_direction, 1.0)
+			var radius: float = float(blob[1]) * grow + (1.5 if pass_index == 0 else 0.0)
+			var colour := Color(0.62, 0.66, 0.74, alpha) if pass_index == 0 else Color(1.0, 1.0, 1.0, alpha)
+			var cells := int(ceil(radius / px))
+			for gy in range(-cells, cells + 1):
+				for gx in range(-cells, cells + 1):
+					var cell := Vector2(gx, gy) * px
+					if cell.length() > radius:
+						continue
+					var at := ((centre + cell) / px).floor() * px
+					if pass_index == 0:
+						at += Vector2(0, px)
+					draw_rect(Rect2(at, Vector2(px, px)), colour)
 
 
 func _extension_at(t: float) -> float:

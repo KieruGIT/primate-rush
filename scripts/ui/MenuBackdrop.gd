@@ -37,7 +37,7 @@ func _process(delta: float) -> void:
 
 ## The approved jungle panorama, baked to the art grid. Drawn at a whole
 ## number scale (never smoothed) to cover the screen, temple in view.
-const PANORAMA := "res://assets/environment/approved/jungle-panorama-px.png"
+const PANORAMA := "res://assets/environment/simple/backdrop-px.png"
 const PANORAMA_PAD := 420
 static var _panorama: Texture2D = null
 

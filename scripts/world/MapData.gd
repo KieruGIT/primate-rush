@@ -40,12 +40,47 @@ var _route_read: bool = false
 
 func _ready() -> void:
 	add_to_group(&"map")
+	_make_platforms_one_way()
 	if dressed:
 		var skin := LevelSkin.new()
 		skin.name = "LevelSkin"
 		skin.palette = skin_palette
 		add_child(skin)
 		move_child(skin, 0)
+
+
+## Thin ledges become one-way platforms: jump up through them from below,
+## land on top, hold down to drop back through. They move onto a body of
+## their own on LAYER_PLATFORM, which is what lets a drop switch just them
+## off for a moment. The ground, walls and pillars stay solid.
+func _make_platforms_one_way() -> void:
+	var level := get_node_or_null(^"Level") as StaticBody2D
+	if level == null:
+		return
+	var ledges: Array[CollisionShape2D] = []
+	for child in level.get_children():
+		var col := child as CollisionShape2D
+		if col != null and String(col.name).begins_with("ColLedge"):
+			ledges.append(col)
+	if ledges.is_empty():
+		return
+	var platforms := make_platform_body()
+	add_child(platforms)
+	for col in ledges:
+		col.reparent(platforms)
+		col.one_way_collision = true
+		col.one_way_collision_margin = 6.0
+
+
+## Shared with the dev checks, so a test platform is built the same way as
+## a real one.
+static func make_platform_body() -> StaticBody2D:
+	var body := StaticBody2D.new()
+	body.name = "Platforms"
+	body.collision_layer = GameConfig.LAYER_PLATFORM
+	body.collision_mask = 0
+	body.add_to_group(&"platforms")
+	return body
 
 
 func progress_of(point: Vector2) -> float:

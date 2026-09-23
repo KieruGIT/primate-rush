@@ -65,6 +65,16 @@ func record_hoard(place: int, field_size: int, score: int) -> void:
 	stats_changed.emit()
 
 
+## Rank points never drop below zero: a bad evening costs progress, not a
+## debt you have to climb out of before the bar moves again.
+func record_ranked(delta: int) -> void:
+	data["rp"] = maxi(int(data.get("rp", 0)) + delta, 0)
+	data["rp_last"] = delta
+	data["ranked_matches"] = int(data.get("ranked_matches", 0)) + 1
+	_save()
+	stats_changed.emit()
+
+
 func best_time(map_id: StringName) -> float:
 	return float(data.get("best_%s" % map_id, 0.0))
 

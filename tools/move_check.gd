@@ -12,6 +12,9 @@ const VINE := preload("res://scenes/Vine.tscn")
 
 const FLOOR_TOP := 500.0
 const VINE_X := 1400.0
+## A one-way platform, 120 px above the floor: a single jump clears it.
+const PLATFORM_X := 3000.0
+const PLATFORM_TOP := FLOOR_TOP - 120.0
 
 var _player: Player
 var _failures: int = 0
@@ -26,6 +29,16 @@ func _ready() -> void:
 	floor_body.position = Vector2(0, FLOOR_TOP + 20.0)
 	floor_body.add_child(floor_shape)
 	add_child(floor_body)
+	var platforms := MapData.make_platform_body()
+	var ledge := CollisionShape2D.new()
+	var ledge_rect := RectangleShape2D.new()
+	ledge_rect.size = Vector2(320, 32)
+	ledge.shape = ledge_rect
+	ledge.one_way_collision = true
+	ledge.one_way_collision_margin = 6.0
+	ledge.position = Vector2(PLATFORM_X, PLATFORM_TOP + 16.0)
+	platforms.add_child(ledge)
+	add_child(platforms)
 	var vine := VINE.instantiate()
 	vine.position = Vector2(VINE_X, 0)
 	vine.set(&"length", 240.0)
@@ -76,26 +89,50 @@ func _run() -> void:
 	_check("down at speed slides", _player.state == Player.State.SLIDE and _player.velocity.x > 450.0,
 		"state %s, vx %.0f" % [Player.State.keys()[_player.state], _player.velocity.x])
 
-	# A tap near a vine does not grab it; holding does.
+	# Jump and swing are separate: holding jump next to a vine never grabs.
 	await _reset(Vector2(VINE_X, 120))
-	var tapped := false
+	var jump_grabbed := false
 	for i in 14:
-		await _tick(Vector2.ZERO, i < 3)
-		tapped = tapped or _player.state == Player.State.SWING
-	_check("tap does not grab", not tapped, "")
+		await _tick(Vector2.ZERO, true)
+		jump_grabbed = jump_grabbed or _player.state == Player.State.SWING
+	_check("jump does not grab", not jump_grabbed, "")
 	await _reset(Vector2(VINE_X, 120))
 	var held := false
 	for i in 14:
-		await _tick(Vector2.ZERO, true)
+		await _tick(Vector2.ZERO, false, false, true)
 		held = held or _player.state == Player.State.SWING
-	_check("hold grabs a vine", held, "")
-	# The button is the grip: letting go of jump lets go of the vine.
+	_check("grab button grabs a vine", held, "")
+	# The grab button is the grip: letting go of it lets go of the vine.
 	for i in 20:
-		await _tick(Vector2(1, 0), true)
-	await _tick(Vector2(1, 0), false)
-	await _tick(Vector2(1, 0), false)
-	_check("letting go of jump lets go", _player.state != Player.State.SWING,
+		await _tick(Vector2(1, 0), false, false, true)
+	await _tick(Vector2(1, 0))
+	await _tick(Vector2(1, 0))
+	_check("letting go of grab lets go", _player.state != Player.State.SWING,
 		"state %s" % Player.State.keys()[_player.state])
+	# Jump while still holding grab leaps off the vine, upward.
+	await _reset(Vector2(VINE_X, 120))
+	for i in 14:
+		await _tick(Vector2.ZERO, false, false, true)
+	await _tick(Vector2(1, 0), true, true, true)
+	await _tick(Vector2(1, 0), true, false, true)
+	_check("jump leaps off a swing", _player.state != Player.State.SWING and _player.velocity.y < -200.0,
+		"state %s, vy %.0f" % [Player.State.keys()[_player.state], _player.velocity.y])
+
+	# One-way platform: jump up through it from below and land on top.
+	await _reset(Vector2(PLATFORM_X, FLOOR_TOP - 40))
+	for i in 70:
+		await _tick(Vector2.ZERO, true, i == 0)
+	var on_top := _player.is_on_floor() and _player.global_position.y < PLATFORM_TOP
+	_check("jump up through a platform", on_top, "y %.0f, platform top %.0f" % [_player.global_position.y, PLATFORM_TOP])
+	# Standing on it without pressing down, it holds.
+	for i in 30:
+		await _tick(Vector2.ZERO)
+	_check("platform holds when not pressing down", _player.global_position.y < PLATFORM_TOP, "y %.0f" % _player.global_position.y)
+	# Down drops back through to the floor.
+	for i in 50:
+		await _tick(Vector2(0, 1))
+	_check("down drops through a platform", _player.global_position.y > PLATFORM_TOP + 40.0 and _player.is_on_floor(),
+		"y %.0f" % _player.global_position.y)
 
 	print("MOVE CHECK %s" % ("OK" if _failures == 0 else "FAIL (%d)" % _failures))
 	get_tree().quit(0 if _failures == 0 else 1)
@@ -144,11 +181,12 @@ func _reset(at: Vector2) -> void:
 			await _tick(Vector2.ZERO)
 
 
-func _tick(move: Vector2, held: bool = false, press: bool = false) -> void:
+func _tick(move: Vector2, held: bool = false, press: bool = false, grab: bool = false) -> void:
 	await get_tree().physics_frame
 	var frame := InputFrame.new()
 	frame.move = move
 	frame.jump_held = held
+	frame.grab_held = grab
 	if press:
 		frame.press(InputFrame.Action.JUMP)
 	_player.feed_input(frame)

@@ -14,18 +14,34 @@ signal pause_requested
 
 var touch_move: Vector2 = Vector2.ZERO
 var touch_jump_held: bool = false
+var touch_grab_held: bool = false
 ## Stick past this and the monkey sprints. See InputFrame.sprint_held.
 const TOUCH_SPRINT_AT: float = 0.92
 
-# Grabbing is not a button of its own. Jump held in the air grabs whatever
-# vine or trunk the monkey touches, which keeps the touch layout down to a
-# stick and three buttons on a phone screen that is mostly thumb.
+# Grabbing has its own button, separate from jump: L, Ctrl or the right
+# mouse button on a keyboard, SWING on a phone. Hold it to hang on.
 var _frame: InputFrame = InputFrame.new()
 
 
 func _ready() -> void:
 	# Run before the tree pauses so a paused game can still be unpaused.
 	process_mode = Node.PROCESS_MODE_ALWAYS
+	_register_grab_action()
+
+
+## Added in code rather than in project.godot, so an editor that is open
+## while this lands cannot save over it.
+func _register_grab_action() -> void:
+	if InputMap.has_action(&"grab"):
+		return
+	InputMap.add_action(&"grab", 0.2)
+	for code in [KEY_L, KEY_CTRL]:
+		var key := InputEventKey.new()
+		key.physical_keycode = code
+		InputMap.action_add_event(&"grab", key)
+	var mouse := InputEventMouseButton.new()
+	mouse.button_index = MOUSE_BUTTON_RIGHT
+	InputMap.action_add_event(&"grab", mouse)
 
 
 func _notification(what: int) -> void:
@@ -46,6 +62,8 @@ func _unhandled_input(event: InputEvent) -> void:
 		_frame.press(InputFrame.Action.ATTACK)
 	elif event.is_action_pressed(&"skill"):
 		_frame.press(InputFrame.Action.SKILL)
+	elif event.is_action_pressed(&"grab"):
+		_frame.press(InputFrame.Action.GRAB)
 	elif event.is_action_pressed(&"ui_cancel"):
 		pause_requested.emit()
 
@@ -62,6 +80,7 @@ func take_local_frame() -> InputFrame:
 	var out := InputFrame.new()
 	out.move = _resolve_move()
 	out.jump_held = _resolve_jump_held()
+	out.grab_held = touch_grab_held or Input.is_action_pressed(&"grab")
 	out.sprint_held = Input.is_action_pressed(&"sprint") or touch_move.length() >= TOUCH_SPRINT_AT
 	out.merge_buttons(_frame)
 	_frame.clear_buttons()

@@ -19,8 +19,10 @@ extends RefCounted
 # ============================================================
 
 const PACK := "res://assets/kenney_ui-pack/PNG"
-const FONT_DISPLAY := "res://assets/kenney_ui-pack/Font/Kenney Future.ttf"
-const FONT_UI := "res://assets/kenney_ui-pack/Font/Kenney Future Narrow.ttf"
+# Low-detail design: the Primate Rush mock fonts (assets/fonts/FONTS.md).
+const FONT_DISPLAY := "res://assets/fonts/PressStart2P.ttf"
+const FONT_UI := "res://assets/fonts/PixelifySans-Bold.ttf"
+const FONT_BODY := "res://assets/fonts/PixelifySans-Regular.ttf"
 
 # --- Palette -------------------------------------------------------
 # Primate Rush key art (output/ui-concepts/primate-rush-ui-v1.png): dark
@@ -28,9 +30,10 @@ const FONT_UI := "res://assets/kenney_ui-pack/Font/Kenney Future Narrow.ttf"
 # for navigation, mossy stone for frames. Chunky pixel blocks, not glossy.
 
 const CANVAS := Color8(11, 16, 36)              # the screen behind everything
-const PANEL := Color8(17, 24, 48)               # a card or a grouped block
-const PANEL_HI := Color8(27, 38, 72)            # a card that is selected
-const EDGE := Color8(58, 92, 62)                # mossy stone frame
+const PANEL := Color8(10, 14, 30)               # a card or a grouped block (mock #0a0e1e)
+const PANEL_HI := Color8(22, 34, 74)            # inset box / selected (mock #16224a)
+const NAVY_BTN := Color8(42, 51, 88)            # neutral button face (mock #2a3358)
+const EDGE := Color8(30, 22, 18)                # low-detail mock: ink frame round every panel
 const INK := Color8(244, 233, 207)              # primary text (cream)
 const INK_DIM := Color8(159, 180, 232)          # secondary text (moon blue)
 const INK_DARK := Color8(26, 15, 10)            # text on gold and on stone
@@ -39,20 +42,21 @@ const LEAF := Color8(69, 179, 107)              # selected, good news (jade)
 const SKY := Color8(58, 123, 213)               # neutral action
 const CORAL := Color8(224, 80, 74)              # leave, locked, bad news
 const WOOD := Color8(138, 90, 46)               # carved-wood navigation
-const OUTLINE := Color8(10, 8, 14)              # every edge
+const OUTLINE := Color8(26, 15, 10)             # every edge (mock #1a0f0a)
 
 # Pixel-art corners: nearly square, so boxes sit with the sprites.
-const RADIUS := 3
+const RADIUS := 0
 
 ## Face, lip (the darker 3D bottom) for each button colour the screens ask
 ## for. Names are the Kenney pack's, kept so no screen needs to change.
 const BUTTON_COLORS := {
-	"Yellow": [Color8(255, 200, 58), Color8(196, 128, 18)],
+	"Yellow": [Color8(255, 200, 58), Color8(212, 138, 18)],
 	"Green": [Color8(79, 154, 58), Color8(40, 96, 34)],
-	"Blue": [Color8(42, 58, 104), Color8(20, 28, 58)],
+	"Blue": [Color8(42, 51, 88), Color8(28, 36, 68)],
 	"Red": [Color8(224, 80, 74), Color8(150, 40, 38)],
 	"Grey": [Color8(88, 94, 118), Color8(44, 48, 66)],
-	"Wood": [Color8(138, 90, 46), Color8(84, 52, 26)],
+	"Sky": [Color8(58, 123, 213), Color8(36, 85, 158)],
+	"Wood": [Color8(138, 90, 46), Color8(92, 58, 28)],
 }
 
 # Nine-patch margins for the pack's 192x64 rectangle buttons. The bottom is
@@ -61,6 +65,43 @@ const BUTTON_COLORS := {
 const BTN_MARGIN_SIDE := 16
 const BTN_MARGIN_TOP := 14
 const BTN_MARGIN_BOTTOM := 18
+
+
+## Boot applies the theme to the window. A screen run on its own (F6 in the
+## editor) never goes through Boot, so each top-level screen calls this and
+## gets the same look either way.
+##
+## Screens sit under Boot, a plain Node, and Godot does not pass a theme
+## from the window through a non-Control parent. So the theme goes on each
+## screen itself: on a Control directly, and on every Control child of a
+## CanvasLayer (including ones added later).
+static var _shared: Theme = null
+
+
+static func shared() -> Theme:
+	if _shared == null:
+		_shared = build()
+	return _shared
+
+
+static func ensure(node: Node) -> void:
+	var theme := shared()
+	var window := node.get_window()
+	if window != null and window.theme == null:
+		window.theme = theme
+	if node is Control:
+		(node as Control).theme = theme
+		return
+	for child in node.get_children():
+		if child is Control and (child as Control).theme == null:
+			(child as Control).theme = theme
+	if not node.child_entered_tree.is_connected(UiTheme._theme_child):
+		node.child_entered_tree.connect(UiTheme._theme_child)
+
+
+static func _theme_child(child: Node) -> void:
+	if child is Control and (child as Control).theme == null:
+		(child as Control).theme = shared()
 
 
 static func build() -> Theme:
@@ -87,24 +128,34 @@ static func _build_labels(theme: Theme) -> void:
 	# Variations rather than per-node overrides: a heading that changes size
 	# should change everywhere at once, and a .tscn full of
 	# theme_override_font_sizes is how that stops being true.
-	_label_variation(theme, &"Title", _font(FONT_DISPLAY), 44, INK)
+	_label_variation(theme, &"Title", _font(FONT_DISPLAY), 28, INK)
 	_label_variation(theme, &"Heading", _font(FONT_UI), 20, BANANA)
-	_label_variation(theme, &"Subheading", _font(FONT_UI), 14, INK_DIM)
-	_label_variation(theme, &"Muted", null, 14, INK_DIM)
+	_label_variation(theme, &"Subheading", _font(FONT_UI), 16, INK_DIM)
+	_label_variation(theme, &"Muted", null, 16, INK_DIM)
 	_label_variation(theme, &"Value", _font(FONT_UI), 18, INK)
+	# Sentences: control descriptions, tips, status lines. A pixel font at
+	# 15 px turns "C" into "O" and "J" into "I", so running text gets a
+	# plain, smooth sans instead.
+	_label_variation(theme, &"Body", body_font(), 17, INK)
 
 	# HUD text sits on top of the game, where the background is whatever the
 	# level happens to be. An outline is the only thing that keeps it legible
 	# over both a bright sky and a dark trunk.
 	_label_variation(theme, &"HudLabel", _font(FONT_UI), 17, INK)
-	_label_variation(theme, &"HudValue", _font(FONT_UI), 22, INK)
-	_label_variation(theme, &"HudBig", _font(FONT_DISPLAY), 64, BANANA)
+	_label_variation(theme, &"HudValue", _font(FONT_DISPLAY), 20, INK)
+	_label_variation(theme, &"HudBig", _font(FONT_DISPLAY), 56, BANANA)
 	# Menu text laid straight over the jungle backdrop, not on a card.
-	_label_variation(theme, &"Display", _font(FONT_DISPLAY), 30, INK)
-	_label_variation(theme, &"DisplayBig", _font(FONT_DISPLAY), 64, BANANA)
-	for type in [&"HudLabel", &"HudValue", &"HudBig", &"Display", &"DisplayBig"]:
-		theme.set_color(&"font_outline_color", type, Color(0.0, 0.0, 0.0, 0.85))
-		theme.set_constant(&"outline_size", type, 8)
+	_label_variation(theme, &"Display", _font(FONT_DISPLAY), 18, INK)
+	_label_variation(theme, &"DisplayBig", _font(FONT_DISPLAY), 36, BANANA)
+	for type in [&"HudLabel", &"HudValue", &"HudBig"]:
+		theme.set_color(&"font_outline_color", type, Color(OUTLINE, 0.9))
+		theme.set_constant(&"outline_size", type, 6)
+	# Mock titles: no outline, a hard ink drop shadow on the pixel grid.
+	for type in [&"Display", &"DisplayBig", &"Title"]:
+		theme.set_color(&"font_shadow_color", type, OUTLINE)
+		theme.set_constant(&"shadow_offset_x", type, 3)
+		theme.set_constant(&"shadow_offset_y", type, 3)
+	theme.set_color(&"font_shadow_color", &"DisplayBig", Color8(150, 78, 10))
 
 
 static func _label_variation(theme: Theme, type: StringName, font: Font, size: int, color: Color) -> void:
@@ -120,25 +171,23 @@ static func _label_variation(theme: Theme, type: StringName, font: Font, size: i
 
 static func _build_buttons(theme: Theme) -> void:
 	_button_set(theme, &"Button", "Blue", INK, INK)
-	_button_variation(theme, &"PrimaryButton", "Yellow", INK_DARK, 22)
-	_button_variation(theme, &"DangerButton", "Red", INK, 18)
-	_button_variation(theme, &"QuietButton", "Wood", INK, 16)
+	theme.set_font(&"font", &"Button", _font(FONT_DISPLAY))
+	_button_variation(theme, &"PrimaryButton", "Yellow", INK_DARK, 16)
+	_button_variation(theme, &"DangerButton", "Red", Color.WHITE, 14)
+	_button_variation(theme, &"QuietButton", "Wood", Color.WHITE, 13)
 	# The one button a menu is built around. Big enough to find with a thumb
 	# without looking, which on a phone is the only way anyone presses it.
-	_button_variation(theme, &"PlayButton", "Yellow", Color.WHITE, 46)
-	theme.set_font(&"font", &"PlayButton", _font(FONT_DISPLAY))
-	_button_variation(theme, &"NavButton", "Wood", Color.WHITE, 22)
-	_button_variation(theme, &"GoButton", "Yellow", Color.WHITE, 24)
-	# Game buttons read like game buttons: white type with a thick dark
-	# outline, legible on any colour of button and any background.
-	for type in [&"PlayButton", &"NavButton", &"GoButton", &"DangerButton", &"PrimaryButton"]:
-		theme.set_color(&"font_outline_color", type, Color(0.13, 0.11, 0.10))
-		theme.set_constant(&"outline_size", type, 10 if type == &"PlayButton" else 7)
-	theme.set_color(&"font_color", &"PrimaryButton", Color.WHITE)
-	theme.set_color(&"font_hover_color", &"PrimaryButton", Color.WHITE)
-	theme.set_color(&"font_pressed_color", &"PrimaryButton", Color.WHITE)
-	theme.set_color(&"font_hover_pressed_color", &"PrimaryButton", Color.WHITE)
-	theme.set_color(&"font_focus_color", &"PrimaryButton", Color.WHITE)
+	_button_variation(theme, &"PlayButton", "Yellow", INK_DARK, 28)
+	_button_variation(theme, &"NavButton", "Wood", Color.WHITE, 15)
+	_button_variation(theme, &"GoButton", "Yellow", INK_DARK, 18)
+	_button_variation(theme, &"GreenButton", "Green", Color.WHITE, 15)
+	_button_variation(theme, &"NavyButton", "Blue", INK, 14)
+	# Mock buttons: dark ink type on gold, white type with an ink drop shadow
+	# on every other colour. No outlines.
+	for type in [&"Button", &"DangerButton", &"QuietButton", &"NavButton", &"GreenButton", &"NavyButton"]:
+		theme.set_color(&"font_shadow_color", type, OUTLINE)
+		theme.set_constant(&"shadow_offset_x", type, 2)
+		theme.set_constant(&"shadow_offset_y", type, 2)
 	_build_tiles(theme)
 
 	# A choice sits unselected in neutral grey and selected in leaf green.
@@ -146,8 +195,8 @@ static func _build_buttons(theme: Theme) -> void:
 	# and "being clicked" are the same drawing and cannot disagree.
 	theme.add_type(&"ChoiceButton")
 	theme.set_type_variation(&"ChoiceButton", &"Button")
-	_button_set(theme, &"ChoiceButton", "Grey", INK_DARK, INK, "Green")
-	theme.set_font_size(&"font_size", &"ChoiceButton", 16)
+	_button_set(theme, &"ChoiceButton", "Blue", INK, INK_DARK, "Yellow")
+	theme.set_font_size(&"font_size", &"ChoiceButton", 12)
 
 
 ## Big picture cards for choosing a mode, a map, a difficulty. Dark glass at
@@ -156,9 +205,9 @@ static func _build_tiles(theme: Theme) -> void:
 	theme.add_type(&"TileButton")
 	theme.set_type_variation(&"TileButton", &"Button")
 	var rest := _flat(Color(PANEL, 0.88), EDGE, 18)
-	var hover := _flat(Color(PANEL_HI, 0.92), LEAF, 18)
-	var chosen := _flat(PANEL_HI, BANANA, 18)
-	chosen.set_border_width_all(5)
+	var hover := _flat(Color(PANEL, 0.95), Color8(90, 100, 140), 18)
+	var chosen := _flat(PANEL, BANANA, 18)
+	chosen.set_border_width_all(4)
 	var off := _flat(Color(PANEL, 0.45), Color(EDGE, 0.4), 18)
 	theme.set_stylebox(&"normal", &"TileButton", rest)
 	theme.set_stylebox(&"hover", &"TileButton", hover)
@@ -182,15 +231,12 @@ static func _button_variation(theme: Theme, type: StringName, color: String, ink
 static func _button_set(theme: Theme, type: StringName, color: String, ink: Color, on_ink: Color, on_color: String = "") -> void:
 	var held := on_color if not on_color.is_empty() else color
 	var normal := _button_box(color, "depth_gloss")
-	var hover := _button_box(color, "depth_gloss")
-	(hover as StyleBoxFlat).bg_color = (hover as StyleBoxFlat).bg_color.lightened(0.12)
+	var tones: Array = BUTTON_COLORS.get(color, BUTTON_COLORS["Blue"])
+	var hover := pixel_button((tones[0] as Color).lightened(0.1), tones[1])
 	# Pressed drops the depth lip and pushes the text down by the height of
 	# that lip, so the button reads as having physically gone in.
 	var pressed := _button_box(held, "gloss")
-	pressed.content_margin_top = 18.0
-	pressed.content_margin_bottom = 14.0
-	var disabled := _button_box("Grey", "depth_flat")
-	(disabled as StyleBoxFlat).bg_color.a = 0.55
+	var disabled := pixel_button(Color8(52, 58, 80), Color8(34, 38, 56))
 
 	theme.set_stylebox(&"normal", type, normal)
 	theme.set_stylebox(&"hover", type, hover)
@@ -204,40 +250,53 @@ static func _button_set(theme: Theme, type: StringName, color: String, ink: Colo
 	theme.set_color(&"font_pressed_color", type, on_ink)
 	theme.set_color(&"font_hover_pressed_color", type, on_ink)
 	theme.set_color(&"font_focus_color", type, ink)
-	theme.set_color(&"font_disabled_color", type, Color(0.62, 0.65, 0.60, 0.7))
-	theme.set_font_size(&"font_size", type, 18)
+	theme.set_color(&"font_disabled_color", type, Color(0.62, 0.65, 0.72, 0.8))
+	theme.set_font_size(&"font_size", type, 14)
 	theme.set_constant(&"h_separation", type, 10)
 
 
 ## Chunky pixel button: flat face, dark outline, a thick darker lip along
 ## the bottom for depth. "gloss" (pressed) drops the lip so it reads pushed.
+static var _box_cache: Dictionary = {}
+
+
 static func _button_box(color: String, style: String) -> StyleBox:
 	var pair: Array = BUTTON_COLORS.get(color, BUTTON_COLORS["Blue"])
-	var box := StyleBoxFlat.new()
-	box.bg_color = pair[0]
-	box.border_color = OUTLINE
-	box.set_corner_radius_all(RADIUS)
-	box.set_border_width_all(3)
-	var pressed := style == "gloss"
-	box.anti_aliasing = false
-	box.content_margin_left = 18.0
-	box.content_margin_right = 18.0
-	box.content_margin_top = 12.0
-	box.content_margin_bottom = 12.0
-	if not pressed:
-		# StyleBoxFlat has one border colour, so the lip is the bottom border
-		# in the darker tone, with a thin outline kept on the other sides.
-		box.border_color = pair[1]
-		box.border_width_bottom = 8
-		box.border_width_left = 2
-		box.border_width_right = 2
-		box.border_width_top = 2
-		box.expand_margin_bottom = 0.0
-		box.content_margin_bottom = 16.0
+	return pixel_button(pair[0], pair[1], style == "gloss")
+
+
+## Mock button, drawn as pixels: 3px ink outline, flat face, a light top
+## edge and a darker lip along the bottom. Pressed drops the lip and pushes
+## the label down, so it reads as physically pressed in. Nine-sliced, so
+## any size keeps the same 3px edges.
+static func pixel_button(face: Color, lip: Color, pressed: bool = false) -> StyleBoxTexture:
+	var key := "%s|%s|%s" % [face.to_html(), lip.to_html(), pressed]
+	if _box_cache.has(key):
+		return _box_cache[key]
+	var p := 3
+	var size := 16 * p
+	var lip_h := 0 if pressed else 2 * p
+	var img := Image.create(size, size, false, Image.FORMAT_RGBA8)
+	img.fill(Color(0, 0, 0, 0))
+	img.fill_rect(Rect2i(p, 0, size - 2 * p, size), OUTLINE)
+	img.fill_rect(Rect2i(0, p, size, size - 2 * p), OUTLINE)
+	img.fill_rect(Rect2i(p, p, size - 2 * p, size - 2 * p), lip)
+	img.fill_rect(Rect2i(p, p, size - 2 * p, size - 2 * p - lip_h), face)
+	if pressed:
+		img.fill_rect(Rect2i(p, p, size - 2 * p, p), lip)
 	else:
-		box.border_color = pair[1]
-		box.set_border_width_all(2)
-		box.content_margin_top = 16.0
+		img.fill_rect(Rect2i(p, p, size - 2 * p, p), face.lightened(0.3))
+	var box := StyleBoxTexture.new()
+	box.texture = ImageTexture.create_from_image(img)
+	box.texture_margin_left = 2 * p
+	box.texture_margin_right = 2 * p
+	box.texture_margin_top = 2 * p
+	box.texture_margin_bottom = 2 * p + lip_h
+	box.content_margin_left = 16.0
+	box.content_margin_right = 16.0
+	box.content_margin_top = 10.0 + (lip_h if pressed else 0) + (2 * p if pressed else 0)
+	box.content_margin_bottom = 10.0 + lip_h
+	_box_cache[key] = box
 	return box
 
 
@@ -274,7 +333,12 @@ static func _build_panels(theme: Theme) -> void:
 	# the jungle rather than over a flat colour.
 	theme.add_type(&"Glass")
 	theme.set_type_variation(&"Glass", &"PanelContainer")
-	theme.set_stylebox(&"panel", &"Glass", _flat(Color(PANEL, 0.86), EDGE, 16))
+	theme.set_stylebox(&"panel", &"Glass", _flat(Color(PANEL, 0.9), EDGE, 16))
+	# Inset box inside a panel (mock hero card top, skill box).
+	theme.add_type(&"Inset")
+	theme.set_type_variation(&"Inset", &"PanelContainer")
+	var inset := _flat(PANEL_HI, Color(0, 0, 0, 0), 0)
+	theme.set_stylebox(&"panel", &"Inset", inset)
 
 	# Overlays sit on top of the running game, so they need a background dark
 	# enough to read against a bright level and no border to fight with it.
@@ -288,6 +352,11 @@ static func _flat(fill: Color, border: Color, radius: int = RADIUS) -> StyleBoxF
 	box.bg_color = fill
 	box.border_color = border
 	box.set_border_width_all(3 if border.a > 0.0 else 0)
+	# The mock's faint cream inner line, as a 2px inset shadow-free border
+	# would need a second box; a soft outer glow in ink keeps the edge crisp.
+	box.shadow_color = Color(OUTLINE, 0.6) if border.a > 0.0 else Color(0, 0, 0, 0)
+	box.shadow_size = 0
+	box.shadow_offset = Vector2(3, 3)
 	# Pixel look: the old 10-18px rounded glass becomes near-square blocks.
 	box.set_corner_radius_all(mini(radius, RADIUS))
 	box.anti_aliasing = false
@@ -395,8 +464,41 @@ static func _texture(path: String) -> Texture2D:
 	return load(path) as Texture2D
 
 
+static var _font_cache: Dictionary = {}
+static var _body_font: Font = null
+
+
+## A clean system sans for reading, smoothed rather than pixel-crisp. Named
+## per platform: Segoe UI on Windows, Roboto on Android, then fallbacks.
+static func body_font() -> Font:
+	if _body_font == null:
+		var font := SystemFont.new()
+		font.font_names = PackedStringArray(["Segoe UI", "Roboto", "Noto Sans", "Helvetica Neue", "Arial", "sans-serif"])
+		font.font_weight = 600
+		font.antialiasing = TextServer.FONT_ANTIALIASING_GRAY
+		font.hinting = TextServer.HINTING_LIGHT
+		font.subpixel_positioning = TextServer.SUBPIXEL_POSITIONING_AUTO
+		_body_font = font
+	return _body_font
+
+
+## Pixel fonts, crisp: no antialiasing, no hinting, whole-pixel placement.
+## A font the editor has not imported yet is read straight off disk.
 static func _font(path: String) -> Font:
-	if not ResourceLoader.exists(path):
+	if _font_cache.has(path):
+		return _font_cache[path]
+	var font: FontFile = null
+	if ResourceLoader.exists(path):
+		font = load(path) as FontFile
+	if font == null and FileAccess.file_exists(path):
+		font = FontFile.new()
+		if font.load_dynamic_font(ProjectSettings.globalize_path(path)) != OK:
+			font = null
+	if font == null:
 		push_warning("UI font missing: %s" % path)
 		return null
-	return load(path) as Font
+	font.antialiasing = TextServer.FONT_ANTIALIASING_NONE
+	font.hinting = TextServer.HINTING_NONE
+	font.subpixel_positioning = TextServer.SUBPIXEL_POSITIONING_DISABLED
+	_font_cache[path] = font
+	return font

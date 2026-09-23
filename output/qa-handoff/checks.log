@@ -1,0 +1,160 @@
+2026-09-23T11:51:36  HUD mode=2 plank=true 'BANANA RUSH 2:57' at (567.5, 10.0) size (145.0, 72.0) carry=true '0' running hoard=true race=false
+2026-09-23T11:51:41  HUD mode=1 plank=true 'RACE 0:02' at (584.0, 10.0) size (112.0, 72.0) carry=false '' running hoard=false race=true
+2026-09-23T11:51:46  HUD mode=3 plank=true '2V2 SLAP 2:27' at (584.0, 10.0) size (112.0, 72.0) carry=false '' running hoard=false race=false
+2026-09-23T11:51:46  HUD PROBE DONE
+2026-09-23T11:52:37  HUD mode=2 plank=true 'BANANA RUSH 2:57' at (567.5, 10.0) size (145.0, 72.0) carry=true '0' running hoard=true race=false
+2026-09-23T11:52:42  HUD mode=1 plank=true 'RACE 0:02' at (584.0, 10.0) size (112.0, 72.0) carry=false '' running hoard=false race=true
+2026-09-23T11:52:47  HUD mode=3 plank=true '2V2 SLAP 2:27' at (584.0, 10.0) size (112.0, 72.0) carry=false '' running hoard=false race=false
+2026-09-23T11:52:47  HUD PROBE DONE
+2026-09-23T11:56:03  HUD mode=2 plank=true 'BANANA RUSH 2:57' at (567.5, 10.0) size (145.0, 72.0) carry=true '0' running hoard=true race=false
+2026-09-23T11:56:08  HUD mode=1 plank=true 'RACE 0:02' at (584.0, 10.0) size (112.0, 72.0) carry=false '' running hoard=false race=true
+2026-09-23T11:56:13  HUD mode=3 plank=true '2V2 SLAP 2:27' at (584.0, 10.0) size (112.0, 72.0) carry=false '' running hoard=false race=false
+2026-09-23T11:56:13  HUD PROBE DONE
+2026-09-23T11:57:14  TREE MapA ok   branches=12 trees=12 latched=true on_tree=true
+2026-09-23T11:57:14  TREE MapB ok   branches=10 trees=11 latched=true on_tree=true
+2026-09-23T11:57:14  TREE SlapArena ok   branches=2 trees=2 latched=true on_tree=true
+2026-09-23T11:57:14  TREE GRAB CHECK OK
+2026-09-23T11:58:07  MOVE ok    double jump goes higher  single 143 px, double 241 px
+2026-09-23T11:58:08  MOVE ok    jump adds momentum  vx 671 after jump, run 420
+2026-09-23T11:58:08  MOVE ok    bunny hop keeps speed  vx 777 after hop
+2026-09-23T11:58:09  MOVE ok    no hop brakes to top speed  vx 546 after landing, top 546
+2026-09-23T11:58:09  MOVE ok    early press waits for the ground  vx 777, double jump still ready: true
+2026-09-23T11:58:09  MOVE ok    down at speed slides  state SLIDE, vx 470
+2026-09-23T11:58:10  MOVE ok    tap does not grab  
+2026-09-23T11:58:10  MOVE ok    hold grabs a vine  
+2026-09-23T11:58:10  MOVE ok    letting go of jump lets go  state AIR
+2026-09-23T11:58:10  MOVE CHECK OK
+2026-09-23T11:58:25  CLIMB grabbed=true climbed=1071  CLIMB CHECK OK
+2026-09-23T11:59:21  SMOKE --- smoke results ---
+2026-09-23T11:59:21  SMOKE   instanced every scene under res://scenes
+2026-09-23T11:59:21  SMOKE   map_a / Free play: 4 monkeys, 4 moved
+2026-09-23T11:59:21  SMOKE   map_b / Free play: 4 monkeys, 4 moved
+2026-09-23T11:59:21  SMOKE   map_c / Free play: 4 monkeys, 4 moved
+2026-09-23T11:59:21  SMOKE   map_a / Race: 4 monkeys, 3 moved
+2026-09-23T11:59:21  SMOKE   map_b / Race: 4 monkeys, 3 moved
+2026-09-23T11:59:21  SMOKE   map_a / Banana Hoard: 4 monkeys, 3 moved
+2026-09-23T11:59:21  SMOKE   map_b / Banana Hoard: 4 monkeys, 4 moved
+2026-09-23T11:59:21  SMOKE   map_c / 2v2 Slap: 4 monkeys, 3 moved
+2026-09-23T11:59:21  SMOKE SMOKE OK
+2026-09-23T12:08:31  SMOKE --- smoke results ---
+2026-09-23T12:08:31  SMOKE   instanced every scene under res://scenes
+2026-09-23T12:08:31  SMOKE   map_a / Free play: 4 monkeys, 4 moved
+2026-09-23T12:08:31  SMOKE   map_b / Free play: 4 monkeys, 3 moved
+2026-09-23T12:08:31  SMOKE   map_c / Free play: 4 monkeys, 4 moved
+2026-09-23T12:08:31  SMOKE   map_a / Race: 4 monkeys, 3 moved
+2026-09-23T12:08:31  SMOKE   map_b / Race: 4 monkeys, 3 moved
+2026-09-23T12:08:31  SMOKE   map_a / Banana Hoard: 4 monkeys, 3 moved
+2026-09-23T12:08:31  SMOKE   map_b / Banana Hoard: 4 monkeys, 3 moved
+2026-09-23T12:08:31  SMOKE   map_c / 2v2 Slap: 4 monkeys, 3 moved
+2026-09-23T12:08:31  SMOKE SMOKE OK
+2026-09-23T15:41:51  HUD mode=2 plank=true 'BANANA RUSH 2:57' at (545.5, 10.0) size (189.0, 80.0) carry=true '0' running hoard=true race=false
+2026-09-23T15:41:57  HUD mode=1 plank=true 'RACE 0:02' at (574.0, 10.0) size (132.0, 80.0) carry=false '' running hoard=false race=true
+2026-09-23T15:42:02  HUD mode=3 plank=true '2V2 SLAP 2:27' at (562.0, 10.0) size (156.0, 80.0) carry=false '' running hoard=false race=false
+2026-09-23T15:42:02  HUD PROBE DONE
+2026-09-23T15:43:20  SMOKE --- smoke results ---
+2026-09-23T15:43:20  SMOKE   instanced every scene under res://scenes
+2026-09-23T15:43:20  SMOKE   map_a / Free play: 4 monkeys, 4 moved
+2026-09-23T15:43:20  SMOKE   map_b / Free play: 4 monkeys, 4 moved
+2026-09-23T15:43:20  SMOKE   map_c / Free play: 4 monkeys, 3 moved
+2026-09-23T15:43:20  SMOKE   map_a / Race: 4 monkeys, 3 moved
+2026-09-23T15:43:20  SMOKE   map_b / Race: 4 monkeys, 3 moved
+2026-09-23T15:43:20  SMOKE   map_a / Banana Hoard: 4 monkeys, 3 moved
+2026-09-23T15:43:20  SMOKE   map_b / Banana Hoard: 4 monkeys, 3 moved
+2026-09-23T15:43:20  SMOKE   map_c / 2v2 Slap: 4 monkeys, 2 moved
+2026-09-23T15:43:20  SMOKE SMOKE OK
+2026-09-23T15:44:02  TREE MapA ok   branches=12 trees=12 latched=true on_tree=true
+2026-09-23T15:44:02  TREE MapB ok   branches=10 trees=11 latched=true on_tree=true
+2026-09-23T15:44:02  TREE SlapArena ok   branches=2 trees=2 latched=true on_tree=true
+2026-09-23T15:44:03  TREE GRAB CHECK OK
+2026-09-23T15:44:37  MOVE ok    double jump goes higher  single 143 px, double 241 px
+2026-09-23T15:44:38  MOVE ok    jump adds momentum  vx 671 after jump, run 420
+2026-09-23T15:44:39  MOVE ok    bunny hop keeps speed  vx 777 after hop
+2026-09-23T15:44:39  MOVE ok    no hop brakes to top speed  vx 546 after landing, top 546
+2026-09-23T15:44:39  MOVE ok    early press waits for the ground  vx 777, double jump still ready: true
+2026-09-23T15:44:40  MOVE ok    down at speed slides  state SLIDE, vx 470
+2026-09-23T15:44:40  MOVE ok    tap does not grab  
+2026-09-23T15:44:41  MOVE ok    hold grabs a vine  
+2026-09-23T15:44:41  MOVE ok    letting go of jump lets go  state AIR
+2026-09-23T15:44:41  MOVE CHECK OK
+2026-09-23T16:04:16  SMOKE --- smoke results ---
+2026-09-23T16:04:16  SMOKE   instanced every scene under res://scenes
+2026-09-23T16:04:16  SMOKE   map_a / Free play: 4 monkeys, 4 moved
+2026-09-23T16:04:16  SMOKE   map_b / Free play: 4 monkeys, 4 moved
+2026-09-23T16:04:16  SMOKE   map_c / Free play: 4 monkeys, 4 moved
+2026-09-23T16:04:16  SMOKE   map_a / Race: 4 monkeys, 3 moved
+2026-09-23T16:04:16  SMOKE   map_b / Race: 4 monkeys, 3 moved
+2026-09-23T16:04:16  SMOKE   map_a / Banana Hoard: 4 monkeys, 3 moved
+2026-09-23T16:04:16  SMOKE   map_b / Banana Hoard: 4 monkeys, 3 moved
+2026-09-23T16:04:16  SMOKE   map_c / 2v2 Slap: 4 monkeys, 3 moved
+2026-09-23T16:04:16  SMOKE SMOKE OK
+2026-09-23T16:09:37  TREE MapA ok   branches=12 trees=12 latched=true on_tree=true
+2026-09-23T16:09:37  TREE MapB ok   branches=10 trees=11 latched=true on_tree=true
+2026-09-23T16:09:37  TREE SlapArena ok   branches=2 trees=2 latched=true on_tree=true
+2026-09-23T16:09:37  TREE GRAB CHECK OK
+2026-09-23T16:46:04  MM menu found=true
+2026-09-23T16:46:04  MM search stage=1 status='Looking for players nearby...' queue=1 mode=1
+2026-09-23T16:46:04  MM after listen stage=4 status='Waiting for players to join...' link=1 searching=true
+2026-09-23T16:46:04  MM arena started=true roster=4 bots=[1, -1, -2, -3] skill=2
+2026-09-23T16:46:04  MM after end: frozen=4/4 bot moved 0.0 px  rp 0 -> 30
+2026-09-23T16:46:04  MM PROBE DONE
+2026-09-23T16:48:41  SMOKE --- smoke results ---
+2026-09-23T16:48:41  SMOKE   instanced every scene under res://scenes
+2026-09-23T16:48:41  SMOKE   map_a / Free play: 4 monkeys, 4 moved
+2026-09-23T16:48:41  SMOKE   map_b / Free play: 4 monkeys, 4 moved
+2026-09-23T16:48:41  SMOKE   map_c / Free play: 4 monkeys, 4 moved
+2026-09-23T16:48:41  SMOKE   map_a / Race: 4 monkeys, 3 moved
+2026-09-23T16:48:41  SMOKE   map_b / Race: 4 monkeys, 3 moved
+2026-09-23T16:48:41  SMOKE   map_a / Banana Hoard: 4 monkeys, 3 moved
+2026-09-23T16:48:41  SMOKE   map_b / Banana Hoard: 4 monkeys, 3 moved
+2026-09-23T16:48:41  SMOKE   map_c / 2v2 Slap: 4 monkeys, 4 moved
+2026-09-23T16:48:41  SMOKE SMOKE OK
+2026-09-23T17:02:12  MOVE ok    double jump goes higher  single 143 px, double 241 px
+2026-09-23T17:02:13  MOVE ok    jump adds momentum  vx 671 after jump, run 420
+2026-09-23T17:02:13  MOVE ok    bunny hop keeps speed  vx 777 after hop
+2026-09-23T17:02:14  MOVE ok    no hop brakes to top speed  vx 546 after landing, top 546
+2026-09-23T17:02:14  MOVE ok    early press waits for the ground  vx 777, double jump still ready: true
+2026-09-23T17:02:15  MOVE ok    down at speed slides  state SLIDE, vx 470
+2026-09-23T17:02:15  MOVE ok    jump does not grab  
+2026-09-23T17:02:15  MOVE ok    grab button grabs a vine  
+2026-09-23T17:02:16  MOVE ok    letting go of grab lets go  state AIR
+2026-09-23T17:02:16  MOVE ok    jump leaps off a swing  state AIR, vy -648
+2026-09-23T17:02:17  MOVE ok    jump up through a platform  y 348, platform top 380
+2026-09-23T17:02:18  MOVE ok    platform holds when not pressing down  y 348
+2026-09-23T17:02:19  MOVE ok    down drops through a platform  y 468
+2026-09-23T17:02:19  MOVE CHECK OK
+2026-09-23T17:02:58  CLIMB grabbed=true climbed=1072  CLIMB CHECK OK
+2026-09-23T17:03:17  TREE MapA FAIL branches=12 trees=12 latched=true on_tree=false
+2026-09-23T17:03:18  TREE MapB FAIL branches=10 trees=11 latched=true on_tree=false
+2026-09-23T17:03:18  TREE SlapArena FAIL branches=2 trees=2 latched=true on_tree=false
+2026-09-23T17:03:18  TREE GRAB CHECK FAIL (3)
+2026-09-23T17:04:44  SMOKE --- smoke results ---
+2026-09-23T17:04:44  SMOKE   instanced every scene under res://scenes
+2026-09-23T17:04:44  SMOKE   map_a / Free play: 4 monkeys, 4 moved
+2026-09-23T17:04:44  SMOKE   map_b / Free play: 4 monkeys, 4 moved
+2026-09-23T17:04:44  SMOKE   map_c / Free play: 4 monkeys, 4 moved
+2026-09-23T17:04:44  SMOKE   map_a / Race: 4 monkeys, 3 moved
+2026-09-23T17:04:44  SMOKE   map_b / Race: 4 monkeys, 3 moved
+2026-09-23T17:04:44  SMOKE   map_a / Banana Hoard: 4 monkeys, 3 moved
+2026-09-23T17:04:44  SMOKE   map_b / Banana Hoard: 4 monkeys, 3 moved
+2026-09-23T17:04:44  SMOKE   map_c / 2v2 Slap: 4 monkeys, 3 moved
+2026-09-23T17:04:44  SMOKE SMOKE OK
+2026-09-23T17:05:48  TREE MapA ok   branches=12 trees=12 latched=true on_tree=true held=CrownGrab58
+2026-09-23T17:05:49  TREE MapB ok   branches=10 trees=11 latched=true on_tree=true held=CrownGrab40
+2026-09-23T17:05:49  TREE SlapArena ok   branches=2 trees=2 latched=true on_tree=true held=CrownGrab15
+2026-09-23T17:05:49  TREE GRAB CHECK OK
+2026-09-23T17:06:32  PLAY punch: bot vx 632 state STUN
+2026-09-23T17:06:32  PLAY skill timer 3.4
+2026-09-23T17:06:32  PLAY grab marker at (-56.0, 323.9987)
+2026-09-23T17:06:32  PLAY swing state SWING on CrownGrab32
+2026-09-23T17:06:32  PLAY platform body found=true shapes=18
+2026-09-23T17:06:32  PLAY on ledge: y 354 top 380 floor true platform true
+2026-09-23T17:06:32  PLAY after down: y 474 (below top: true)
+2026-09-23T17:06:32  PLAY PROBE DONE
+2026-09-23T17:07:53  PLAY punch: bot vx 627 state STUN
+2026-09-23T17:07:53  PLAY skill timer 3.4
+2026-09-23T17:07:53  PLAY grab marker at (-56.0, 323.9987)
+2026-09-23T17:07:53  PLAY swing state SWING on CrownGrab32
+2026-09-23T17:07:53  PLAY platform body found=true shapes=18
+2026-09-23T17:07:53  PLAY on ledge: y 354 top 380 floor true platform true
+2026-09-23T17:07:53  PLAY after down: y 474 (below top: true)
+2026-09-23T17:07:53  PLAY PROBE DONE

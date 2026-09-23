@@ -36,6 +36,10 @@ var _local_id: int = 1
 var _idle_frame: InputFrame = InputFrame.new()
 ## Latch so one fall counts once, rather than once per frame spent below.
 var _local_below_kill: bool = false
+## Set once the round is decided. From then on nothing in the arena moves,
+## thinks or makes a sound: the results screen sits over a frozen tableau
+## instead of bots still punching each other behind it.
+var _over: bool = false
 
 @onready var _map_slot: Node2D = $MapSlot
 @onready var _player_root: Node2D = $Players
@@ -65,6 +69,8 @@ func _exit_tree() -> void:
 
 
 func _toggle_pause() -> void:
+	if _over:
+		return
 	var existing := get_node_or_null(^"Pause")
 	if existing != null:
 		existing.call(&"resume")
@@ -115,11 +121,34 @@ func _start_mode() -> void:
 
 
 func _on_match_over(results: Array) -> void:
+	if _over:
+		return
+	_freeze_arena()
 	_record_career(results)
 	var overlay := RESULTS_SCENE.instantiate()
 	add_child(overlay)
 	if overlay.has_method(&"show_results"):
 		overlay.call(&"show_results", results)
+
+
+## Stops every monkey, bot brain, pickup and director. The arena node itself
+## keeps running only so the results overlay (its child) still works.
+func _freeze_arena() -> void:
+	_over = true
+	bots.clear()
+	for id in players.keys():
+		var player := players[id] as Player
+		if player == null:
+			continue
+		player.velocity = Vector2.ZERO
+		player.process_mode = Node.PROCESS_MODE_DISABLED
+	for node in [_player_root, _pickup_root, race, hoard, slap]:
+		if node != null:
+			(node as Node).process_mode = Node.PROCESS_MODE_DISABLED
+	var pause := get_node_or_null(^"Pause")
+	if pause != null:
+		pause.queue_free()
+	get_tree().paused = false
 
 
 func _record_career(results: Array) -> void:
@@ -129,6 +158,8 @@ func _record_career(results: Array) -> void:
 			continue
 		var row: Dictionary = entry
 		var place := index + 1
+		if Net.queue == GameConfig.Queue.RANKED:
+			Profile.record_ranked(GameConfig.ranked_delta(Net.mode, place, results.size(), row))
 		if Net.mode == GameConfig.Mode.HOARD:
 			Profile.record_hoard(place, results.size(), int(row.get("score", 0)))
 		elif Net.mode == GameConfig.Mode.RACE:
@@ -210,6 +241,11 @@ func despawn_player(id: int) -> void:
 # --- Per-tick routing ----------------------------------------------
 
 func _physics_process(delta: float) -> void:
+	if _over:
+		# Still drain the local input queue, so presses made on the results
+		# screen do not pile up and fire in the next round.
+		GameInput.take_local_frame()
+		return
 	_route_input(delta)
 	_track_local_fall()
 	if _is_authority():
@@ -287,6 +323,8 @@ func _check_falls() -> void:
 
 
 func _begin_respawn(id: int) -> void:
+	if _over:
+		return
 	_respawning[id] = true
 	slap.player_fell(id)
 	var player := players.get(id) as Player
@@ -299,6 +337,8 @@ func _begin_respawn(id: int) -> void:
 	player.global_position = Vector2(0.0, limit + 4000.0)
 	await get_tree().create_timer(GameConfig.RESPAWN_DELAY).timeout
 	if not is_instance_valid(player):
+		return
+	if _over:
 		return
 	player.respawn_at(_checkpoints.get(id, _spawn_position(0)))
 	_respawning[id] = false
@@ -315,6 +355,8 @@ func set_checkpoint(id: int, point: Vector2) -> void:
 # --- Snapshot wire (host -> clients) -------------------------------
 
 func collect_snapshot() -> Dictionary:
+	if _over:
+		return {}
 	var out: Dictionary = {}
 	for id in players.keys():
 		out[id] = players[id].get_net_state()
@@ -322,6 +364,8 @@ func collect_snapshot() -> Dictionary:
 
 
 func apply_snapshot(snapshot: Dictionary) -> void:
+	if _over:
+		return
 	for id in snapshot.keys():
 		var pid := int(id)
 		var player := players.get(pid) as Player
@@ -338,6 +382,8 @@ func apply_snapshot(snapshot: Dictionary) -> void:
 
 
 func apply_remote_hit(target_id: int, force: Vector2, stun: float, attacker_id: int) -> void:
+	if _over:
+		return
 	var player := players.get(target_id) as Player
 	if player != null:
 		player.take_hit(attacker_id, force, stun)
@@ -348,6 +394,8 @@ func apply_remote_hit(target_id: int, force: Vector2, stun: float, attacker_id: 
 
 
 func apply_remote_ability(target_id: int, ability_id: StringName, duration: float) -> void:
+	if _over:
+		return
 	var player := players.get(target_id) as Player
 	if player != null:
 		player.set_ability(ability_id, duration)

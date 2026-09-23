@@ -1,13 +1,22 @@
 class_name MonkeySprite
 extends Sprite2D
 
-## Locked character artwork, baked crisp by tools/art/pixel_bake.py
+## Low-detail branch: chibi artwork baked by tools/art/simple_bake.py.
+## The high-detail art (assets/monkeys/crisp) is locked artwork baked by tools/art/pixel_bake.py
 ## (area-averaged, palette-locked, 1px outline). The older nearest-neighbour
 ## bake in assets/monkeys/locked read as blurry noise at 2x.
 ## Pose indices retain the existing atlas contract for menus and gameplay.
-const ART_DIR: String = "res://assets/monkeys/crisp"
+const ART_DIR: String = "res://assets/monkeys/simple"
 const CANVAS: int = 64
-const PIXEL: float = 2.0
+## In-match size: 4/3 world px per atlas px = 4 world px per art pixel of
+## the low-detail chibis (was 2.0 = 6 px, too big on screen).
+const PIXEL: float = 4.0 / 3.0
+## Per-species size on top of PIXEL. 4/3 keeps the low-detail art on an even
+## grid (3 atlas px per art px x 2 x 4/3 = 8 world px), so the gorilla reads
+## as the big one without smeared pixels.
+const SIZE: Dictionary = {&"gorilla": 1.25}
+## Menus keep their own size ratio (drawn by MonkeyStage at whole scales).
+const MENU_SIZE: Dictionary = {&"gorilla": 4.0 / 3.0}
 const POSES: Dictionary = MonkeyFrames.POSES
 const ANIMS: Dictionary = MonkeyFrames.ANIMS
 const FRONT_POSES: Dictionary = POSES
@@ -42,7 +51,7 @@ func setup(id: StringName, facing_camera: bool = false, skin_id: StringName = &"
 	vframes = MonkeyFrames.ROWS
 	centered = false
 	offset = Vector2(-CANVAS * 0.5, -CANVAS)
-	scale = Vector2.ONE * PIXEL
+	scale = Vector2.ONE * pixel_for(id)
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	anim = &"idle"
 	_clock = 0.0
@@ -156,7 +165,12 @@ static func front_sheet_for(id: StringName, skin_id: StringName = &"natural") ->
 
 
 static func head_height(id: StringName) -> float:
-	return float(MonkeyFrames.HEIGHTS.get(id, 46)) * PIXEL
+	return float(MonkeyFrames.HEIGHTS.get(id, 46)) * pixel_for(id)
+
+
+## World px per atlas px for this species.
+static func pixel_for(id: StringName) -> float:
+	return PIXEL * float(SIZE.get(id, 1.0))
 
 
 ## In sprite-local pixels, respecting the current body's facing and scale.

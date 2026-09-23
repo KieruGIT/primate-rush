@@ -9,6 +9,7 @@ extends CanvasLayer
 # ============================================================
 
 const GO_FLASH_SECONDS: float = 0.9
+const SkillFx = preload("res://scripts/player/SkillFx.gd")
 
 @onready var _title: Label = %Title
 @onready var _info: Label = %Info
@@ -26,15 +27,36 @@ var _debug: bool = false
 var _portrait: TextureRect = null
 var _portrait_for: StringName = &""
 var _board_card: PanelContainer = null
+## Mock HUD: wood plank timer top-centre, banana count top-left.
+var _plank: PanelContainer = null
+var _plank_mode: Label = null
+var _plank_time: Label = null
+var _carry: PanelContainer = null
+var _carry_count: Label = null
+var _card: PanelContainer = null
+var _board_list: VBoxContainer = null
+var _board_sig: String = ""
+## Skill card, bottom right on keyboard: name, key, cooldown bar and seconds.
+var _skill_card: PanelContainer = null
+var _skill_name: Label = null
+var _skill_state: Label = null
+var _skill_bar: ProgressBar = null
+var _skill_fill: StyleBoxFlat = null
+var _skill_was_cooling: bool = false
 
 
 func _ready() -> void:
 	layer = 5
+	UiTheme.ensure(self)
 	_center.text = ""
 	_build_card()
 	_build_board_card()
+	_build_plank()
+	_build_carry()
 	if not OS.has_feature("mobile"):
 		_build_key_strip()
+		# Phones show the cooldown on the SKILL button itself.
+		_build_skill_card()
 	_center.theme_type_variation = &"HudBig"
 	_center.add_theme_font_size_override(&"font_size", 88)
 	# Above the monkeys, who stand in the middle of the screen.
@@ -57,9 +79,132 @@ func _build_board_card() -> void:
 	_board_card.offset_right = -20.0
 	_board_card.custom_minimum_size = Vector2(310.0, 0.0)
 	root.add_child(_board_card)
-	_board.reparent(_board_card)
-	_board.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	_board_card.offset_top = 16.0
+	var column := VBoxContainer.new()
+	column.add_theme_constant_override(&"separation", 6)
+	_board_card.add_child(column)
+	var header := Label.new()
+	header.text = "LEADERBOARD"
+	header.add_theme_font_override(&"font", UiTheme._font(UiTheme.FONT_DISPLAY))
+	header.add_theme_font_size_override(&"font_size", 11)
+	header.add_theme_color_override(&"font_color", UiTheme.INK_DIM)
+	column.add_child(header)
+	_board_list = VBoxContainer.new()
+	_board_list.add_theme_constant_override(&"separation", 4)
+	column.add_child(_board_list)
+	_board.reparent(column)
+	_board.visible = false
 	_board_card.visible = false
+
+
+## The match timer on a carved wood sign, top centre, as in the mock.
+func _build_plank() -> void:
+	_plank = PanelContainer.new()
+	var box: StyleBoxTexture = UiTheme.pixel_button(UiTheme.WOOD, Color8(92, 58, 28)).duplicate()
+	box.content_margin_left = 34
+	box.content_margin_right = 34
+	box.content_margin_top = 10
+	box.content_margin_bottom = 14
+	_plank.add_theme_stylebox_override(&"panel", box)
+	_plank.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_plank.set_anchors_preset(Control.PRESET_CENTER_TOP)
+	_plank.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	_plank.offset_top = 10.0
+	var column := VBoxContainer.new()
+	column.add_theme_constant_override(&"separation", 0)
+	_plank.add_child(column)
+	_plank_mode = Label.new()
+	_plank_mode.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_plank_mode.add_theme_font_override(&"font", UiTheme._font(UiTheme.FONT_DISPLAY))
+	_plank_mode.add_theme_font_size_override(&"font_size", 11)
+	_plank_mode.add_theme_color_override(&"font_color", Color8(244, 233, 207, 200))
+	column.add_child(_plank_mode)
+	_plank_time = Label.new()
+	_plank_time.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_plank_time.theme_type_variation = &"HudValue"
+	_plank_time.add_theme_font_size_override(&"font_size", 32)
+	_plank_time.add_theme_color_override(&"font_outline_color", Color(0, 0, 0, 0))
+	_plank_time.add_theme_color_override(&"font_shadow_color", Color8(26, 15, 10))
+	_plank_time.add_theme_constant_override(&"shadow_offset_x", 3)
+	_plank_time.add_theme_constant_override(&"shadow_offset_y", 3)
+	column.add_child(_plank_time)
+	add_child(_plank)
+	_plank.visible = false
+
+
+## Bananas you are carrying, big and gold, top left under your card.
+func _build_carry() -> void:
+	_carry = PanelContainer.new()
+	_carry.theme_type_variation = &"Glass"
+	_carry.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_carry.position = Vector2(20.0, 16.0)
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override(&"separation", 14)
+	_carry.add_child(row)
+	var banana := BananaIcon.new()
+	banana.custom_minimum_size = Vector2(40, 40)
+	banana.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	row.add_child(banana)
+	var column := VBoxContainer.new()
+	column.add_theme_constant_override(&"separation", 6)
+	row.add_child(column)
+	_carry_count = Label.new()
+	_carry_count.theme_type_variation = &"HudValue"
+	_carry_count.add_theme_font_size_override(&"font_size", 30)
+	_carry_count.add_theme_color_override(&"font_color", UiTheme.BANANA)
+	column.add_child(_carry_count)
+	var word := Label.new()
+	word.text = "CARRYING"
+	word.add_theme_font_override(&"font", UiTheme._font(UiTheme.FONT_DISPLAY))
+	word.add_theme_font_size_override(&"font_size", 10)
+	word.add_theme_color_override(&"font_color", UiTheme.INK)
+	column.add_child(word)
+	add_child(_carry)
+	_carry.visible = false
+
+
+## The mock's pixel banana: a stepped crescent with an ink edge.
+class BananaIcon extends Control:
+	func _draw() -> void:
+		var p := size.x / 10.0
+		var cells := [[7, 0], [8, 0], [6, 1], [7, 1], [5, 2], [6, 2], [4, 3], [5, 3], [2, 4], [3, 4], [4, 4],
+			[0, 5], [1, 5], [2, 5], [3, 5], [1, 6], [2, 6]]
+		for c in cells:
+			draw_rect(Rect2(c[0] * p - 2.0, c[1] * p + p - 2.0, p + 4.0, p + 4.0), UiTheme.OUTLINE)
+		for c in cells:
+			draw_rect(Rect2(c[0] * p, c[1] * p + p, p, p), Color8(247, 201, 72))
+		for c in [[7, 0], [6, 1], [5, 2], [4, 3], [2, 4]]:
+			draw_rect(Rect2(c[0] * p, c[1] * p + p, p, p * 0.5), Color8(255, 243, 176))
+
+
+func _update_plank() -> void:
+	# Shown from the countdown on, so the sign is up before GO.
+	var mode := ""
+	var seconds := -1.0
+	match Net.mode:
+		GameConfig.Mode.HOARD:
+			if _hoard != null:
+				mode = "BANANA RUSH"
+				seconds = _hoard.time_left if _hoard.is_running() else _hoard.round_seconds
+		GameConfig.Mode.SLAP:
+			if _slap != null:
+				mode = "2V2 SLAP"
+				var left: Variant = _slap.get(&"time_left")
+				seconds = float(left) if left != null else 0.0
+		GameConfig.Mode.RACE:
+			if _race != null:
+				mode = "RACE"
+				seconds = _race.elapsed
+	_plank.visible = seconds >= 0.0
+	if _plank.visible:
+		_plank_mode.text = mode
+		_plank_time.text = "%d:%02d" % [int(seconds) / 60, int(seconds) % 60]
+	var carrying := _player != null and is_instance_valid(_player) and Net.mode == GameConfig.Mode.HOARD and _hoard != null
+	_carry.visible = carrying
+	if _card != null:
+		_card.visible = not carrying
+	if carrying:
+		_carry_count.text = str(_player.bananas)
 
 
 ## Wraps the scene's Title and Info labels in a card with the monkey's face,
@@ -87,6 +232,7 @@ func _build_card() -> void:
 	_title.theme_type_variation = &"HudValue"
 	_info.theme_type_variation = &"HudLabel"
 	top.get_parent().add_child(card)
+	_card = card
 	top.queue_free()
 
 
@@ -102,7 +248,7 @@ func _build_key_strip() -> void:
 	strip.add_theme_constant_override(&"separation", 14)
 	strip.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	strip.modulate = Color(1, 1, 1, 0.85)
-	for pair in [["A D", "MOVE"], ["SPACE", "JUMP x2 / HOLD GRAB"], ["W S", "ARM IN / OUT"], ["S", "SLIDE"], ["LEFT CLICK", "PUNCH"], ["E", "SKILL"], ["ESC", "PAUSE"]]:
+	for pair in [["A D", "MOVE"], ["SPACE", "JUMP x2"], ["L / RIGHT CLICK", "HOLD TO SWING"], ["S", "DROP / SLIDE"], ["LEFT CLICK", "PUNCH"], ["E", "SKILL"], ["ESC", "PAUSE"]]:
 		var item := HBoxContainer.new()
 		item.add_theme_constant_override(&"separation", 6)
 		var chip := PanelContainer.new()
@@ -132,6 +278,81 @@ func _build_key_strip() -> void:
 	add_child(strip)
 
 
+func _build_skill_card() -> void:
+	_skill_card = PanelContainer.new()
+	_skill_card.theme_type_variation = &"Card"
+	_skill_card.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_skill_card.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
+	_skill_card.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+	_skill_card.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	_skill_card.offset_right = -18.0
+	_skill_card.offset_bottom = -52.0
+	_skill_card.custom_minimum_size = Vector2(250, 0)
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override(&"separation", 6)
+	_skill_card.add_child(box)
+	var top := HBoxContainer.new()
+	top.add_theme_constant_override(&"separation", 8)
+	box.add_child(top)
+	var key := Label.new()
+	key.text = "E"
+	key.theme_type_variation = &"HudValue"
+	key.add_theme_font_size_override(&"font_size", 14)
+	key.add_theme_color_override(&"font_color", UiTheme.BANANA)
+	top.add_child(key)
+	_skill_name = Label.new()
+	_skill_name.theme_type_variation = &"HudValue"
+	_skill_name.add_theme_font_size_override(&"font_size", 14)
+	_skill_name.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	top.add_child(_skill_name)
+	_skill_state = Label.new()
+	_skill_state.theme_type_variation = &"HudValue"
+	_skill_state.add_theme_font_size_override(&"font_size", 14)
+	top.add_child(_skill_state)
+	_skill_bar = ProgressBar.new()
+	_skill_bar.show_percentage = false
+	_skill_bar.max_value = 1.0
+	_skill_bar.custom_minimum_size = Vector2(0, 12)
+	var back := StyleBoxFlat.new()
+	back.bg_color = UiTheme.PANEL_HI
+	back.border_color = UiTheme.OUTLINE
+	back.set_border_width_all(2)
+	_skill_bar.add_theme_stylebox_override(&"background", back)
+	_skill_fill = StyleBoxFlat.new()
+	_skill_fill.bg_color = UiTheme.BANANA
+	_skill_bar.add_theme_stylebox_override(&"fill", _skill_fill)
+	box.add_child(_skill_bar)
+	add_child(_skill_card)
+
+
+## Fills as the skill recharges, in the skill's own colour, and pops when
+## it is ready again.
+func _update_skill_card() -> void:
+	if _skill_card == null:
+		return
+	_skill_card.visible = _player != null and is_instance_valid(_player) and _player.stats.skill_id != &""
+	if not _skill_card.visible:
+		return
+	var id := _player.stats.skill_id
+	var colour := SkillFx.colour_of(id)
+	_skill_name.text = SkillFx.name_of(id)
+	_skill_name.add_theme_color_override(&"font_color", colour)
+	_skill_fill.bg_color = colour
+	var left := _player.skill_timer
+	var total := maxf(_player.stats.skill_cooldown, left)
+	var cooling := left > 0.0
+	_skill_bar.value = 1.0 - (left / total if cooling and total > 0.0 else 0.0)
+	_skill_state.text = "%.1fs" % left if cooling else "READY"
+	_skill_state.add_theme_color_override(&"font_color", UiTheme.INK_DIM if cooling else UiTheme.LEAF)
+	_skill_card.modulate = Color(1, 1, 1, 0.8) if cooling else Color.WHITE
+	if _skill_was_cooling and not cooling:
+		_skill_card.pivot_offset = _skill_card.size * 0.5
+		var pop := _skill_card.create_tween()
+		pop.tween_property(_skill_card, "scale", Vector2.ONE * 1.12, 0.08)
+		pop.tween_property(_skill_card, "scale", Vector2.ONE, 0.16)
+	_skill_was_cooling = cooling
+
+
 func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed(&"debug_toggle"):
 		_debug = not _debug
@@ -146,6 +367,8 @@ func _process(delta: float) -> void:
 			_center.text = ""
 
 	_update_board()
+	_update_plank()
+	_update_skill_card()
 
 	if _player == null or not is_instance_valid(_player):
 		_title.text = "Monkey"
@@ -166,15 +389,11 @@ func _info_parts() -> PackedStringArray:
 	if _debug:
 		parts.append_array([_mode_text(), _state_text(_player.state), "%d px/s" % int(_player.velocity.length()), _skill_text()])
 	if _race != null and _race.is_running():
-		parts.append("%.1fs" % _race.elapsed)
 		parts.append("place %d of %d" % [_live_place(), _field_size()])
 	if _slap != null and _slap.is_running() and _player.team >= 0:
 		parts.append("TEAM %s" % GameConfig.TEAM_NAMES[_player.team].to_upper())
 		parts.append("%d DMG" % int(_player.slap_damage))
-		parts.append("%d:%02d" % [int(_slap.time_left) / 60, int(_slap.time_left) % 60])
 	if _hoard != null and _hoard.is_running():
-		parts.append("%d bananas" % _player.bananas)
-		parts.append("%d:%02d left" % [int(_hoard.time_left) / 60, int(_hoard.time_left) % 60])
 		if _player.ability != &"":
 			parts.append("%s %.1fs" % [String(_player.ability).replace("_", " "), _player.ability_timer])
 	return parts
@@ -185,16 +404,86 @@ func _info_parts() -> PackedStringArray:
 func _update_board() -> void:
 	var rows := _board_rows()
 	if rows.is_empty():
-		_board.text = ""
 		_board_card.visible = false
+		_board_sig = ""
 		return
 	_board_card.visible = true
 	rows.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return a["sort"] > b["sort"])
-	var lines: PackedStringArray = []
+	var sig := ""
+	for row in rows:
+		sig += "%s|%s|%s;" % [row["name"], row["detail"], row.get("you", false)]
+	if sig == _board_sig:
+		return
+	_board_sig = sig
+	for child in _board_list.get_children():
+		child.queue_free()
 	for index in rows.size():
-		var row: Dictionary = rows[index]
-		lines.append("%d. %s  %s" % [index + 1, row["name"], row["detail"]])
-	_board.text = "\n".join(lines)
+		_board_list.add_child(_board_row(index + 1, rows[index]))
+
+
+## One leaderboard line from the mock: rank chip, name, BOT tag, count.
+func _board_row(place: int, row: Dictionary) -> Control:
+	var you := bool(row.get("you", false))
+	var line := PanelContainer.new()
+	var back := StyleBoxFlat.new()
+	back.bg_color = Color(1, 1, 1, 0.08) if you else Color(0, 0, 0, 0)
+	back.content_margin_left = 4
+	back.content_margin_right = 6
+	back.content_margin_top = 3
+	back.content_margin_bottom = 3
+	line.add_theme_stylebox_override(&"panel", back)
+	line.custom_minimum_size = Vector2(290, 0)
+	var h := HBoxContainer.new()
+	h.add_theme_constant_override(&"separation", 10)
+	line.add_child(h)
+	var chip := PanelContainer.new()
+	var chip_box := StyleBoxFlat.new()
+	chip_box.bg_color = UiTheme.BANANA if place == 1 else UiTheme.NAVY_BTN
+	chip_box.content_margin_left = 7
+	chip_box.content_margin_right = 7
+	chip_box.content_margin_top = 4
+	chip_box.content_margin_bottom = 4
+	chip.add_theme_stylebox_override(&"panel", chip_box)
+	chip.add_child(_display(str(place), 11, UiTheme.INK_DARK if place == 1 else UiTheme.INK))
+	h.add_child(chip)
+	var name_label := _display(String(row["name"]).to_upper(), 13, UiTheme.BANANA if you else UiTheme.INK)
+	name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	name_label.clip_text = true
+	h.add_child(name_label)
+	if bool(row.get("bot", false)):
+		var tag := PanelContainer.new()
+		var tag_box := StyleBoxFlat.new()
+		tag_box.bg_color = Color8(36, 52, 110)
+		tag_box.content_margin_left = 5
+		tag_box.content_margin_right = 5
+		tag_box.content_margin_top = 3
+		tag_box.content_margin_bottom = 3
+		tag.add_theme_stylebox_override(&"panel", tag_box)
+		tag.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		tag.add_child(_display("BOT", 8, UiTheme.INK_DIM))
+		h.add_child(tag)
+	var count := _display(String(row["detail"]), 13, UiTheme.BANANA)
+	count.custom_minimum_size = Vector2(40, 0)
+	count.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	h.add_child(count)
+	return line
+
+
+func _is_bot(id: int) -> bool:
+	if id < 0:
+		return true
+	var entry: Variant = Net.roster.get(id)
+	return entry is Dictionary and bool((entry as Dictionary).get("bot", false))
+
+
+func _display(text: String, size: int, colour: Color) -> Label:
+	var label := Label.new()
+	label.text = text
+	label.add_theme_font_override(&"font", UiTheme._font(UiTheme.FONT_DISPLAY))
+	label.add_theme_font_size_override(&"font_size", size)
+	label.add_theme_color_override(&"font_color", colour)
+	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	return label
 
 
 func _board_rows() -> Array:
@@ -208,8 +497,8 @@ func _board_rows() -> Array:
 	var race_running := _race != null and _race.is_running()
 	if _slap != null and _slap.is_running():
 		return [
-			{"name": "TEAM %s" % GameConfig.TEAM_NAMES[0].to_upper(), "sort": 1.0, "detail": str(_slap.scores[0])},
-			{"name": "TEAM %s" % GameConfig.TEAM_NAMES[1].to_upper(), "sort": 0.0, "detail": str(_slap.scores[1])},
+			{"name": "TEAM %s" % GameConfig.TEAM_NAMES[0].to_upper(), "sort": 1.0, "detail": str(_slap.scores[0]), "you": _player != null and _player.team == 0},
+			{"name": "TEAM %s" % GameConfig.TEAM_NAMES[1].to_upper(), "sort": 0.0, "detail": str(_slap.scores[1]), "you": _player != null and _player.team == 1},
 		]
 	if not hoard_running and not race_running:
 		return []
@@ -219,14 +508,13 @@ func _board_rows() -> Array:
 		var player := (table as Dictionary)[id] as Player
 		if player == null:
 			continue
-		var label: String = player.display_label()
-		if int(id) == Net.local_id():
-			label += " (you)"
+		var you := int(id) == Net.local_id()
+		var label: String = "YOU" if you else player.display_label()
 		if hoard_running:
-			rows.append({"name": label, "sort": float(player.bananas), "detail": "%d" % player.bananas})
+			rows.append({"name": label, "sort": float(player.bananas), "detail": "%d" % player.bananas, "you": you, "bot": _is_bot(int(id))})
 		else:
 			var progress := _race.progress_of(int(id))
-			rows.append({"name": label, "sort": progress, "detail": ""})
+			rows.append({"name": label, "sort": progress, "detail": "", "you": you, "bot": _is_bot(int(id))})
 	return rows
 
 

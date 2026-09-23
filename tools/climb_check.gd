@@ -64,6 +64,7 @@ func _physics_process(_delta: float) -> void:
 			if _holding:
 				frame.press(InputFrame.Action.JUMP)
 		frame.jump_held = _holding
+		frame.grab_held = _holding
 		if _holding:
 			frame.move = Vector2(0, -1)
 	_player.feed_input(frame)
