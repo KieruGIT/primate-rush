@@ -115,8 +115,14 @@ Five is the target. Build **two first**, gorilla and gibbon, because they sit at
 
 ## 4. Movement System
 
-### Climb
-Contact with a climbable surface allows vertical movement at Climb speed. Jump off to redirect. Being hit knocks you off.
+### Jump and grab
+One button. Tap to jump, tap again in the air to double jump (a forward roll). Hold it in the air and the monkey grabs whatever is in reach; a tap never grabs. The button is the grip: let go of jump and you let go. There is no dash.
+
+### Momentum
+Speed above run speed is earned, not given: a jump from a run adds a small forward push, and a swing release carries its speed through the air. Jumping inside a short window after landing keeps that speed (bunny hop). Holding down on landing, or while running fast, slides.
+
+### Arm grab (trunks and cliff faces)
+There is no climbing mode. Held jump near a trunk or cliff face stretches the arm to the highest point of it in reach (never through solid ground, never below the shoulders) and the monkey swings from that point like a vine. Up/down hauls the arm in or out, at a speed set by the Climb stat. Letting go while swinging launches with the swing's speed; letting go while hanging still is a pull-up hop, so a cliff is climbed grab, haul in, let go, grab higher. Arm Length (orangutan 1.5) stretches the grab reach and the slap reach together. Being hit knocks you off.
 
 ### Swing
 Vine anchors placed by the level designer. Grab within radius, become a pendulum, release timing sets launch angle and speed. Swing stat controls momentum retention and air control. Chaining swings without touching ground is the mastery goal.

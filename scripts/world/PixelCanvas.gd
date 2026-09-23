@@ -124,8 +124,8 @@ func stamp_art(x: int, y: int, art: Array, ink: Callable, blend_to: Color, amoun
 ## A trunk: solid bark, a lit edge on the sun side, a dark one opposite,
 ## and notches that never line up into a column.
 func trunk(cx: int, top: int, bottom: int, thickness: int, bark: Color, behind: Color, notched: bool = true) -> void:
-	var light := bark.lightened(0.22)
-	var dark := bark.darkened(0.3)
+	var light := bark.lightened(0.22) if notched else bark.lerp(behind, 0.16)
+	var dark := bark.darkened(0.3) if notched else bark.darkened(0.10)
 	var left := cx - thickness / 2
 	for y in range(maxi(top, 0), mini(bottom, height)):
 		band(left, y, thickness, bark)

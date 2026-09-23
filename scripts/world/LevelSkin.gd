@@ -33,6 +33,9 @@ const COLUMNS: int = JungleTiles.COLUMNS
 
 ## How far apart torches stand along a ground, in world pixels.
 const TORCH_SPACING := Vector2(420.0, 760.0)
+## Grab-tree branch reach, world pixels.
+const BRANCH_LENGTH: float = 96.0
+const PANORAMA := "res://assets/environment/approved/jungle-panorama-px.png"
 
 ## Seed for decoration placement, so every machine in a match - and every
 ## run of the capture tool - grows the same trees in the same places.
@@ -155,29 +158,21 @@ func _draw() -> void:
 
 
 func _draw_depth_extrusion(rect: Rect2) -> void:
-	var offset := Vector2(12.0, 15.0)
-	var visible_depth := minf(rect.size.y, 42.0)
-	var top_right := Vector2(rect.end.x, rect.position.y)
-	var lower_right := Vector2(rect.end.x, rect.position.y + visible_depth)
-	var lower_left := Vector2(rect.position.x, rect.position.y + visible_depth)
-	# Right plane catches cool ambient shade; lower plane is deeper and gives
-	# every ledge a readable thickness against the sky and water.
-	draw_colored_polygon(PackedVector2Array([
-		top_right, top_right + offset, lower_right + offset, lower_right
-	]), Color(0.12, 0.15, 0.25, 0.68))
-	draw_colored_polygon(PackedVector2Array([
-		lower_left, lower_right, lower_right + offset, lower_left + offset
-	]), Color(0.075, 0.085, 0.16, 0.78))
-	draw_line(top_right + Vector2(2, 3), top_right + offset, Color(JunglePalette.SUN_RIM, 0.35), 2.0)
-	# Light comes down through the canopy, so the top edge of everything
-	# catches a warm rim. Two pixels of it is the difference between a shaded
-	# scene and a murky one.
-	draw_rect(Rect2(rect.position.x, rect.position.y - 2.0, rect.size.x, 2.0), Color(JunglePalette.SUN_RIM, 0.30))
+	# Side-view rock silhouettes, in whole art pixels. No extruded 3D plane.
+	if rect.size.y >= 60.0 or rect.size.y >= rect.size.x * 3.0:
+		return
+	var x := rect.position.x + 8.0
+	while x < rect.end.x - 12.0:
+		var tooth := 10.0 + float(posmod(int(x / 2.0), 5)) * 2.0
+		draw_rect(Rect2(x, rect.position.y + 16.0, 16.0, tooth), JunglePalette.DIRT_DARK)
+		draw_rect(Rect2(x + 2.0, rect.position.y + 16.0, 6.0, tooth - 2.0), JunglePalette.ROCK_COOL)
+		x += 28.0
 
 
 func _draw_ground(rect: Rect2) -> void:
-	# Grounds run down into the water so none floats in the sky.
-	var bottom := maxf(rect.end.y, _water_y + TILE)
+	# Keep the real collision silhouette: the reference uses suspended rock
+	# islands, so do not stretch every island into a solid wall down to water.
+	var bottom := rect.end.y
 	_row(JungleTiles.GRASS, rect.position.x, rect.size.x, rect.position.y)
 	var y := rect.position.y + TILE
 	var depth := 1
@@ -188,6 +183,17 @@ func _draw_ground(rect: Rect2) -> void:
 		depth += 1
 	_scatter_soil(rect, bottom)
 	_scatter_grass(rect)
+	_hanging_moss(rect)
+	draw_rect(Rect2(rect.position.x, bottom - 4.0, rect.size.x, 4.0), JunglePalette.OUTLINE)
+	var root_x := rect.position.x + 16.0
+	while root_x < rect.end.x - 16.0:
+		var root_length := 10 + posmod(int(root_x) * 3, 27)
+		for i in root_length:
+			var at := snap(Vector2(root_x + (2.0 if i > 9 else 0.0), bottom + i * 2.0))
+			draw_rect(Rect2(at, Vector2(4, 2)), JunglePalette.BARK_DARK)
+			if i < root_length - 3:
+				draw_rect(Rect2(at, Vector2(2, 2)), JunglePalette.MOSS)
+		root_x += 74.0
 
 
 ## Tufts standing up off a ground's grass line, at spacings unrelated to the
@@ -274,6 +280,23 @@ func _draw_ledge(rect: Rect2) -> void:
 		_blit(JungleTiles.LEDGE_SOLO, 0.0, rect.size.x / SCALE, SRC, Vector2(rect.position.x, rect.position.y))
 		return
 	_row(JungleTiles.LEDGE, rect.position.x, rect.size.x, rect.position.y)
+	_scatter_grass(rect)
+	_hanging_moss(rect)
+
+
+## Long moss fingers break the rock silhouette below the landing surface.
+func _hanging_moss(rect: Rect2) -> void:
+	var x := rect.position.x + 12.0
+	while x < rect.end.x - 8.0:
+		var run := 7 + posmod(int(x / 2.0) * 7, 19)
+		for i in run:
+			var at := snap(Vector2(x + (2.0 if i > run / 2 else 0.0), rect.position.y + 8.0 + i * 2.0))
+			var width := 6.0 if i < run / 2 else 4.0
+			draw_rect(Rect2(at, Vector2(width, 2)), JunglePalette.GRASS_DARK)
+			draw_rect(Rect2(at, Vector2(2, 2)), JunglePalette.MOSS if i > 4 else JunglePalette.GRASS)
+			if i % 6 == 2:
+				draw_rect(Rect2(at - Vector2(2, 0), Vector2(4, 2)), JunglePalette.GRASS)
+		x += 42.0 + float(posmod(int(x), 3)) * 8.0
 
 
 ## A three-slice row: left cap, repeated middle, right cap. Narrower than two
@@ -330,13 +353,9 @@ func _draw_water() -> void:
 	var width := right - left
 
 	draw_rect(Rect2(left, _water_y, width, 6.0), Color(JunglePalette.WATER_GLINT, 0.55))
-	draw_polygon(
-		PackedVector2Array([
-			Vector2(left, _water_y + 6.0), Vector2(right, _water_y + 6.0),
-			Vector2(right, _water_y + 620.0), Vector2(left, _water_y + 620.0)
-		]),
-		PackedColorArray([JunglePalette.WATER, JunglePalette.WATER, JunglePalette.WATER_DEEP, JunglePalette.WATER_DEEP])
-	)
+	for band in 20:
+		var tone := JunglePalette.WATER.lerp(JunglePalette.WATER_DEEP, float(band) / 19.0)
+		draw_rect(Rect2(left, _water_y + 6.0 + band * 32.0, width, 32.0), tone)
 	draw_rect(Rect2(left, _water_y + 620.0, width, 4000.0), JunglePalette.WATER_DEEP)
 	_draw_surface_glints(left, right)
 
@@ -358,7 +377,7 @@ func _draw_surface_glints(left: float, right: float) -> void:
 			var x := centre + rng.randf_range(-spread, spread) - w * 0.5
 			if x + w < left or x > right:
 				continue
-			draw_rect(Rect2(x, y, w, 3.0), Color(JunglePalette.WATER_GLINT, 0.30 * fade))
+			draw_rect(snap_rect(Rect2(x, y, w, 2.0)), Color(JunglePalette.WATER_GLINT, 0.30 * fade))
 
 
 # --- Decoration ----------------------------------------------------
@@ -374,11 +393,16 @@ func _plan_decor() -> void:
 		var x := rect.position.x + rng.randf_range(60.0, 200.0)
 		while x < rect.end.x - 120.0:
 			var roll := rng.randf()
-			if roll < 0.32:
+			if roll < 0.46:
+				# Grab trees: real world-space anchors in the swing system,
+				# spaced inside one arm-swing of each other so they chain.
 				var foot := Vector2(x, rect.position.y)
-				_decor.append([&"tree", foot, rng.randf() < 0.5, true])
-				_add_tree_climbable(foot, TILE * 3.6, TILE * 0.8)
-				x += rng.randf_range(260.0, 420.0)
+				var height := TILE * float(rng.randi_range(4, 6))
+				var side := -1.0 if rng.randf() < 0.5 else 1.0
+				_decor.append([&"tree", foot, rng.randf() < 0.5, true, side, height])
+				_add_tree_climbable(foot, height, TILE * 0.8)
+				_add_branch_climbable(foot, height, side)
+				x += rng.randf_range(220.0, 340.0)
 			elif roll < 0.50:
 				var foot := Vector2(x, rect.position.y)
 				_decor.append([&"palm", foot, rng.randf() < 0.5, true])
@@ -387,12 +411,12 @@ func _plan_decor() -> void:
 			else:
 				# Undergrowth sits in front of the player's feet, so it is
 				# drawn late and never hides a platform edge.
-				_decor.append([&"fern" if rng.randf() < 0.45 else &"shrub", Vector2(x, rect.position.y), rng.randf() < 0.5, false])
+				_decor.append([&"fern" if rng.randf() < 0.70 else &"shrub", Vector2(x, rect.position.y), rng.randf() < 0.5, false])
 				x += rng.randf_range(90.0, 200.0)
 	for rect in _thin:
 		if rect.size.x >= 180.0 and rng.randf() < 0.6:
 			var at := Vector2(rng.randf_range(rect.position.x + 30.0, rect.end.x - 60.0), rect.position.y)
-			_decor.append([&"shrub", at, rng.randf() < 0.5, false])
+			_decor.append([&"fern", at, rng.randf() < 0.5, false])
 
 
 ## Torches at intervals along a ground. Warm accents on a shaded jungle
@@ -419,21 +443,55 @@ func _add_tree_climbable(foot: Vector2, height: float, width: float) -> void:
 	add_child(climbable)
 
 
+## A branch sticking out near the top of a grab tree. Horizontal Climbable,
+## so the existing trunk-grab reach finds a hand-hold out over the gap.
+func _add_branch_climbable(foot: Vector2, height: float, side: float) -> void:
+	var climbable := CLIMBABLE_SCENE.instantiate() as Climbable
+	climbable.name = "BranchClimbable%d" % get_child_count()
+	climbable.position = snap(Vector2(foot.x + side * BRANCH_LENGTH * 0.5, foot.y - height + TILE * 1.5))
+	climbable.size = Vector2(BRANCH_LENGTH, 20.0)
+	climbable.draw_debug_face = false
+	add_child(climbable)
+
+
+## Bark arm with gold grip knots: the knots are the "you can grab this"
+## signal, never used on background canopy, so real anchors read at a glance.
+func _draw_branch(foot: Vector2, height: float, side: float) -> void:
+	var y := foot.y - height + TILE * 1.5
+	var x0 := foot.x if side > 0.0 else foot.x - BRANCH_LENGTH
+	var body := Rect2(snap(Vector2(x0, y - 6.0)), Vector2(BRANCH_LENGTH, 12.0))
+	draw_rect(body.grow(float(SCALE)), JunglePalette.OUTLINE)
+	draw_rect(body, JunglePalette.BARK)
+	draw_rect(Rect2(body.position, Vector2(body.size.x, float(SCALE) * 2.0)), JunglePalette.BARK_LIGHT)
+	draw_rect(Rect2(body.position + Vector2(0.0, body.size.y - float(SCALE)), Vector2(body.size.x, float(SCALE))), JunglePalette.BARK_DARK)
+	for k in [0.45, 0.9]:
+		var at := snap(Vector2(foot.x + side * BRANCH_LENGTH * k, y) - Vector2(4.0, 6.0))
+		draw_rect(Rect2(at - Vector2(float(SCALE), float(SCALE)), Vector2(12.0, 16.0)), JunglePalette.OUTLINE)
+		draw_rect(Rect2(at, Vector2(8.0, 12.0)), JunglePalette.BANANA_DARK)
+		draw_rect(Rect2(at, Vector2(8.0, 4.0)), JunglePalette.BANANA)
+	_prop(&"fern", Vector2(foot.x + side * BRANCH_LENGTH, y + 4.0), side < 0.0)
+
+
 func _draw_decor(item: Array) -> void:
 	var kind: StringName = item[0]
 	var foot: Vector2 = item[1]
 	var flip: bool = bool(item[2])
 	match kind:
 		&"tree":
-			var height := TILE * 3.0
+			var height: float = float(item[5]) if item.size() > 5 else TILE * 3.0
 			_trunk_column(foot, height)
 			_draw_climb_marks(foot, height)
+			if item.size() > 4:
+				_draw_branch(foot, height, float(item[4]))
 			_prop(&"crown_big", foot - Vector2(0.0, height), flip)
+			_prop(&"fern", foot - Vector2(0.0, height - 16.0), flip)
+			_prop(&"fern", foot + Vector2(22.0, 0.0), not flip, 1.0)
 		&"palm":
 			var tall := TILE * 5.5
 			_trunk_column(foot, tall)
 			_draw_climb_marks(foot, tall)
-			_prop(&"crown_small", foot - Vector2(0.0, tall), flip)
+			_prop(&"fern", foot - Vector2(0.0, tall), flip)
+			_prop(&"fern", foot - Vector2(8.0, tall - 10.0), not flip)
 		_:
 			_prop(kind, foot, flip, 1.0)
 
@@ -503,9 +561,15 @@ func _build_backdrop() -> void:
 	# Fractions of that reach, all inside the frame: a canopy placed a whole
 	# reach up sits exactly on the top edge and disappears the moment a map
 	# zooms out, which is how the arena ended up as a forest of bare trunks.
-	_band(&"far", Vector2(0.14, 0.09), eye - reach * 0.12, -30)
-	_band(&"mid", Vector2(0.34, 0.20), eye - reach * 0.38, -24)
-	_band(&"near", Vector2(0.62, 0.40), eye - reach * 0.75, -18)
+	# The approved painted panorama (baked to the art grid) is the far
+	# distance when present; the procedural far canopy is the fallback.
+	var has_panorama := _panorama_band(eye, reach)
+	if not has_panorama:
+		_band(&"far", Vector2(0.14, 0.0), eye - reach * 0.95, -30)
+		# The painted panorama already carries the middle distance; the teal
+		# procedural mid layer only fights its night palette.
+		_band(&"mid", Vector2(0.34, 0.0), eye - reach * 1.10, -24)
+	_band(&"near", Vector2(0.62, 0.0), eye - reach * 1.28, -18)
 
 
 ## Eye level: the spawn point if the map declares one, since that is where
@@ -530,6 +594,36 @@ func _camera_zoom() -> float:
 	return float(zoom) if zoom != null else 1.0
 
 
+## The approved jungle panorama, tiled as mirrored pairs so the seams match.
+## Scenery only: nothing here is collision or a grab anchor.
+func _panorama_band(eye: float, reach: float) -> bool:
+	var texture := MonkeySprite.load_art(PANORAMA)
+	if texture == null:
+		return false
+	var zoom := float(JungleBackdrop.ZOOM)
+	var width := texture.get_size().x * zoom
+	var plane := SnappedParallax.new()
+	plane.scroll_scale = Vector2(0.08, 0.0)
+	plane.span = width * 2.0
+	plane.anchor_y = eye
+	plane.z_index = -31
+	plane.z_as_relative = false
+	add_child(plane)
+	# Painted part starts ~0.6 reach above eye; the dark pad above covers
+	# zoomed-out arena cameras.
+	var top := eye - reach * 0.6 - 420.0 * zoom
+	for i in range(-2, 4):
+		var sprite := Sprite2D.new()
+		sprite.texture = texture
+		sprite.centered = false
+		sprite.flip_h = posmod(i, 2) == 1
+		sprite.scale = Vector2.ONE * zoom
+		sprite.position = snap(Vector2(i * width, top))
+		sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		plane.add_child(sprite)
+	return true
+
+
 ## One parallax plane carrying one baked layer, tiled across the level.
 ## `canopy_y` is where that layer's canopy line should sit in world space;
 ## the sprite's own top edge is worked back from it.
@@ -539,6 +633,7 @@ func _band(kind: StringName, scroll: Vector2, canopy_y: float, z: int) -> void:
 	var plane := SnappedParallax.new()
 	plane.scroll_scale = scroll
 	plane.span = span
+	plane.anchor_y = _eye_level()
 	plane.z_index = z
 	plane.z_as_relative = false
 	add_child(plane)
@@ -572,13 +667,17 @@ func _band(kind: StringName, scroll: Vector2, canopy_y: float, z: int) -> void:
 class SnappedParallax extends Node2D:
 	var scroll_scale: Vector2 = Vector2.ONE
 	var span: float = 1280.0
+	var anchor_y: float = 0.0
 
 	func _process(_delta: float) -> void:
 		var camera := get_viewport().get_camera_2d()
 		if camera == null:
 			return
-		var base := camera.get_screen_center_position() * (Vector2.ONE - scroll_scale)
-		base.x -= fposmod(base.x, span)
+		var eye := camera.get_screen_center_position()
+		# Keep copies near the camera while retaining each layer's scroll
+		# phase. Rounding the offset to a whole span erased the parallax and
+		# eventually left long maps outside the four copies altogether.
+		var base := Vector2(eye.x - fposmod(eye.x * scroll_scale.x, span), (eye.y - anchor_y) * (1.0 - scroll_scale.y))
 		position = LevelSkin.snap(base)
 
 

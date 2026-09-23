@@ -27,7 +27,7 @@ git pull --ff-only origin main
 if errorlevel 1 (
   echo.
   echo ============================================================
-  echo  Pull failed. Copy everything above and send it to Claude.
+  echo  Pull failed. Copy everything above and keep it for troubleshooting.
   echo  Do NOT run "reset --hard" - that is how work gets lost.
   echo ============================================================
   echo.

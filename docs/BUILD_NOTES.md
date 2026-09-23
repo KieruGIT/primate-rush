@@ -41,8 +41,14 @@ hardware.
    - running and jumping feel right, and a tapped jump is shorter than a held one
    - walking off a ledge and jumping late still jumps (coyote time)
    - jumping just before landing still jumps (jump buffer)
-   - pushing into the wall around x=2150 starts a climb, jump kicks you off it
-   - jumping into a vine grabs it, A/D pumps the swing, jump releases it
+   - a second jump press in the air double jumps
+   - holding jump near the wall around x=2150 stretches an arm to it and
+     swings; W hauls in, letting go of jump hops up off it
+   - holding jump into a vine grabs it (a tap does not), A/D pumps the
+     swing, letting go of jump releases it
+   - a slap shows the open hand and a SLAP! burst on contact
+   - landing fast off a swing and jumping straight away keeps the speed
+     (bunny hop); holding S on the landing slides instead
    - falling below the map respawns you at the last checkpoint after ~0.7s
 4. Switch to Race. Confirm the countdown freezes input, the timer runs, and
    crossing the finish gives a placement and a results screen.

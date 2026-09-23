@@ -1,0 +1,184 @@
+{
+  "characters": [
+    "Common monkey",
+    "Chimpanzee",
+    "Gorilla",
+    "Orangutan",
+    "Gibbon"
+  ],
+  "sheets": {
+    "locomotion": {
+      "file": "locomotion.png",
+      "x": [
+        0,
+        150,
+        275,
+        394,
+        508,
+        640,
+        765,
+        890,
+        1010,
+        1140,
+        1265,
+        1385,
+        1536
+      ],
+      "y": [
+        0,
+        208,
+        389,
+        580,
+        777,
+        1024
+      ]
+    },
+    "traversal": {
+      "file": "traversal-reactions.png",
+      "x": [
+        0,
+        150,
+        285,
+        425,
+        565,
+        700,
+        830,
+        974,
+        1110,
+        1270,
+        1400,
+        1536
+      ],
+      "y": [
+        0,
+        208,
+        387,
+        582,
+        783,
+        1024
+      ]
+    },
+    "approved": {
+      "file": "approved-design.png",
+      "x": [
+        0,
+        168,
+        325,
+        480,
+        634,
+        785,
+        940,
+        1091,
+        1250,
+        1410,
+        1536
+      ],
+      "y": [
+        0,
+        200,
+        389,
+        577,
+        776,
+        1024
+      ]
+    }
+  },
+  "animations": [
+    {
+      "name": "Idle",
+      "sheet": "locomotion",
+      "frames": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "fps": 4
+    },
+    {
+      "name": "Walk",
+      "sheet": "locomotion",
+      "frames": [
+        4,
+        5,
+        6,
+        7
+      ],
+      "fps": 6
+    },
+    {
+      "name": "Run",
+      "sheet": "locomotion",
+      "frames": [
+        8,
+        9,
+        10,
+        11
+      ],
+      "fps": 9
+    },
+    {
+      "name": "Jump / landing",
+      "sheet": "traversal",
+      "frames": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "fps": 5
+    },
+    {
+      "name": "Climb",
+      "sheet": "traversal",
+      "frames": [
+        4,
+        5,
+        6,
+        5
+      ],
+      "fps": 5
+    },
+    {
+      "name": "Hit reaction",
+      "sheet": "traversal",
+      "frames": [
+        7,
+        8,
+        9,
+        10
+      ],
+      "fps": 5
+    },
+    {
+      "name": "Double-jump roll (approved)",
+      "sheet": "approved",
+      "frames": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "fps": 8
+    },
+    {
+      "name": "Slap (approved)",
+      "sheet": "approved",
+      "frames": [
+        5,
+        6,
+        7,
+        8
+      ],
+      "fps": 8
+    },
+    {
+      "name": "Separate grab arm (approved)",
+      "sheet": "approved",
+      "frames": [
+        9
+      ],
+      "fps": 1
+    }
+  ]
+}

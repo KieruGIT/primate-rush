@@ -19,30 +19,30 @@ extends RefCounted
 
 # --- Sky and air ---------------------------------------------------
 ## What little sky shows through the canopy: hazy, bright, washed out.
-const SKY_HIGH := Color8(126, 214, 198)
-const SKY_LOW := Color8(176, 232, 198)
+const SKY_HIGH := Color8(19, 57, 83)
+const SKY_LOW := Color8(66, 139, 155)
 ## The haze the far jungle sits in. Everything distant fades toward this.
-const HAZE := Color8(108, 178, 166)
+const HAZE := Color8(48, 111, 137)
 ## A shaft of sun coming down through a gap in the leaves.
-const SUNSHAFT := Color8(228, 248, 190)
+const SUNSHAFT := Color8(139, 193, 190)
 
 # --- Foliage, back to front ----------------------------------------
 # Four depths. Each one is darker, greener and more detailed than the one
 # behind it - that progression is the whole illusion of a deep jungle.
-const CANOPY_FAR := Color8(74, 150, 136)
-const CANOPY_MID := Color8(46, 118, 96)
-const CANOPY_NEAR := Color8(30, 84, 64)
-const CANOPY_FRAME := Color8(16, 48, 40)
+const CANOPY_FAR := Color8(31, 87, 112)
+const CANOPY_MID := Color8(21, 65, 76)
+const CANOPY_NEAR := Color8(16, 45, 48)
+const CANOPY_FRAME := Color8(7, 24, 31)
 
-const LEAF := Color8(58, 158, 92)
-const LEAF_DARK := Color8(30, 92, 62)
-const LEAF_LIGHT := Color8(138, 214, 96)
+const LEAF := Color8(70, 125, 57)
+const LEAF_DARK := Color8(30, 72, 49)
+const LEAF_LIGHT := Color8(133, 174, 63)
 ## Where sun catches the very top of a leaf cluster.
-const LEAF_SUN := Color8(190, 236, 118)
+const LEAF_SUN := Color8(190, 210, 95)
 
-const BARK := Color8(74, 53, 38)
-const BARK_LIGHT := Color8(122, 86, 52)
-const BARK_DARK := Color8(46, 32, 24)
+const BARK := Color8(78, 57, 50)
+const BARK_LIGHT := Color8(136, 99, 64)
+const BARK_DARK := Color8(42, 34, 40)
 
 # --- Terrain -------------------------------------------------------
 # The platform palette, top to bottom. Read the list downward and you have
@@ -51,17 +51,19 @@ const BARK_DARK := Color8(46, 32, 24)
 
 ## The one dark line that goes round every solid thing in the game. A single
 ## shared outline colour is most of what makes a tileset look like a set.
-const OUTLINE := Color8(22, 30, 28)
+const OUTLINE := Color8(12, 20, 29)
 
-const GRASS_SUN := Color8(158, 220, 92)
-const GRASS := Color8(86, 170, 74)
-const GRASS_DARK := Color8(46, 112, 60)
+const GRASS_SUN := Color8(194, 214, 91)
+const GRASS := Color8(116, 158, 54)
+const GRASS_DARK := Color8(49, 99, 52)
 ## The fringe hanging under a platform's lip.
-const MOSS := Color8(58, 132, 66)
+const MOSS := Color8(70, 123, 57)
 
-const DIRT := Color8(104, 68, 44)
-const DIRT_LIGHT := Color8(138, 96, 60)
-const DIRT_DARK := Color8(64, 41, 28)
+const DIRT := Color8(84, 60, 66)
+const DIRT_LIGHT := Color8(137, 99, 72)
+const DIRT_DARK := Color8(44, 35, 49)
+const ROCK_MID := Color8(103, 76, 78)
+const ROCK_COOL := Color8(61, 53, 72)
 
 
 ## Multiplied over the Kenney tiles. Barely tinted: this is shade, not night,
@@ -73,9 +75,9 @@ const DEPTH_TINT := Color(0.42, 0.44, 0.46)
 const SUN_RIM := Color8(198, 236, 152)
 
 # --- Water ---------------------------------------------------------
-const WATER := Color8(46, 134, 138)
-const WATER_DEEP := Color8(18, 62, 74)
-const WATER_GLINT := Color8(158, 226, 212)
+const WATER := Color8(37, 105, 130)
+const WATER_DEEP := Color8(12, 37, 59)
+const WATER_GLINT := Color8(143, 205, 210)
 
 # --- Light ---------------------------------------------------------
 # The warm end of the palette. A flame is drawn as three stacked circles -

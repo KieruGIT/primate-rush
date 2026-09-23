@@ -47,6 +47,8 @@ button, which keeps the phone layout down to a stick and two buttons.
 | Feature | State |
 |---|---|
 | Run, jump, coyote time, jump buffer, variable jump height | done |
+| Double jump (roll); hold jump to grab, release to let go; stretchy-arm trunk swing | done |
+| Momentum: jump push, swing carry, bunny hop, slide (no dash) | done |
 | Climb on climbable surfaces, wall jump off them | done |
 | Vine swing: pendulum, pumping, rope length, timed release | done |
 | Normal attack, randomized slap/punch/kick flavor | done |

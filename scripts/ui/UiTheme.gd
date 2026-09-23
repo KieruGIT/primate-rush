@@ -23,24 +23,37 @@ const FONT_DISPLAY := "res://assets/kenney_ui-pack/Font/Kenney Future.ttf"
 const FONT_UI := "res://assets/kenney_ui-pack/Font/Kenney Future Narrow.ttf"
 
 # --- Palette -------------------------------------------------------
-# Jungle at night: dark green-black behind, warm banana for whatever the
-# player should press first, leaf green for "this one is selected".
+# Primate Rush key art (output/ui-concepts/primate-rush-ui-v1.png): dark
+# navy night, jade for "selected", gold for the thing to press, carved wood
+# for navigation, mossy stone for frames. Chunky pixel blocks, not glossy.
 
-const CANVAS := Color(0.055, 0.078, 0.067)      # the screen behind everything
-const PANEL := Color(0.098, 0.133, 0.114)       # a card or a grouped block
-const PANEL_HI := Color(0.133, 0.180, 0.153)    # a card that is selected
-const EDGE := Color(0.204, 0.278, 0.231)        # panel borders and dividers
-const INK := Color(0.918, 0.945, 0.910)         # primary text
-const INK_DIM := Color(0.596, 0.659, 0.616)     # secondary text
-const INK_DARK := Color(0.157, 0.180, 0.129)    # text on yellow and on grey
-const BANANA := Color(1.0, 0.800, 0.0)          # primary action
-const LEAF := Color(0.278, 0.788, 0.478)        # selected, good news
-const SKY := Color(0.243, 0.678, 0.898)         # neutral action
-const CORAL := Color(0.941, 0.302, 0.376)       # leave, locked, bad news
+const CANVAS := Color8(11, 16, 36)              # the screen behind everything
+const PANEL := Color8(17, 24, 48)               # a card or a grouped block
+const PANEL_HI := Color8(27, 38, 72)            # a card that is selected
+const EDGE := Color8(58, 92, 62)                # mossy stone frame
+const INK := Color8(244, 233, 207)              # primary text (cream)
+const INK_DIM := Color8(159, 180, 232)          # secondary text (moon blue)
+const INK_DARK := Color8(26, 15, 10)            # text on gold and on stone
+const BANANA := Color8(255, 200, 58)            # primary action (gold)
+const LEAF := Color8(69, 179, 107)              # selected, good news (jade)
+const SKY := Color8(58, 123, 213)               # neutral action
+const CORAL := Color8(224, 80, 74)              # leave, locked, bad news
+const WOOD := Color8(138, 90, 46)               # carved-wood navigation
+const OUTLINE := Color8(10, 8, 14)              # every edge
 
-# Corner radius shared by every flat box, so panels and bars visibly belong
-# to the same set even though the buttons come from a texture pack.
-const RADIUS := 10
+# Pixel-art corners: nearly square, so boxes sit with the sprites.
+const RADIUS := 3
+
+## Face, lip (the darker 3D bottom) for each button colour the screens ask
+## for. Names are the Kenney pack's, kept so no screen needs to change.
+const BUTTON_COLORS := {
+	"Yellow": [Color8(255, 200, 58), Color8(196, 128, 18)],
+	"Green": [Color8(79, 154, 58), Color8(40, 96, 34)],
+	"Blue": [Color8(42, 58, 104), Color8(20, 28, 58)],
+	"Red": [Color8(224, 80, 74), Color8(150, 40, 38)],
+	"Grey": [Color8(88, 94, 118), Color8(44, 48, 66)],
+	"Wood": [Color8(138, 90, 46), Color8(84, 52, 26)],
+}
 
 # Nine-patch margins for the pack's 192x64 rectangle buttons. The bottom is
 # larger than the top because the "depth" variants carry a shadow lip there
@@ -109,13 +122,13 @@ static func _build_buttons(theme: Theme) -> void:
 	_button_set(theme, &"Button", "Blue", INK, INK)
 	_button_variation(theme, &"PrimaryButton", "Yellow", INK_DARK, 22)
 	_button_variation(theme, &"DangerButton", "Red", INK, 18)
-	_button_variation(theme, &"QuietButton", "Grey", INK_DARK, 16)
+	_button_variation(theme, &"QuietButton", "Wood", INK, 16)
 	# The one button a menu is built around. Big enough to find with a thumb
 	# without looking, which on a phone is the only way anyone presses it.
 	_button_variation(theme, &"PlayButton", "Yellow", Color.WHITE, 46)
 	theme.set_font(&"font", &"PlayButton", _font(FONT_DISPLAY))
-	_button_variation(theme, &"NavButton", "Blue", Color.WHITE, 22)
-	_button_variation(theme, &"GoButton", "Green", Color.WHITE, 24)
+	_button_variation(theme, &"NavButton", "Wood", Color.WHITE, 22)
+	_button_variation(theme, &"GoButton", "Yellow", Color.WHITE, 24)
 	# Game buttons read like game buttons: white type with a thick dark
 	# outline, legible on any colour of button and any background.
 	for type in [&"PlayButton", &"NavButton", &"GoButton", &"DangerButton", &"PrimaryButton"]:
@@ -142,11 +155,11 @@ static func _build_buttons(theme: Theme) -> void:
 static func _build_tiles(theme: Theme) -> void:
 	theme.add_type(&"TileButton")
 	theme.set_type_variation(&"TileButton", &"Button")
-	var rest := _flat(Color(0.04, 0.08, 0.07, 0.78), Color(1, 1, 1, 0.16), 18)
-	var hover := _flat(Color(0.07, 0.12, 0.10, 0.85), Color(1, 1, 1, 0.3), 18)
+	var rest := _flat(Color(PANEL, 0.88), EDGE, 18)
+	var hover := _flat(Color(PANEL_HI, 0.92), LEAF, 18)
 	var chosen := _flat(PANEL_HI, BANANA, 18)
 	chosen.set_border_width_all(5)
-	var off := _flat(Color(0.04, 0.06, 0.05, 0.45), Color(1, 1, 1, 0.08), 18)
+	var off := _flat(Color(PANEL, 0.45), Color(EDGE, 0.4), 18)
 	theme.set_stylebox(&"normal", &"TileButton", rest)
 	theme.set_stylebox(&"hover", &"TileButton", hover)
 	theme.set_stylebox(&"pressed", &"TileButton", chosen)
@@ -170,14 +183,14 @@ static func _button_set(theme: Theme, type: StringName, color: String, ink: Colo
 	var held := on_color if not on_color.is_empty() else color
 	var normal := _button_box(color, "depth_gloss")
 	var hover := _button_box(color, "depth_gloss")
-	hover.modulate_color = Color(1.14, 1.14, 1.14)
+	(hover as StyleBoxFlat).bg_color = (hover as StyleBoxFlat).bg_color.lightened(0.12)
 	# Pressed drops the depth lip and pushes the text down by the height of
 	# that lip, so the button reads as having physically gone in.
 	var pressed := _button_box(held, "gloss")
 	pressed.content_margin_top = 18.0
 	pressed.content_margin_bottom = 14.0
 	var disabled := _button_box("Grey", "depth_flat")
-	disabled.modulate_color = Color(1.0, 1.0, 1.0, 0.55)
+	(disabled as StyleBoxFlat).bg_color.a = 0.55
 
 	theme.set_stylebox(&"normal", type, normal)
 	theme.set_stylebox(&"hover", type, hover)
@@ -196,20 +209,35 @@ static func _button_set(theme: Theme, type: StringName, color: String, ink: Colo
 	theme.set_constant(&"h_separation", type, 10)
 
 
+## Chunky pixel button: flat face, dark outline, a thick darker lip along
+## the bottom for depth. "gloss" (pressed) drops the lip so it reads pushed.
 static func _button_box(color: String, style: String) -> StyleBox:
-	var texture := _texture("%s/%s/Default/button_rectangle_%s.png" % [PACK, color, style])
-	if texture == null:
-		return _flat(PANEL_HI, EDGE)
-	var box := StyleBoxTexture.new()
-	box.texture = texture
-	box.texture_margin_left = BTN_MARGIN_SIDE
-	box.texture_margin_right = BTN_MARGIN_SIDE
-	box.texture_margin_top = BTN_MARGIN_TOP
-	box.texture_margin_bottom = BTN_MARGIN_BOTTOM
+	var pair: Array = BUTTON_COLORS.get(color, BUTTON_COLORS["Blue"])
+	var box := StyleBoxFlat.new()
+	box.bg_color = pair[0]
+	box.border_color = OUTLINE
+	box.set_corner_radius_all(RADIUS)
+	box.set_border_width_all(3)
+	var pressed := style == "gloss"
+	box.anti_aliasing = false
 	box.content_margin_left = 18.0
 	box.content_margin_right = 18.0
 	box.content_margin_top = 12.0
-	box.content_margin_bottom = 20.0
+	box.content_margin_bottom = 12.0
+	if not pressed:
+		# StyleBoxFlat has one border colour, so the lip is the bottom border
+		# in the darker tone, with a thin outline kept on the other sides.
+		box.border_color = pair[1]
+		box.border_width_bottom = 8
+		box.border_width_left = 2
+		box.border_width_right = 2
+		box.border_width_top = 2
+		box.expand_margin_bottom = 0.0
+		box.content_margin_bottom = 16.0
+	else:
+		box.border_color = pair[1]
+		box.set_border_width_all(2)
+		box.content_margin_top = 16.0
 	return box
 
 
@@ -246,21 +274,23 @@ static func _build_panels(theme: Theme) -> void:
 	# the jungle rather than over a flat colour.
 	theme.add_type(&"Glass")
 	theme.set_type_variation(&"Glass", &"PanelContainer")
-	theme.set_stylebox(&"panel", &"Glass", _flat(Color(0.03, 0.06, 0.05, 0.62), Color(1, 1, 1, 0.12), 16))
+	theme.set_stylebox(&"panel", &"Glass", _flat(Color(PANEL, 0.86), EDGE, 16))
 
 	# Overlays sit on top of the running game, so they need a background dark
 	# enough to read against a bright level and no border to fight with it.
 	theme.add_type(&"Overlay")
 	theme.set_type_variation(&"Overlay", &"PanelContainer")
-	theme.set_stylebox(&"panel", &"Overlay", _flat(Color(0.031, 0.047, 0.039, 0.82), Color(0, 0, 0, 0), 14))
+	theme.set_stylebox(&"panel", &"Overlay", _flat(Color(CANVAS, 0.88), EDGE, 14))
 
 
 static func _flat(fill: Color, border: Color, radius: int = RADIUS) -> StyleBoxFlat:
 	var box := StyleBoxFlat.new()
 	box.bg_color = fill
 	box.border_color = border
-	box.set_border_width_all(2 if border.a > 0.0 else 0)
-	box.set_corner_radius_all(radius)
+	box.set_border_width_all(3 if border.a > 0.0 else 0)
+	# Pixel look: the old 10-18px rounded glass becomes near-square blocks.
+	box.set_corner_radius_all(mini(radius, RADIUS))
+	box.anti_aliasing = false
 	box.set_content_margin_all(14.0)
 	return box
 
@@ -284,7 +314,7 @@ static func _build_inputs(theme: Theme) -> void:
 	theme.set_color(&"selection_color", &"LineEdit", Color(SKY.r, SKY.g, SKY.b, 0.45))
 	theme.set_font_size(&"font_size", &"LineEdit", 16)
 
-	var track := _flat(Color(0.04, 0.06, 0.05), EDGE, 8)
+	var track := _flat(CANVAS, EDGE, 8)
 	track.set_content_margin_all(0.0)
 	track.content_margin_top = 6.0
 	track.content_margin_bottom = 6.0
@@ -310,7 +340,7 @@ static func _build_inputs(theme: Theme) -> void:
 # --- Meters --------------------------------------------------------
 
 static func _build_bars(theme: Theme) -> void:
-	var back := _flat(Color(0.04, 0.06, 0.05), EDGE, 6)
+	var back := _flat(CANVAS, EDGE, 6)
 	back.set_content_margin_all(0.0)
 	var fill := _flat(LEAF, Color(0, 0, 0, 0), 6)
 	fill.set_content_margin_all(0.0)
@@ -331,7 +361,7 @@ static func _build_bars(theme: Theme) -> void:
 static func _build_scroll(theme: Theme) -> void:
 	theme.set_stylebox(&"panel", &"ScrollContainer", StyleBoxEmpty.new())
 	for axis in [&"VScrollBar", &"HScrollBar"]:
-		var track := _flat(Color(0.04, 0.06, 0.05, 0.6), Color(0, 0, 0, 0), 6)
+		var track := _flat(Color(CANVAS, 0.6), Color(0, 0, 0, 0), 6)
 		track.set_content_margin_all(0.0)
 		theme.set_stylebox(&"scroll", axis, track)
 		var grab := _flat(EDGE, Color(0, 0, 0, 0), 6)

@@ -33,10 +33,6 @@ window/size/viewport_width=1280
 window/size/viewport_height=720
 window/stretch/mode="canvas_items"
 window/stretch/aspect="expand"
-; Without these the canvas is scaled by a float on any window that is not
-; exactly 1280x720, and an art pixel lands across a screen pixel boundary.
-; "integer" scales by whole numbers and letterboxes the remainder; the snap
-; settings keep nodes and vertices on whole pixels once it has.
 window/stretch/scale_mode="integer"
 window/handheld/orientation=1
 
@@ -112,13 +108,9 @@ debug_toggle={
 
 [rendering]
 
-; Godot defaults canvas textures to LINEAR filtering, so every node that does
-; not override it is bilinearly blurred. For pixel art that smears each edge
-; across two screen pixels, and nothing in the scene tree mentions it, so it
-; never shows up in review.
 textures/canvas_textures/default_texture_filter=0
-2d/snap/snap_2d_transforms_to_pixel=true
-2d/snap/snap_2d_vertices_to_pixel=true
 renderer/rendering_method="gl_compatibility"
 renderer/rendering_method.mobile="gl_compatibility"
 textures/vram_compression/import_etc2_astc=true
+2d/snap/snap_2d_transforms_to_pixel=true
+2d/snap/snap_2d_vertices_to_pixel=true

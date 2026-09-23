@@ -53,8 +53,13 @@ var _passing_through: bool = false
 ## few seconds lets go anyway: hanging forever is the one failure a swing
 ## must never have.
 var _swing_time: float = 0.0
-## 2v2: one recovery dash per trip off the island.
-var _recovery_dashed: bool = false
+## The vine just let go of, and how long to leave it alone. Without it a
+## bot dropping to a target below re-takes the same vine, forever. Only
+## that vine: the next one in a chain is fair game at once.
+var _left_vine: Node2D = null
+var _no_grab_time: float = 0.0
+## 2v2: one recovery double jump per trip off the island.
+var _recovery_jumped: bool = false
 
 
 func think(player: Player, arena: Node, delta: float) -> InputFrame:
@@ -83,6 +88,14 @@ func think(player: Player, arena: Node, delta: float) -> InputFrame:
 		# a tapped jump is a short hop and bots need the full arc to clear
 		# the gaps the level designer built for a full arc.
 		_jump_hold = 0.24
+		frame.jump_held = true
+	elif player.state == Player.State.SWING:
+		# The button is the grip: keep holding until it is time to let go.
+		frame.jump_held = not _should_release(player, to_target)
+		if not frame.jump_held and not player.swing_on_trunk:
+			_left_vine = player.get(&"_swing_node") as Node2D
+			_no_grab_time = 0.6
+	elif not player.is_on_floor() and _wants_grab(player, to_target):
 		frame.jump_held = true
 
 	var victim := _nearest_opponent(player, arena)
@@ -128,6 +141,7 @@ func _aim(player: Player, arena: Node, delta: float) -> Vector2:
 
 func _tick_cooldowns(delta: float) -> void:
 	_jump_hold = maxf(_jump_hold - delta, 0.0)
+	_no_grab_time = maxf(_no_grab_time - delta, 0.0)
 	_attack_cooldown = maxf(_attack_cooldown - delta, 0.0)
 	_skill_cooldown = maxf(_skill_cooldown - delta, 0.0)
 
@@ -283,22 +297,18 @@ func _steer(player: Player, to_target: Vector2) -> Vector2:
 	if _unstick_dir != 0.0:
 		move.x = _unstick_dir
 
-	# Vertical intent drives climbing and rope length, both of which are
-	# contextual in Player. The bot just says "up" and lets the monkey
-	# decide whether that means a wall or a vine.
-	if to_target.y < -60.0:
-		move.y = -1.0
-	elif player.state == Player.State.CLIMB and to_target.y < 4.0:
-		# On a wall, keep going until level with the target. Stopping at
-		# "roughly level" leaves a bot hanging just under the lip.
-		move.y = -1.0
-	if player.state == Player.State.CLIMB and to_target.y < -10.0:
-		# Straight up until above the target, then step off toward it. A
-		# sideways push mid-climb peels the bot off the wall early and drops
-		# it beside the ledge it was climbing to.
+	if player.state == Player.State.SWING and player.swing_on_trunk:
+		# Hanging off a trunk by the arm: haul in, then lean toward the
+		# target for the hop that letting go turns into.
+		move.y = -1.0 if to_target.y < -30.0 else 0.0
 		move.x = 0.0
-
-	if player.state == Player.State.SWING:
+		if _pulled_in(player):
+			# Still well below the target: lean into the trunk, which turns
+			# the release hop straight up. Nearly level: lean at the target.
+			var trunk := player.get(&"_swing_node") as Node2D
+			var toward_trunk := signf(trunk.global_position.x - player.global_position.x) if trunk != null else 0.0
+			move.x = toward_trunk if to_target.y < -60.0 else signf(to_target.x)
+	elif player.state == Player.State.SWING:
 		move.y = 0.0
 		move.x = _pump(player, to_target)
 	if Net.mode == GameConfig.Mode.SLAP and player.is_on_floor() and absf(move.x) > 0.1:
@@ -325,16 +335,6 @@ func _pump(player: Player, to_target: Vector2) -> float:
 func _should_jump(player: Player, to_target: Vector2) -> bool:
 	if _jump_hold > 0.0:
 		return false
-	if player.state == Player.State.SWING:
-		# Target below: drop to it. Otherwise release on the forward arc,
-		# which is where a release turns into distance. And never hang on.
-		# Drop only when there is something under to land on, and never
-		# hang on for more than a few seconds whatever is below.
-		if to_target.y > 70.0 and _ray(player, player.global_position, player.global_position + Vector2(0.0, 500.0)):
-			return true
-		if _swing_time > 4.0:
-			return true
-		return player.velocity.x * signf(to_target.x) > 260.0
 	if not player.is_on_floor():
 		return false
 	# A spring only fires for a monkey landing on it or walking over it. A
@@ -363,11 +363,51 @@ func _should_jump(player: Player, to_target: Vector2) -> bool:
 	return false
 
 
-## Knocked off the island: head for the middle, and spend the air dash on
-## the way back up. Returns null while there is ground below to land on.
+## When to let go of the grip. On a vine: target below, drop to it;
+## otherwise on the forward arc, which is where a release turns into
+## distance. On a trunk: once hauled in, so the release is a pull-up hop.
+## And never hang on for more than a few seconds, whatever is below.
+func _should_release(player: Player, to_target: Vector2) -> bool:
+	if _swing_time > 4.0:
+		return true
+	if player.swing_on_trunk:
+		if to_target.y < -30.0:
+			return _pulled_in(player)
+		return true
+	if _drop_to(player, to_target):
+		return true
+	return player.velocity.x * signf(to_target.x) > 260.0
+
+
+## The target is under the vine: let go and fall onto it. A target below
+## but well off to the side is swung toward instead - dropping straight
+## down there lands in the gap between.
+func _drop_to(player: Player, to_target: Vector2) -> bool:
+	return to_target.y > 70.0 and absf(to_target.x) < 120.0 		and _ray(player, player.global_position, player.global_position + Vector2(0.0, 500.0))
+
+
+## Grabbing is jump held in the air. A bot holds it when there is a vine in
+## reach, or when the target is above and a trunk is how to get there.
+## Holding for every whole flight would grab each pillar it passes.
+func _wants_grab(player: Player, to_target: Vector2) -> bool:
+	for area in player.vine_sensor.get_overlapping_areas():
+		# A vine it would only drop straight off again is not worth taking.
+		if _drop_to(player, to_target):
+			break
+		if _no_grab_time <= 0.0 or area != _left_vine:
+			return true
+	return to_target.y < -40.0 and _no_grab_time <= 0.0
+
+
+func _pulled_in(player: Player) -> bool:
+	return float(player.get(&"_swing_length")) <= player.swing_min_length + 6.0
+
+
+## Knocked off the island: head for the middle, and spend the double jump
+## on the way back up. Returns null while there is ground below to land on.
 func _recover(player: Player) -> InputFrame:
-	if player.is_on_floor() or player.state == Player.State.CLIMB:
-		_recovery_dashed = false
+	if player.is_on_floor() or player.state == Player.State.SWING:
+		_recovery_jumped = false
 		return null
 	if _ray(player, player.global_position, player.global_position + Vector2(0.0, 900.0)):
 		return null
@@ -375,9 +415,12 @@ func _recover(player: Player) -> InputFrame:
 	var home := Vector2(-signf(player.global_position.x), -0.8).normalized()
 	frame.move = home
 	frame.sprint_held = true
-	if not _recovery_dashed and player.velocity.y > -100.0:
-		frame.press(InputFrame.Action.DASH)
-		_recovery_dashed = true
+	# Held, so the double jump rises its full height and grabs any trunk
+	# or vine it reaches on the way back.
+	frame.jump_held = true
+	if not _recovery_jumped and player.velocity.y > -100.0:
+		frame.press(InputFrame.Action.JUMP)
+		_recovery_jumped = true
 	return frame
 
 

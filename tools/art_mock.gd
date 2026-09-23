@@ -28,8 +28,8 @@ const SETTLE_FRAMES: int = 20
 ## right as a sentence: walking in, winding up, taking it.
 const CAST := [
 	{"id": &"macaque", "pose": &"run_1", "at": Vector2(-210.0, 0.0), "flip": false},
-	{"id": &"gorilla", "pose": &"punch", "at": Vector2(30.0, 0.0), "flip": false},
-	{"id": &"capuchin", "pose": &"stun", "at": Vector2(150.0, 0.0), "flip": true},
+	{"id": &"gorilla", "pose": &"punch_2", "at": Vector2(30.0, 0.0), "flip": false},
+	{"id": &"capuchin", "pose": &"stun_1", "at": Vector2(150.0, 0.0), "flip": true},
 ]
 
 

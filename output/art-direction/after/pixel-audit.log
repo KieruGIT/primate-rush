@@ -1,0 +1,9 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+ERROR: Failed to read the root certificate store.
+   at: get_system_ca_certificates (platform/windows/os_windows.cpp:2582)
+RevenueCat singleton absent - store features run in stub mode.
+shot_art_drawn_z1.png   1280x720   edges=6886    best block=2 (97% aligned)   all=[1:1.00 2:0.97 3:0.31 4:0.47 5:0.21 6:0.30 7:0.15 8:0.23]
+shot_game_a.png         1280x720   edges=7632    best block=2 (88% aligned)   all=[1:1.00 2:0.88 3:0.35 4:0.44 5:0.22 6:0.31 7:0.13 8:0.22]
+shot_game_b.png         1280x720   edges=7480    best block=2 (90% aligned)   all=[1:1.00 2:0.90 3:0.35 4:0.46 5:0.23 6:0.31 7:0.16 8:0.21]
+shot_game_c.png         1280x720   edges=7608    best block=2 (90% aligned)   all=[1:1.00 2:0.90 3:0.34 4:0.46 5:0.22 6:0.31 7:0.15 8:0.22]

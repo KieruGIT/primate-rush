@@ -29,6 +29,9 @@ extends Resource
 @export_range(0.4, 2.0, 0.05) var climb: float = 1.0
 ## Swing momentum retention and air control.
 @export_range(0.4, 2.0, 0.05) var swing: float = 1.0
+## Arm length. Stretches the slap's reach and the grab reach together, so a
+## long-armed monkey is long-armed at everything it does with its arms.
+@export_range(0.8, 2.0, 0.05) var arm_length: float = 1.0
 
 @export_group("Skill")
 ## Identifier consumed by the skill system. Empty means no skill yet.

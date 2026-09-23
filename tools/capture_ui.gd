@@ -34,6 +34,7 @@ const SIZE := Vector2i(1280, 720)
 ## Long enough for the theme to apply, the rows to build and one layout pass
 ## to settle. A shot taken on the first frame catches every container at zero.
 const SETTLE_FRAMES := 72
+var _force_touch: bool = true
 
 
 func _ready() -> void:
@@ -44,6 +45,8 @@ func _ready() -> void:
 			out = argument.trim_prefix("--out=")
 		elif argument.begins_with("--shots="):
 			only = argument.trim_prefix("--shots=").split(",")
+		elif argument == "--desktop":
+			_force_touch = false
 
 	for key in SHOTS.keys():
 		if only.is_empty() or only.has(String(key)):
@@ -88,7 +91,7 @@ func _shoot(key: String, path: String, out: String) -> void:
 		}
 	var screen: Node = load(path).instantiate()
 	if screen.get(&"force_touch_controls") != null:
-		screen.set(&"force_touch_controls", true)
+		screen.set(&"force_touch_controls", _force_touch)
 	# Set on the screen itself, not on the root window the way Boot does it.
 	# A SubViewport is not a Window, so a theme on the real one never reaches
 	# in here, and the shot would quietly come back in the engine default.

@@ -36,7 +36,6 @@ var _stick_home: Vector2 = Vector2.ZERO
 var _jump_center: Vector2 = Vector2.ZERO
 var _attack_center: Vector2 = Vector2.ZERO
 var _skill_center: Vector2 = Vector2.ZERO
-var _dash_center: Vector2 = Vector2.ZERO
 var _pause_center: Vector2 = Vector2.ZERO
 
 var _textures: Dictionary = {}
@@ -67,9 +66,6 @@ func _layout() -> void:
 	_jump_center = Vector2(view.x - JUMP_RADIUS - 48.0, view.y - JUMP_RADIUS - 44.0)
 	_attack_center = _jump_center + Vector2(-JUMP_RADIUS - BUTTON_RADIUS - 26.0, 16.0)
 	_skill_center = _jump_center + Vector2(-30.0, -JUMP_RADIUS - BUTTON_RADIUS - 22.0)
-	# Dash sits in the gap between slap and skill: a thumb rolling up and
-	# left from jump finds it without lifting.
-	_dash_center = _jump_center + Vector2(-178.0, -148.0)
 	# Top corner, small, and away from every other control: a pause you can
 	# hit by accident mid-swing is worse than no pause button.
 	_pause_center = Vector2(view.x - 50.0, 50.0)
@@ -104,9 +100,6 @@ func _handle_touch(event: InputEventScreenTouch) -> void:
 		elif _in_button(event.position, _skill_center):
 			_button_touches[event.index] = &"skill"
 			GameInput.touch_press(InputFrame.Action.SKILL)
-		elif event.position.distance_to(_dash_center) <= BUTTON_RADIUS:
-			_button_touches[event.index] = &"dash"
-			GameInput.touch_press(InputFrame.Action.DASH)
 		elif event.position.distance_to(_pause_center) <= PAUSE_RADIUS * 1.3:
 			_button_touches[event.index] = &"pause"
 			GameInput.pause_requested.emit()
@@ -150,9 +143,8 @@ func _in_button(position: Vector2, center: Vector2) -> bool:
 func draw_surface() -> void:
 	_draw_stick()
 	var pressed: Array = _button_touches.values()
-	_draw_button(_jump_center, JUMP_RADIUS, "Yellow", pressed.has(&"jump"), "JUMP", _draw_jump_icon)
-	_draw_button(_attack_center, BUTTON_RADIUS, "Red", pressed.has(&"attack"), "SLAP", _draw_hit_icon)
-	_draw_button(_dash_center, BUTTON_RADIUS * 0.86, "Green", pressed.has(&"dash"), "DASH", _draw_dash_icon)
+	_draw_button(_jump_center, JUMP_RADIUS, "Green", pressed.has(&"jump"), "JUMP", _draw_jump_icon)
+	_draw_button(_attack_center, BUTTON_RADIUS, "Red", pressed.has(&"attack"), "PUNCH", _draw_hit_icon)
 	_draw_button(_skill_center, BUTTON_RADIUS, "Blue", pressed.has(&"skill"), "SKILL", _draw_skill_icon)
 	_draw_cooldown()
 	_draw_button(_pause_center, PAUSE_RADIUS, "Grey", pressed.has(&"pause"), "", _draw_pause_icon)
@@ -224,12 +216,6 @@ func _draw_skill_icon(at: Vector2, s: float) -> void:
 		at + Vector2(s * 0.25, -s * 1.05), at + Vector2(-s * 0.6, s * 0.15), at + Vector2(-s * 0.02, s * 0.15),
 		at + Vector2(-s * 0.25, s * 1.05), at + Vector2(s * 0.6, -s * 0.2), at + Vector2(s * 0.04, -s * 0.2),
 	]))
-
-
-func _draw_dash_icon(at: Vector2, s: float) -> void:
-	for offset in [-0.45, 0.35]:
-		var o := at + Vector2(s * offset, 0.0)
-		_outlined(PackedVector2Array([o + Vector2(-s * 0.45, -s * 0.8), o + Vector2(s * 0.45, 0.0), o + Vector2(-s * 0.45, s * 0.8), o + Vector2(-s * 0.15, 0.0)]))
 
 
 func _draw_pause_icon(at: Vector2, s: float) -> void:

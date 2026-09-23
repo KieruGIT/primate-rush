@@ -1,0 +1,19 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Five monkey sprite prototype</title>
+<style>body{background:#101827;color:#f4dfb1;font:16px system-ui;margin:32px}p{color:#bac7d0}button,select{padding:10px;font:inherit;margin:8px;background:#29404e;color:white;border:1px solid #607986;border-radius:6px}.grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:16px}article{border:1px solid #52626e;border-radius:8px;text-align:center}h2{font-size:16px}canvas{width:100%;image-rendering:pixelated}img{width:100%;image-rendering:pixelated}a{color:#f5cb77}@media(max-width:700px){.grid{grid-template-columns:repeat(2,1fr)}}</style>
+<h1>Five monkeys · sprite prototype</h1><p>Five distinct primate designs in the approved pixel style. Separate arm components are included in the last column of the atlas.</p>
+<button id="play">Pause</button><button id="step">Next frame</button>
+<select id="action" aria-label="Action"><option value="1">Double-jump roll</option><option value="5">Slap attack</option><option value="0">Idle</option><option value="9">Attachable arm</option></select>
+<select id="speed" aria-label="Playback speed"><option value="4">4 FPS</option><option value="8" selected>8 FPS</option><option value="12">12 FPS</option></select>
+<div id="grid" class="grid"></div><p>First visual study: four frames per action. Background removal, frame alignment and animation polish remain before engine import.</p>
+<a href="monkeys-unique-v4.png">Full atlas</a><img src="monkeys-unique-v4.png" alt="Five distinct primate species with idle, roll, slap, and separate arm designs">
+<script>
+const names=['Common monkey','Chimpanzee','Gorilla','Orangutan','Gibbon'],xs=[0,168,325,480,634,785,940,1091,1250,1410,1536],ys=[0,200,389,577,776,1024],canvases=[];let frame=0,playing=true,last=0;
+for(const name of names){const card=document.createElement('article'),h=document.createElement('h2'),c=document.createElement('canvas');h.textContent=name;c.width=180;c.height=230;card.append(h,c);document.getElementById('grid').append(card);canvases.push(c)}
+const atlas=new Image();atlas.src='monkeys-unique-v4.png';
+function draw(){let start=Number(document.getElementById('action').value),col=(start===0||start===9)?start:start+frame;canvases.forEach((c,row)=>{const ctx=c.getContext('2d'),w=xs[col+1]-xs[col],h=ys[row+1]-ys[row];ctx.imageSmoothingEnabled=false;ctx.fillStyle='#101827';ctx.fillRect(0,0,180,230);ctx.drawImage(atlas,xs[col],ys[row],w,h,Math.round((180-w)/2),Math.round((230-h)/2),w,h)})}
+document.getElementById('play').onclick=()=>{playing=!playing;document.getElementById('play').textContent=playing?'Pause':'Play'};
+document.getElementById('step').onclick=()=>{playing=false;document.getElementById('play').textContent='Play';frame=(frame+1)%4;draw()};
+document.getElementById('action').onchange=()=>{frame=0;draw()};
+atlas.onload=()=>{draw();requestAnimationFrame(function loop(t){if(playing&&t-last>=1000/Number(document.getElementById('speed').value)){frame=(frame+1)%4;draw();last=t}requestAnimationFrame(loop)})};
+</script></html>
+

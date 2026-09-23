@@ -1,66 +1,24 @@
 class_name MonkeyPortrait
 extends RefCounted
 
-# ============================================================
-# MONKEY PORTRAIT - a 24x24 pixel face per monkey, built at runtime.
-#
-# Drawn from an ASCII template rather than shipped as five PNGs, for the same
-# reason Sfx synthesises its waveforms: the art is then a diff anyone can
-# read, and a recolour is one line rather than a round trip through an image
-# editor. Twenty-four rows of twelve characters is a small enough sprite that
-# the source and the picture are the same thing.
-#
-# Only the left half is written out. Everything mirrors, which halves the
-# template and makes a crooked face impossible rather than merely unlikely.
-#
-# Drawn with nearest filtering wherever it is used, so scaling it up to a
-# selection card keeps the pixels square instead of smearing them.
-# ============================================================
+## HUD portraits use the same species-specific heads as the full-body
+## three-quarter animation sheets. No shared generic face template.
 
-const SIZE: int = 24
-
-## o outline   f fur   d fur shade   m face   n nose and mouth
-## e eye white   p pupil   . transparent
-const HALF: Array[String] = [
-	"............",
-	".......ooooo",
-	".....oofffff",
-	"....offfffff",
-	".oooffffffff",
-	"offoffffffff",
-	"ofmoffffffff",
-	"offofmmmmmmm",
-	".ooofmmmmmmm",
-	"...ofmeppmmm",
-	"...ofmpppmmm",
-	"...ofmmmmmmm",
-	"...ofmmmmmmn",
-	"...ofmmmmmmm",
-	"...ofmmmmnnn",
-	"...offmmmmmm",
-	"....offfffff",
-	".....offffff",
-	"......oooooo",
-	".......ooddd",
-	".....oodffff",
-	"...oodffffff",
-	"..odffffffff",
-	"..oooooooooo",
-]
+const SIZE: int = 40
 
 ## Fur, fur shade, face and nose per monkey. The outline, the eye white and
 ## the pupil are shared: five monkeys with five different blacks would read
 ## as five different lighting conditions rather than five species.
-const OUTLINE := Color8(22, 18, 16)
+const OUTLINE := JunglePalette.OUTLINE
 const EYE := Color8(248, 248, 244)
 const PUPIL := Color8(20, 16, 14)
 
 const PALETTES: Dictionary = {
-	&"gorilla": {"f": Color8(74, 66, 66), "d": Color8(52, 46, 46), "m": Color8(58, 50, 50), "n": Color8(30, 26, 26)},
-	&"gibbon": {"f": Color8(196, 166, 120), "d": Color8(160, 132, 92), "m": Color8(48, 40, 38), "n": Color8(28, 22, 20)},
-	&"macaque": {"f": Color8(150, 106, 64), "d": Color8(116, 80, 48), "m": Color8(214, 158, 142), "n": Color8(150, 96, 86)},
-	&"orangutan": {"f": Color8(186, 92, 36), "d": Color8(142, 66, 24), "m": Color8(150, 88, 54), "n": Color8(96, 52, 32)},
-	&"capuchin": {"f": Color8(78, 56, 42), "d": Color8(56, 40, 30), "m": Color8(236, 214, 180), "n": Color8(150, 120, 92)},
+	&"gorilla": {"f": Color8(57, 65, 77), "d": Color8(30, 37, 50), "m": Color8(185, 172, 138), "n": Color8(57, 42, 37)},
+	&"gibbon": {"f": Color8(179, 144, 93), "d": Color8(107, 81, 56), "m": Color8(242, 211, 156), "n": Color8(68, 43, 35)},
+	&"macaque": {"f": Color8(153, 99, 54), "d": Color8(87, 53, 39), "m": Color8(239, 195, 126), "n": Color8(74, 40, 32)},
+	&"orangutan": {"f": Color8(194, 104, 47), "d": Color8(112, 57, 39), "m": Color8(239, 185, 116), "n": Color8(74, 40, 32)},
+	&"capuchin": {"f": Color8(97, 66, 49), "d": Color8(51, 37, 36), "m": Color8(249, 219, 162), "n": Color8(74, 40, 32)},
 }
 
 ## Built once per monkey and kept. The lobby asks for these on every refresh,
@@ -68,24 +26,16 @@ const PALETTES: Dictionary = {
 static var _cache: Dictionary = {}
 
 
-static func texture(id: StringName) -> ImageTexture:
+static func texture(id: StringName) -> Texture2D:
 	if _cache.has(id):
 		return _cache[id]
-	var made := ImageTexture.create_from_image(image(id))
+	var made := MonkeySprite.load_art("%s/%s/portrait.png" % [MonkeySprite.ART_DIR, MonkeySprite.asset_id(id)])
 	_cache[id] = made
 	return made
 
 
 static func image(id: StringName) -> Image:
-	var palette := palette_for(id)
-	var img := Image.create_empty(SIZE, SIZE, false, Image.FORMAT_RGBA8)
-	for y in HALF.size():
-		var row: String = HALF[y]
-		for x in row.length():
-			var color := _color(row[x], palette)
-			img.set_pixel(x, y, color)
-			img.set_pixel(SIZE - 1 - x, y, color)
-	return img
+	return texture(id).get_image()
 
 
 ## An unknown monkey still gets a face, tinted from its body colour, rather
@@ -105,6 +55,10 @@ static func palette_for(id: StringName) -> Dictionary:
 
 static func _color(symbol: String, palette: Dictionary) -> Color:
 	match symbol:
+		"h":
+			return (palette["f"] as Color).lerp(Color8(241, 187, 101), 0.30)
+		"s":
+			return (palette["m"] as Color).lerp(palette["f"], 0.38)
 		"o":
 			return OUTLINE
 		"e":

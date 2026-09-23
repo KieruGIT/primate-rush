@@ -1,8 +1,10 @@
 extends Node
 
 # ============================================================
-# CLIMB CHECK - dev only. A monkey against an ivy wall, holding only jump,
-# must go up it; pushing away and jumping must wall-jump off.
+# CLIMB CHECK - dev only. A monkey jumps beside an ivy wall and keeps jump
+# held, which must grab it by the arm. Then it climbs the only way there is:
+# haul in on the stick, let go (a pull-up hop), press and hold to grab
+# higher. Several rounds of that must gain real height.
 #   godot --headless --fixed-fps 60 res://tools/ClimbCheck.tscn
 # ============================================================
 
@@ -12,7 +14,12 @@ const CLIMB := preload("res://scenes/Climbable.tscn")
 var _player: Player
 var _ticks: int = 0
 var _start_y: float = 0.0
-var _top_y: float = 0.0
+var _best_y: float = INF
+var _grabbed_trunk: bool = false
+## Ticks left in the current phase, and which phase: hold (grab and haul
+## in) or gap (grip released, waiting to press again).
+var _phase_left: int = 0
+var _holding: bool = false
 
 
 func _ready() -> void:
@@ -44,23 +51,28 @@ func _ready() -> void:
 
 func _physics_process(_delta: float) -> void:
 	_ticks += 1
-	var frame := InputFrame.new()
 	if _ticks == 20:
-		frame.press(InputFrame.Action.JUMP)
 		_start_y = _player.global_position.y
-	if _ticks >= 20 and _ticks < 140:
-		frame.jump_held = true
-	if _ticks == 140:
-		_top_y = _player.global_position.y
-	if _ticks == 150:
-		frame.move = Vector2(-1, 0)
-		frame.press(InputFrame.Action.JUMP)
-	if _ticks > 150:
-		frame.move = Vector2(-1, 0)
+	var frame := InputFrame.new()
+	if _ticks >= 20:
+		_phase_left -= 1
+		if _phase_left <= 0:
+			_holding = not _holding
+			# Hold long enough to grab and haul all the way in; let go for
+			# just long enough to hop.
+			_phase_left = 50 if _holding else 6
+			if _holding:
+				frame.press(InputFrame.Action.JUMP)
+		frame.jump_held = _holding
+		if _holding:
+			frame.move = Vector2(0, -1)
 	_player.feed_input(frame)
-	if _ticks == 175:
-		var climbed := _start_y - _top_y
-		var left := _player.global_position.x < 20.0
-		print("climbed %.0f px holding jump (state then %s); wall jump carried to x=%.0f" % [climbed, Player.State.keys()[_player.state], _player.global_position.x])
-		print("CLIMB CHECK %s" % ("OK" if climbed > 200.0 and left else "FAIL"))
-		get_tree().quit(0 if climbed > 200.0 and left else 1)
+	if _player.state == Player.State.SWING and _player.swing_on_trunk and not _grabbed_trunk:
+		_grabbed_trunk = true
+	_best_y = minf(_best_y, _player.global_position.y)
+	if _ticks == 420:
+		var climbed := _start_y - _best_y
+		var ok := _grabbed_trunk and climbed > 250.0
+		print("grabbed the wall by the arm: %s; climbed %.0f px by haul-and-hop" % [_grabbed_trunk, climbed])
+		print("CLIMB CHECK %s" % ("OK" if ok else "FAIL"))
+		get_tree().quit(0 if ok else 1)

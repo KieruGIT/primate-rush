@@ -6,13 +6,14 @@
 script = ExtResource("1_stats")
 id = &"orangutan"
 display_name = "Orangutan"
-blurb = "The Climber. Dominant on the vertical map, sluggish on the horizontal one."
+blurb = "The Climber. Longest arms in the jungle: slaps from further away and grabs from further off."
 body_color = Color(0.78, 0.38, 0.18, 1)
 body_size = Vector2(38, 70)
-speed = 0.75
+speed = 0.86
 weight = 1.5
 power = 1.0
 climb = 1.9
 swing = 1.0
+arm_length = 1.5
 skill_id = &"long_arm"
 skill_cooldown = 5.0

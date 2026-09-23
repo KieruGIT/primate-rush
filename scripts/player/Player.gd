@@ -4,7 +4,7 @@ extends CharacterBody2D
 # ============================================================
 # MONKEY
 #
-# One script, five states: ground, air, climb, swing, stun. Movement feel
+# One script: ground, slide, air, swing, stun. Movement feel
 # (coyote time, jump buffering, variable jump height, asymmetric gravity)
 # is the foundation everything else sits on, so it stays here rather than
 # being split across a state machine of tiny files that each hide a third
@@ -27,11 +27,16 @@ signal skill_used(skill_id: StringName)
 signal bananas_changed(count: int)
 signal ability_changed(ability_id: StringName)
 
-# DASH is appended rather than inserted: the state enum travels over the
-# wire as an int, and renumbering it would desync mid-update.
-enum State { GROUND, AIR, CLIMB, SWING, STUN, DASH }
+# New states are appended rather than inserted: the state enum travels over
+# the wire as an int, and renumbering it would desync mid-update. DASH is
+# now only the skill movers (grapple, roll, snatch); there is no dash button.
+enum State { GROUND, AIR, CLIMB, SWING, STUN, DASH, SLIDE }
 
 const ATTACK_FLAVORS: Array[StringName] = [&"slap", &"punch", &"kick"]
+## How far forward of the monkey's centre a slap connects, before arm length
+## stretches it. Matched to where the drawn hand actually lands, so nobody
+## is hit by a hand that visibly never reached them.
+const SLAP_REACH: float = 80.0
 
 @export_group("Identity")
 @export var stats: MonkeyStats
@@ -65,27 +70,62 @@ const ATTACK_FLAVORS: Array[StringName] = [&"slap", &"punch", &"kick"]
 @export var jump_buffer_time: float = 0.12
 ## Releasing jump early cuts the rise, giving short and tall hops.
 @export var jump_cut_multiplier: float = 0.45
+## Forward shove on a jump from the ground, in the direction held. It is
+## allowed past run speed, so every jump is a small burst of momentum.
+@export var jump_push: float = 70.0
+## Second jump in the air, as a share of the first. One per airtime, given
+## back by landing or grabbing something.
+@export var double_jump_ratio: float = 0.86
+## How long jump must be held in the air before it grabs. Shorter than a
+## full-height jump, longer than a tap. Letting go of jump lets go of the
+## grab: the button is the grip.
+@export var grab_hold_time: float = 0.1
 
-@export_group("Climb")
-## Horizontal drift while on a wall, as a fraction of climb speed.
-@export var climb_lateral_ratio: float = 0.45
-## Sideways shove when jumping off a wall, so wall jumps make progress.
-@export var climb_jump_push: float = 320.0
-## Blocks instantly regrabbing the wall you just jumped off.
-@export var climb_regrab_delay: float = 0.18
+@export_group("Momentum")
+## Speed past run speed comes only from jumps, swing releases and hops.
+## This is the ceiling that keeps a chain of bunny hops finite.
+@export var max_momentum_speed: float = 780.0
+## How fast speed above run speed bleeds in the air while you keep holding
+## the way you are going. Low, so a swing release carries across a gap.
+@export var momentum_air_drag: float = 180.0
+## Speed above run speed survives this long after landing. Jump inside it
+## and the speed carries into the next hop - that is the bunny hop.
+@export var bhop_window: float = 0.12
+## Each chained hop keeps its speed times this, capped by max_momentum_speed.
+@export var bhop_gain: float = 1.04
+## Holding down while landing or running fast slides instead of braking.
+@export var slide_friction: float = 380.0
+## A slide needs at least this share of run speed to start, and ends below
+## half of it.
+@export var slide_min_ratio: float = 0.85
+
+@export_group("Arm grab")
+## How far the arm stretches to take hold of a trunk or a cliff face. The
+## monkey reaches up and grabs the nearest point of it inside this range,
+## then swings from that point like a vine.
+@export var grab_reach: float = 150.0
+## Letting go of a trunk while hanging nearly still is a pull-up: a hop up
+## and a little away, so a cliff is climbed grab, pull in, let go, grab.
+@export var trunk_hop_lift: float = 0.85
+@export var trunk_hop_push: float = 120.0
+## Below this speed a trunk release counts as "hanging still" and hops.
+@export var trunk_hop_below_speed: float = 260.0
 
 @export_group("Swing")
 @export var swing_min_length: float = 48.0
 @export var swing_max_length: float = 260.0
 ## Pumping the stick adds angular velocity, which is the whole skill.
 @export var swing_pump: float = 8.2
-## Climbing the rope itself, in pixels per second.
+## Pulling in on the rope or the stretched arm, in pixels per second,
+## scaled by the Climb stat.
 @export var swing_rope_speed: float = 180.0
 ## Release speed multiplier. Above 1.0 so a well-timed release beats running.
-@export var swing_release_boost: float = 1.18
+@export var swing_release_boost: float = 1.22
+## Flat speed added along the release direction on a swing let-go.
+@export var swing_release_kick: float = 70.0
 ## Prevents a shortened rope from becoming an accidental physics cannon.
-@export var swing_max_speed: float = 1320.0
-@export var swing_regrab_delay: float = 0.35
+@export var swing_max_speed: float = 1100.0
+@export var swing_regrab_delay: float = 0.2
 
 @export_group("Attack")
 ## Wind-up before the hitbox opens. Long enough to be readable, short
@@ -128,18 +168,17 @@ const ATTACK_FLAVORS: Array[StringName] = [&"slap", &"punch", &"kick"]
 ## Whiffing still costs something, or the grapple is a free scan every frame.
 @export var skill_whiff_cooldown: float = 0.6
 
-@export_group("Sprint and dash")
+@export_group("Sprint")
 ## Held sprint multiplies run speed, on the ground and in the air, so a
 ## sprinting jump carries further. Every monkey has it; the stats still
 ## decide how fast "fast" is.
-@export var sprint_multiplier: float = 1.45
-## Dash: a short burst in the aimed direction, any of eight. One in the air
-## per jump, reset by landing, climbing or grabbing a vine.
-@export var dash_speed: float = 1050.0
-@export var dash_time: float = 0.15
-@export var dash_cooldown: float = 0.55
-## Share of dash speed kept when it ends, so a dash flows into the run.
-@export var dash_carry: float = 0.55
+@export var sprint_multiplier: float = 1.3
+## Always sprint while moving. The sprint key is no longer needed.
+@export var auto_sprint: bool = true
+## Every jump adds this to your speed in the direction you are moving.
+@export var jump_momentum: float = 55.0
+## Punches hit this much harder than the stat block alone.
+@export var punch_power: float = 1.4
 
 @export_group("Hoard")
 ## Banana Magnet reach.
@@ -187,9 +226,19 @@ var _snatch_hit: Array[int] = []
 var _dash_kind: StringName = &""
 var _dash_target: Vector2 = Vector2.ZERO
 var _air_launch_ready: bool = true
-var _air_dash_ready: bool = true
-var _dash_cooldown_timer: float = 0.0
-var _dash_dir: Vector2 = Vector2.RIGHT
+var _double_jump_ready: bool = true
+## Counts down from bhop_window on landing. While it runs, speed above run
+## speed is not braked away.
+var _momentum_grace: float = 0.0
+## How long jump has been held without letting go. Drives the grab.
+var _jump_held_time: float = 0.0
+## Counts down while this monkey's sprite jolts from a slap it just took.
+## Presentation only.
+var _jolt_time: float = 0.0
+## Counts down through the double jump's tucked roll. The roll is drawn
+## frames in the sprite sheet; the sprite itself never rotates.
+var _roll_time: float = 0.0
+const ROLL_SECONDS: float = 0.4
 var _trail_timer: float = 0.0
 ## A spring launch waiting for the next gravity step. Set by bounce(), used
 ## by _apply_gravity, because a monkey standing on a pad is on the floor and
@@ -219,10 +268,14 @@ var bananas: int = 0
 var ability: StringName = &""
 var ability_timer: float = 0.0
 
-var _climb_lock: float = 0.0
 var _swing_lock: float = 0.0
 var _swing_anchor: Vector2 = Vector2.ZERO
 var _swing_node: Node2D = null
+## Grab point relative to _swing_node. Zero for a vine (its pivot is the
+## node); the spot the hand closed on for a trunk.
+var _swing_offset: Vector2 = Vector2.ZERO
+## True when hanging from a trunk by the stretched arm rather than a vine.
+var swing_on_trunk: bool = false
 var _swing_length: float = 0.0
 var _swing_angle: float = 0.0
 var _swing_ang_vel: float = 0.0
@@ -251,7 +304,6 @@ var _ground_shadow_alpha: float = 0.0
 var _last_position: Vector2 = Vector2.ZERO
 var _moved_speed: float = 0.0
 @onready var shape: CollisionShape2D = $Collision
-@onready var climb_sensor: Area2D = $ClimbSensor
 @onready var vine_sensor: Area2D = $VineSensor
 @onready var hitbox: Area2D = $Hitbox
 @onready var hitbox_shape: CollisionShape2D = $Hitbox/Shape
@@ -329,6 +381,15 @@ func _apply_appearance() -> void:
 		rect.size = size
 		shape.shape = rect
 
+	# The slap box runs from the monkey's centre to where its hand lands.
+	# Long arms land further away.
+	var hit_rect := hitbox_shape.shape as RectangleShape2D
+	if hit_rect != null:
+		hit_rect = hit_rect.duplicate()
+		hit_rect.size.x = SLAP_REACH * stats.arm_length
+		hitbox_shape.shape = hit_rect
+		hitbox.position.x = hit_rect.size.x * 0.5 * float(facing)
+
 	if name_label != null:
 		name_label.text = display_label()
 		name_label.position.y = head_top - 30.0
@@ -405,8 +466,6 @@ func _physics_process(delta: float) -> void:
 				_process_stun(delta)
 			State.DASH:
 				_process_dash(delta)
-			State.CLIMB:
-				_process_climb(delta)
 			State.SWING:
 				_process_swing(delta)
 			_:
@@ -446,7 +505,6 @@ func _apply_input_frame(_delta: float) -> void:
 
 
 func _tick_timers(delta: float) -> void:
-	_climb_lock = maxf(_climb_lock - delta, 0.0)
 	_swing_lock = maxf(_swing_lock - delta, 0.0)
 	_attack_cooldown_timer = maxf(_attack_cooldown_timer - delta, 0.0)
 	_buffer_timer = maxf(_buffer_timer - delta, 0.0)
@@ -457,14 +515,17 @@ func _tick_timers(delta: float) -> void:
 		if ability_timer <= 0.0:
 			set_ability(&"", 0.0)
 	_tick_windup(delta)
-	_dash_cooldown_timer = maxf(_dash_cooldown_timer - delta, 0.0)
+	_momentum_grace = maxf(_momentum_grace - delta, 0.0)
+	_jump_held_time = _jump_held_time + delta if _input.jump_held else 0.0
 	_spawn_shield = maxf(_spawn_shield - delta, 0.0)
-	if is_on_floor() or state == State.CLIMB or state == State.SWING:
-		_air_dash_ready = true
+	if is_on_floor() or state == State.SWING:
+		_double_jump_ready = true
 	if is_on_floor():
 		_air_launch_ready = true
-	if _input.consume(InputFrame.Action.DASH):
-		_try_dash()
+	# There is no dash button any more. A press left over from an older
+	# client, or a stale touch layout, is dropped rather than queued forever.
+	while _input.consume(InputFrame.Action.DASH):
+		pass
 	if _input.consume(InputFrame.Action.JUMP):
 		_buffer_timer = jump_buffer_time
 	if _input.consume(InputFrame.Action.ATTACK):
@@ -478,19 +539,22 @@ func _tick_timers(delta: float) -> void:
 func _process_grounded_or_air(delta: float) -> void:
 	if _try_enter_swing():
 		return
-	if _try_enter_climb():
-		return
 
 	_apply_gravity(delta)
 	_apply_horizontal(delta)
 	_try_jump()
 	_apply_jump_cut()
 
+	var was_airborne := not is_on_floor()
 	move_and_slide()
 
 	if is_on_floor():
+		if was_airborne and absf(velocity.x) > _top_speed():
+			# Landing fast opens the bunny hop window. Until it closes the
+			# ground does not brake the extra speed away.
+			_momentum_grace = bhop_window
 		_coyote_timer = coyote_time
-		_set_state(State.GROUND)
+		_set_state(State.SLIDE if _wants_slide() else State.GROUND)
 	else:
 		_coyote_timer = maxf(_coyote_timer - delta, 0.0)
 		_set_state(State.AIR)
@@ -517,17 +581,37 @@ func _apply_horizontal(delta: float) -> void:
 	var grounded := is_on_floor()
 	var accel := ground_accel if grounded else air_accel * stats.air_control()
 	var friction := ground_friction if grounded else air_friction
-	var wants_sprint := _input.sprint_held and absf(axis) > 0.1
+	var wants_sprint := (auto_sprint or _input.sprint_held) and absf(axis) > 0.1
 	var sprint_rate := 7.5 if wants_sprint else 4.5
 	_sprint_blend = move_toward(_sprint_blend, 1.0 if wants_sprint else 0.0, sprint_rate * delta)
-	if wants_sprint and grounded and not _sprint_latched:
+	var sliding := grounded and state == State.SLIDE
+	if wants_sprint and grounded and not _sprint_latched and not sliding:
 		# A small launch on the first stride makes sprint a verb rather than a
 		# barely visible maximum-speed setting.
 		velocity.x += axis * 72.0
 	_sprint_latched = wants_sprint
 
+	# A slide ignores the stick: it is the carried speed running out slowly.
+	if sliding:
+		velocity.x = move_toward(velocity.x, 0.0, slide_friction * delta)
+		return
+
+	var top := _top_speed()
+	# Momentum: speed above run speed that a jump, a hop or a swing earned.
+	# Holding the way you are going (or nothing) lets it bleed slowly instead
+	# of being clamped straight back to run speed. Pushing against it brakes
+	# at the normal rate below.
+	var same_way := absf(axis) <= 0.1 or signf(axis) == signf(velocity.x)
+	if absf(velocity.x) > top and same_way:
+		var bleed: float
+		if grounded:
+			bleed = 0.0 if _momentum_grace > 0.0 else ground_friction
+		else:
+			bleed = momentum_air_drag if absf(axis) > 0.1 else air_friction
+		velocity.x = move_toward(velocity.x, signf(velocity.x) * top, bleed * delta)
+		return
+
 	if absf(axis) > 0.1:
-		var top := stats.run_speed() * _speed_multiplier() * lerpf(1.0, sprint_multiplier, _sprint_blend)
 		if grounded:
 			accel *= lerpf(1.0, 1.72, _sprint_blend)
 			if signf(velocity.x) != signf(axis):
@@ -535,6 +619,21 @@ func _apply_horizontal(delta: float) -> void:
 		velocity.x = move_toward(velocity.x, axis * top, accel * delta)
 	else:
 		velocity.x = move_toward(velocity.x, 0.0, friction * delta)
+
+
+## Run speed right now: stats, pickups and how far into a sprint you are.
+func _top_speed() -> float:
+	return stats.run_speed() * _speed_multiplier() * lerpf(1.0, sprint_multiplier, _sprint_blend)
+
+
+## Down held with speed to spend. Starting needs most of run speed; an
+## ongoing slide keeps going down to half of it, so it does not flicker off
+## the moment friction takes the first bite.
+func _wants_slide() -> bool:
+	if _input.move.y < 0.5:
+		return false
+	var needed := slide_min_ratio if state != State.SLIDE else 0.5
+	return absf(velocity.x) >= stats.run_speed() * needed
 
 
 func _speed_multiplier() -> float:
@@ -570,13 +669,59 @@ func is_ghost() -> bool:
 
 
 func _try_jump() -> void:
-	var can_jump := is_on_floor() or _coyote_timer > 0.0
-	if can_jump and _buffer_timer > 0.0:
-		velocity.y = stats.jump_velocity()
-		_jump_rising = true
-		_buffer_timer = 0.0
-		_coyote_timer = 0.0
-		Sfx.play(&"jump", _voice_pitch())
+	if _buffer_timer <= 0.0:
+		return
+	if is_on_floor() or _coyote_timer > 0.0:
+		_ground_jump()
+	elif _double_jump_ready and not _landing_soon():
+		_double_jump()
+	# With the double jump spent, the press stays buffered and fires as a
+	# normal jump if the ground arrives inside the buffer window.
+
+
+## Falling with the floor only a few frames away. A press now is someone
+## timing a hop off the landing, and spending the double jump on it instead
+## would throw the hop away, so the press waits in the buffer for the ground.
+func _landing_soon() -> bool:
+	if velocity.y <= 0.0:
+		return false
+	var reach := maxf(velocity.y * jump_buffer_time * 0.6, 10.0)
+	return test_move(global_transform, Vector2(0.0, reach))
+
+
+func _ground_jump() -> void:
+	# Jumping out of a slide or inside the landing window is the bunny hop:
+	# the carried speed survives, slightly amplified.
+	if _momentum_grace > 0.0 or state == State.SLIDE:
+		velocity.x *= bhop_gain
+	var axis := _input.move.x
+	if absf(axis) > 0.2:
+		velocity.x += axis * jump_push
+		# Momentum: every jump pushes a little past run speed.
+		velocity.x += signf(axis) * jump_momentum
+	velocity.x = clampf(velocity.x, -max_momentum_speed, max_momentum_speed)
+	velocity.y = stats.jump_velocity()
+	_momentum_grace = 0.0
+	_jump_rising = true
+	_buffer_timer = 0.0
+	_coyote_timer = 0.0
+	Sfx.play(&"jump", _voice_pitch())
+
+
+func _double_jump() -> void:
+	_double_jump_ready = false
+	var axis := _input.move.x
+	# Reversing in the air is the reason to double jump as often as height
+	# is, so a stick pushed against the drift turns you round at run speed.
+	if absf(axis) > 0.2 and signf(axis) != signf(velocity.x):
+		velocity.x = axis * stats.run_speed() * 0.8
+	elif absf(axis) > 0.2:
+		velocity.x = clampf(velocity.x + signf(axis) * jump_momentum * 0.6, -max_momentum_speed, max_momentum_speed)
+	velocity.y = stats.jump_velocity() * double_jump_ratio
+	_jump_rising = true
+	_buffer_timer = 0.0
+	_roll_time = ROLL_SECONDS
+	Sfx.play(&"jump", _voice_pitch() * 1.18)
 
 
 ## Only a jump the player pressed can be cut short. A spring, a dash or a
@@ -593,67 +738,13 @@ func _apply_jump_cut() -> void:
 		_jump_rising = false
 
 
-# --- Climb ---------------------------------------------------------
+# --- Grab ----------------------------------------------------------
 
-func _try_enter_climb() -> bool:
-	if _climb_lock > 0.0 or not _touching_climbable():
-		return false
-	# Pressing into the wall or up it - or holding jump against it, since
-	# jump climbs too. Brushing past a wall mid-jump with nothing held
-	# should not yank you onto it.
-	var holding_jump := _input.jump_held and not is_on_floor()
-	if absf(_input.move.y) < 0.35 and absf(_input.move.x) < 0.5 and not holding_jump:
-		return false
-	_set_state(State.CLIMB)
-	velocity = Vector2.ZERO
-	_air_launch_ready = true
-	return true
-
-
-func _process_climb(delta: float) -> void:
-	if not _touching_climbable():
-		_set_state(State.AIR)
-		return
-
-	# Jump on a wall is a climb. It becomes a wall jump only when you are
-	# also pushing away from the wall - the one case where leaving is meant.
-	if _buffer_timer > 0.0:
-		_buffer_timer = 0.0
-		var wall_side := _wall_side()
-		if wall_side != 0.0 and _input.move.x * wall_side < -0.3:
-			_climb_lock = climb_regrab_delay
-			velocity = Vector2(-wall_side * climb_jump_push, stats.jump_velocity() * 0.92)
-			facing = -int(wall_side)
-			_jump_rising = true
-			Sfx.play(&"jump", _voice_pitch())
-			_set_state(State.AIR)
-			return
-
-	var speed := stats.climb_speed()
-	var vertical := _input.move.y
-	if _input.jump_held and vertical > -0.35 and vertical < 0.35:
-		vertical = -1.0
-	velocity = Vector2(
-		_input.move.x * speed * climb_lateral_ratio,
-		vertical * speed
-	)
-	move_and_slide()
-
-	if is_on_floor() and _input.move.y > 0.1:
-		_set_state(State.GROUND)
-
-
-## Which side the wall being climbed is on: -1 left, 1 right, 0 unknown.
-func _wall_side() -> float:
-	for area in climb_sensor.get_overlapping_areas():
-		var offset := (area as Node2D).global_position.x - global_position.x
-		if absf(offset) > 1.0:
-			return signf(offset)
-	return float(facing)
-
-
-func _touching_climbable() -> bool:
-	return climb_sensor.has_overlapping_areas() or climb_sensor.has_overlapping_bodies()
+## Jump held long enough in the air to mean "grab", not "jump". A tap next
+## to a tree stays a jump; keep holding and the monkey takes hold of the
+## first thing in reach.
+func _grab_held() -> bool:
+	return _input.jump_held and _jump_held_time >= grab_hold_time and not is_on_floor()
 
 
 # --- Swing ---------------------------------------------------------
@@ -663,14 +754,27 @@ func _touching_climbable() -> bool:
 # angular velocity are two floats the host can ship over the wire.
 
 func _try_enter_swing() -> bool:
-	if _swing_lock > 0.0 or is_on_floor():
+	# Nothing is grabbed by bumping into it: jump has to be held.
+	if _swing_lock > 0.0 or not _grab_held():
 		return false
+	# A vine in reach wins over a trunk: it is the thing placed to be swung on.
 	var anchor_node := _nearest_vine()
+	var on_trunk := false
+	var grab_point := Vector2.ZERO
 	if anchor_node == null:
-		return false
+		var trunk := _nearest_trunk_point()
+		if trunk.is_empty():
+			return false
+		anchor_node = trunk["node"]
+		grab_point = trunk["point"]
+		on_trunk = true
+	else:
+		grab_point = anchor_node.global_position
 
 	_swing_node = anchor_node
-	_swing_anchor = anchor_node.global_position
+	_swing_offset = grab_point - anchor_node.global_position
+	swing_on_trunk = on_trunk
+	_swing_anchor = grab_point
 	var offset := global_position - _swing_anchor
 	if offset.length() < 1.0:
 		return false
@@ -683,19 +787,75 @@ func _try_enter_swing() -> bool:
 	var tangent := Vector2(-sin(_swing_angle), cos(_swing_angle))
 	_swing_ang_vel = velocity.dot(tangent) / _swing_length
 	_air_launch_ready = true
+	_buffer_timer = 0.0
 	Sfx.play(&"grab", _voice_pitch())
 	_set_state(State.SWING)
 	return true
+
+
+## The point on a trunk or cliff face the arm closes on: the highest part
+## of it the arm can reach. Reaching up is the whole point of the arm -
+## grabbing a wall level with your own head and hauling in just drags you
+## sideways into it. Empty when nothing is within grab_reach.
+func _nearest_trunk_point() -> Dictionary:
+	var query := PhysicsShapeQueryParameters2D.new()
+	var circle := CircleShape2D.new()
+	var reach := grab_reach * stats.arm_length
+	circle.radius = reach
+	query.shape = circle
+	query.transform = Transform2D(0.0, global_position)
+	query.collision_mask = GameConfig.LAYER_CLIMBABLE
+	query.collide_with_areas = true
+	query.collide_with_bodies = false
+	var best: Dictionary = {}
+	var best_y := INF
+	for hit in get_world_2d().direct_space_state.intersect_shape(query, 16):
+		var area := hit.get("collider") as Climbable
+		if area == null:
+			continue
+		var rect := Rect2(area.global_position - area.size * 0.5, area.size)
+		var x := clampf(global_position.x, rect.position.x, rect.end.x)
+		var dx := absf(x - global_position.x)
+		if dx > reach:
+			continue
+		# As high as the arm stretches at that sideways distance, kept on
+		# the trunk.
+		var rise := sqrt(reach * reach - dx * dx)
+		var y := clampf(global_position.y - rise, rect.position.y, rect.end.y)
+		var point := Vector2(x, y)
+		if point.distance_to(global_position) > reach + 0.5:
+			continue
+		# Hands go up, never down: hanging from a treetop you are flying
+		# over would yank you back down onto it.
+		if point.y > global_position.y - 24.0:
+			continue
+		if not _arm_can_reach(point):
+			continue
+		if y < best_y:
+			best_y = y
+			best = {"node": area, "point": point}
+	return best
+
+
+## The arm cannot pass through solid ground. A grab point on a wall sits
+## inside the wall, so the ray is allowed to stop just short of it; stopping
+## well short means a ledge or a slab is in the way.
+func _arm_can_reach(point: Vector2) -> bool:
+	var ray := PhysicsRayQueryParameters2D.create(global_position, point, GameConfig.LAYER_WORLD, [get_rid()])
+	var hit := get_world_2d().direct_space_state.intersect_ray(ray)
+	if hit.is_empty():
+		return true
+	return (hit["position"] as Vector2).distance_to(point) < 36.0
 
 
 func _process_swing(delta: float) -> void:
 	if _swing_node == null or not is_instance_valid(_swing_node):
 		_release_swing(false)
 		return
-	_swing_anchor = _swing_node.global_position
+	_swing_anchor = _swing_node.global_position + _swing_offset
 
-	if _buffer_timer > 0.0:
-		_buffer_timer = 0.0
+	# The button is the grip. Let go of jump and you let go of the vine.
+	if not _input.jump_held:
 		_release_swing(true)
 		return
 
@@ -717,7 +877,7 @@ func _process_swing(delta: float) -> void:
 
 	var old_length := _swing_length
 	_swing_length = clampf(
-		_swing_length + _input.move.y * swing_rope_speed * delta,
+		_swing_length + _input.move.y * swing_rope_speed * stats.climb * delta,
 		swing_min_length,
 		swing_max_length
 	)
@@ -742,11 +902,23 @@ func _process_swing(delta: float) -> void:
 func _release_swing(boosted: bool) -> void:
 	var tangent := Vector2(-sin(_swing_angle), cos(_swing_angle))
 	velocity = tangent * _swing_ang_vel * _swing_length
-	if boosted:
+	if boosted and swing_on_trunk and velocity.length() < trunk_hop_below_speed and _swing_node != null:
+		# Let go while hanging still from a trunk: pull up and hop off it,
+		# up and a little away, which is how a cliff gets climbed.
+		var away := signf(global_position.x - _swing_node.global_position.x)
+		if away == 0.0:
+			away = -float(facing)
+		velocity = Vector2(away * trunk_hop_push + _input.move.x * trunk_hop_push, stats.jump_velocity() * trunk_hop_lift)
+		_jump_rising = false
+	elif boosted:
 		velocity *= swing_release_boost
+		if velocity.length() > 1.0:
+			velocity += velocity.normalized() * swing_release_kick
+		velocity = velocity.limit_length(max_momentum_speed)
 		var release_lift := lerpf(0.32, 0.52, clampf(velocity.length() / swing_max_speed, 0.0, 1.0))
 		velocity.y = minf(velocity.y, stats.jump_velocity() * release_lift)
 	_swing_node = null
+	swing_on_trunk = false
 	_swing_lock = swing_regrab_delay
 	if boosted:
 		Sfx.play(&"swing", _voice_pitch())
@@ -786,7 +958,7 @@ func _try_attack() -> void:
 	# cannot choose, and a variety system becomes a frustration system.
 	Sfx.play(&"attack", _voice_pitch())
 	if _slap_fist != null:
-		_slap_fist.play(facing, stats.body_color)
+		_play_fist()
 		_attack_was_visible = true
 	attacked.emit(ATTACK_FLAVORS[randi() % ATTACK_FLAVORS.size()])
 
@@ -865,7 +1037,7 @@ func _resolve_hit(area: Area2D) -> void:
 	# on the target so one monkey's stat block is the only thing that decides
 	# how far it flies.
 	var super_hit := ability == &"super_hit"
-	var force := dir * stats.knockback_dealt() * (super_hit_multiplier if super_hit else 1.0)
+	var force := dir * stats.knockback_dealt() * punch_power * (super_hit_multiplier if super_hit else 1.0)
 	if target.team >= 0:
 		force *= SLAP_BASE * (1.0 + target.slap_damage * SLAP_SCALING)
 	if super_hit:
@@ -876,7 +1048,7 @@ func _resolve_hit(area: Area2D) -> void:
 	if _slap_fist != null:
 		_slap_fist.impact()
 	if local_control:
-		kick_camera(4.5 if not super_hit else 8.0, 0.10)
+		kick_camera(6.5 if not super_hit else 10.0, 0.13)
 	hit_landed.emit(target.player_id)
 	if Net.is_online():
 		Net.broadcast_hit(target.player_id, force, GameConfig.BASE_STUN_TIME, player_id)
@@ -897,6 +1069,10 @@ func take_hit(attacker_id: int, force: Vector2, base_stun: float, double_drop: b
 		_knock_bananas_loose(double_drop)
 	var applied := force.normalized() * stats.knockback_taken(force.length())
 	velocity = applied
+	# Runs on every machine that applies the hit, so everyone sees the burst.
+	# It sits on the side the slap came from, where the hand met the face.
+	SlapBurst.spawn(get_parent(), global_position + Vector2(-signf(force.x) * 14.0, -14.0), force.length() > 900.0)
+	_jolt_time = 0.12
 	if team >= 0:
 		# Every machine applies the same hits in the same order, so every
 		# machine arrives at the same percentage without shipping it.
@@ -911,8 +1087,6 @@ func take_hit(attacker_id: int, force: Vector2, base_stun: float, double_drop: b
 	if state == State.SWING:
 		_swing_node = null
 		_swing_lock = swing_regrab_delay
-	if state == State.CLIMB:
-		_climb_lock = climb_regrab_delay
 	_set_state(State.STUN)
 	# Pitched by the weight of whoever got hit, so a gorilla taking one reads
 	# differently from a capuchin without any extra audio.
@@ -1112,12 +1286,6 @@ func _process_dash(delta: float) -> void:
 			_end_dash()
 			return
 		velocity = to_target.normalized() * grapple_pull_speed
-	elif _dash_kind == &"dash":
-		velocity = _dash_dir * dash_speed
-		if _dash_time <= 0.0:
-			velocity = _dash_dir * dash_speed * dash_carry
-			_end_dash()
-			return
 	elif _dash_kind == &"snatch":
 		velocity = Vector2(float(facing) * snatch_speed, 0.0)
 		_resolve_snatch()
@@ -1136,37 +1304,6 @@ func _process_dash(delta: float) -> void:
 		_end_dash()
 
 
-## Everyone's dash. Separate from the species skill on purpose: movement is
-## the game, and a move only some monkeys have is a move nobody learns.
-func _try_dash() -> void:
-	if _dash_cooldown_timer > 0.0 or state == State.STUN or state == State.DASH:
-		return
-	var grounded := is_on_floor()
-	if not grounded and not _air_dash_ready:
-		return
-	var aim := _input.move
-	if aim.length() < 0.3:
-		aim = Vector2(float(facing), 0.0)
-	# Eight directions, snapped, so a dash goes where the thumb meant and not
-	# two degrees off it.
-	var angle := snappedf(aim.angle(), PI / 4.0)
-	_dash_dir = Vector2.from_angle(angle)
-	if grounded and _dash_dir.y > 0.1:
-		_dash_dir = Vector2(signf(_dash_dir.x) if absf(_dash_dir.x) > 0.1 else float(facing), 0.0)
-	if not grounded:
-		_air_dash_ready = false
-	if state == State.SWING:
-		_swing_node = null
-		_swing_lock = swing_regrab_delay
-	_dash_kind = &"dash"
-	_dash_time = dash_time
-	_dash_cooldown_timer = dash_cooldown
-	if absf(_dash_dir.x) > 0.1:
-		facing = 1 if _dash_dir.x > 0.0 else -1
-	Sfx.play(&"dash", _voice_pitch())
-	_set_state(State.DASH)
-
-
 ## Bounce pads. Replaces vertical speed rather than adding to it, so a pad
 ## launches the same height whether you walked on or fell on - which is what
 ## lets a level designer put a ledge exactly at the top of the arc.
@@ -1182,7 +1319,7 @@ func bounce(strength: float) -> void:
 	_pending_bounce = strength
 	_jump_rising = false
 	_coyote_timer = 0.0
-	_air_dash_ready = true
+	_double_jump_ready = true
 	_squash = 0.35
 	_set_state(State.AIR)
 	Sfx.play(&"bounce", _voice_pitch())
@@ -1301,7 +1438,7 @@ func _process(delta: float) -> void:
 	# Remote attacks arrive as one boolean in snapshots.  Detect the rising
 	# edge here so they get the same full animation as the local attacker.
 	if is_attacking and not _attack_was_visible and _slap_fist != null:
-		_slap_fist.play(facing, stats.body_color)
+		_play_fist()
 	_attack_was_visible = is_attacking
 	if is_attacking or state == State.SWING or _dash_kind == &"grapple":
 		queue_redraw()
@@ -1317,27 +1454,50 @@ func _draw() -> void:
 	_draw_ground_shadow()
 	_draw_speed_lines()
 	if state == State.SWING and _swing_node != null and is_instance_valid(_swing_node):
-		Vine.draw_vine(self, to_local(_swing_anchor), Vector2(0.0, -12.0), Color(0.35, 0.55, 0.28))
+		if swing_on_trunk:
+			_draw_stretch_arm(to_local(_swing_anchor))
+		else:
+			Vine.draw_vine(self, to_local(_swing_anchor), Vector2(0.0, -12.0), Color(0.35, 0.55, 0.28))
 
 	if _dash_kind == &"grapple":
 		var target := to_local(_dash_target)
 		draw_line(Vector2.ZERO, target, Color(0.85, 0.75, 0.45), 3.0)
 		draw_circle(target, 7.0, Color(0.95, 0.85, 0.5))
 
-	if is_attacking:
-		_draw_attack_arc()
+
+## The punch uses the same authored arm as the grab: the monkey's own
+## species arm texture, shot straight out on the side it faces.
+func _play_fist() -> void:
+	_slap_fist.species = stats.id
+	_slap_fist.shoulder_local = sprite.position + sprite.shoulder_position() if sprite != null else Vector2.ZERO
+	_slap_fist.play(facing, stats.body_color, stats.arm_length)
 
 
-func _draw_attack_arc() -> void:
-	var radius: float = absf(hitbox.position.x) + 8.0
-	if hitbox_shape.shape is RectangleShape2D:
-		radius = absf(hitbox.position.x) + (hitbox_shape.shape as RectangleShape2D).size.x * 0.5
-	var facing_angle: float = 0.0 if facing > 0 else PI
-	var windup_done: bool = _attack_timer >= attack_windup
-	var spread: float = 0.75 if windup_done else 0.35
-	var color := Color(1.0, 0.95, 0.6, 0.9) if windup_done else Color(1.0, 1.0, 1.0, 0.35)
-	var width: float = 7.0 if windup_done else 3.0
-	draw_arc(Vector2(0.0, -4.0), radius, facing_angle - spread, facing_angle + spread, 16, color, width)
+## The rubber arm, from the shoulder to the hand clamped on the grab point.
+## Uses the species' crisp arm texture (MonkeyArm) on the sprite's 2x grid;
+## the old pixel-by-pixel arm stays as the fallback if the art is missing.
+func _draw_stretch_arm(hand: Vector2) -> void:
+	if sprite != null and MonkeyArm.texture_for(stats.id, true) != null:
+		MonkeyArm.draw_arm(self, stats.id, sprite.position + sprite.shoulder_position(), hand, true, facing)
+		return
+	var dir := hand.normalized()
+	var shoulder := dir * 14.0
+	var fur := stats.body_color if stats != null else Color(0.6, 0.4, 0.25)
+	var px := MonkeySprite.PIXEL
+	var length := shoulder.distance_to(hand)
+	var steps := maxi(int(length / px), 1)
+	for pass_index in 2:
+		# Outline pass first, one art pixel fatter, then the fur on top.
+		var half := 2.0 * px if pass_index == 0 else 1.0 * px
+		var colour := JunglePalette.OUTLINE if pass_index == 0 else fur
+		for i in steps + 1:
+			var at := shoulder.lerp(hand, float(i) / steps)
+			var cell := (at / px).floor() * px
+			draw_rect(Rect2(cell - Vector2(half, half), Vector2(half, half) * 2.0), colour)
+	# The hand, a lighter fist closed round the trunk.
+	var fist := (hand / px).floor() * px
+	draw_rect(Rect2(fist - Vector2(3, 3) * px, Vector2(6, 6) * px), JunglePalette.OUTLINE)
+	draw_rect(Rect2(fist - Vector2(2, 2) * px, Vector2(4, 4) * px), fur.lightened(0.18))
 
 
 func _update_ground_shadow() -> void:
@@ -1369,7 +1529,8 @@ func _draw_ground_shadow() -> void:
 
 
 func _draw_speed_lines() -> void:
-	if _sprint_blend < 0.22 or state != State.GROUND or absf(velocity.x) < 220.0:
+	var sliding := state == State.SLIDE
+	if (_sprint_blend < 0.22 and not sliding) or not (state == State.GROUND or sliding) or absf(velocity.x) < 220.0:
 		return
 	var back := -float(facing)
 	var pulse := fmod(float(Time.get_ticks_msec()) * 0.09, 16.0)
@@ -1438,7 +1599,8 @@ func _tick_squash(delta: float) -> void:
 	var squash := Vector2(1.0 + _squash * 0.35, 1.0 - _squash * 0.35)
 	body.scale = squash
 	if sprite != null:
-		sprite.scale = squash * MonkeySprite.PIXEL
+		# The rig supplies the poses; fractional scaling breaks the art grid.
+		sprite.scale = Vector2.ONE * MonkeySprite.PIXEL
 
 
 func _update_visual() -> void:
@@ -1461,20 +1623,21 @@ func _update_visual() -> void:
 			sprite.play(&"stun")
 			# Flicker, so a stunned monkey reads as hit rather than as posing.
 			tint = Color(1.0, 0.55, 0.55) if int(Time.get_ticks_msec() / 80) % 2 == 0 else Color.WHITE
-		State.CLIMB:
-			sprite.play(&"climb")
-			sprite.paused = _moved_speed < 20.0
 		State.SWING:
 			sprite.play(&"swing")
-			if _swing_node != null and is_instance_valid(_swing_node):
-				# Hang from the vine: the sprite's up points at the pivot.
-				var to_anchor := _swing_anchor - global_position
-				sprite.rotation = to_anchor.angle() + PI * 0.5
 		State.DASH:
 			sprite.play(&"dash")
 			tint = Color(1.0, 0.97, 0.8)
+		State.SLIDE:
+			# The dash pose leans hard into the motion, which is what a slide
+			# on the backside reads as at this size.
+			sprite.play(&"dash")
 		State.AIR:
-			sprite.play(&"jump" if step.y < 0.0 else &"fall")
+			if _roll_time > 0.0:
+				_roll_time = maxf(_roll_time - tick, 0.0)
+				sprite.show_progress(&"roll", 1.0 - _roll_time / ROLL_SECONDS)
+			else:
+				sprite.play(&"jump" if step.y < 0.0 else &"fall")
 		_:
 			if absf(step.x) / maxf(tick, 0.001) > 40.0:
 				sprite.play(&"run")
@@ -1483,18 +1646,29 @@ func _update_visual() -> void:
 				sprite.play(&"idle")
 	if is_attacking and state != State.STUN:
 		sprite.play(&"punch")
-		sprite.rotation = float(facing) * -0.075
-		sprite.scale *= Vector2(1.08, 0.94)
 		if _hitbox_open:
 			tint = Color(1.25, 1.2, 1.05)
+	if state != State.AIR:
+		_roll_time = 0.0
+	# A slap lands as a jolt: the struck monkey's sprite snaps a pixel or
+	# two away from the hand and back for a few frames, before the
+	# knockback carries it off. Whole pixels, so it stays on the grid.
+	var feet := Vector2(0.0, stats.body_size.y * 0.5)
+	if _jolt_time > 0.0:
+		_jolt_time = maxf(_jolt_time - tick, 0.0)
+		var k := int(_jolt_time * 60.0)
+		sprite.position = feet + Vector2(MonkeySprite.PIXEL * (2.0 if k % 2 == 0 else -1.0), 0.0)
+	else:
+		sprite.position = feet
 	if _spawn_shield > 0.0 and int(Time.get_ticks_msec() / 90) % 2 == 0:
 		tint.a = 0.35
 	sprite.self_modulate = tint
 	if state == State.GROUND and _sprint_blend > 0.05 and absf(step.x) > 0.05:
-		sprite.rotation = float(facing) * 0.055 * _sprint_blend
 		sprite.speed_scale *= lerpf(1.0, 1.26, _sprint_blend)
+	# Snap only the artwork, never the physics body or network position.
+	sprite.position = LevelSkin.snap(global_position + Vector2(0, stats.body_size.y * 0.5)) - global_position
 	if _sprite_shadow != null:
-		_sync_sprite_layer(_sprite_shadow, Vector2(5.0, 6.0), 1.015)
+		_sync_sprite_layer(_sprite_shadow, Vector2(4.0, 6.0), 1.0)
 	if _sprite_rim != null:
 		_sync_sprite_layer(_sprite_rim, Vector2(-2.0, -2.0), 1.0)
 

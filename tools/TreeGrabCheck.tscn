@@ -1,0 +1,6 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://tools/tree_grab_check.gd" id="1_s"]
+
+[node name="TreeGrabCheck" type="Node"]
+script = ExtResource("1_s")

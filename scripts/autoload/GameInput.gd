@@ -17,9 +17,9 @@ var touch_jump_held: bool = false
 ## Stick past this and the monkey sprints. See InputFrame.sprint_held.
 const TOUCH_SPRINT_AT: float = 0.92
 
-# Contextual actions (climb, swing) are deliberately not buttons. They
-# trigger on contact, which keeps the touch layout down to a stick and two
-# buttons on a phone screen that is mostly thumb.
+# Grabbing is not a button of its own. Jump held in the air grabs whatever
+# vine or trunk the monkey touches, which keeps the touch layout down to a
+# stick and three buttons on a phone screen that is mostly thumb.
 var _frame: InputFrame = InputFrame.new()
 
 
@@ -46,8 +46,6 @@ func _unhandled_input(event: InputEvent) -> void:
 		_frame.press(InputFrame.Action.ATTACK)
 	elif event.is_action_pressed(&"skill"):
 		_frame.press(InputFrame.Action.SKILL)
-	elif event.is_action_pressed(&"dash"):
-		_frame.press(InputFrame.Action.DASH)
 	elif event.is_action_pressed(&"ui_cancel"):
 		pause_requested.emit()
 

@@ -59,26 +59,24 @@ func _draw() -> void:
 ## Shared with the swing rope a monkey draws, so the vine it holds looks like
 ## the vine it grabbed. Stem, a leaf pair every so often, a knot at the top.
 static func draw_vine(canvas: CanvasItem, from: Vector2, to: Vector2, color: Color) -> void:
-	var outline := JunglePalette.BARK_DARK
-	var leaf := color.lightened(0.35)
-	var leaf_dark := color.darkened(0.15)
 	var span := to - from
-	var length := span.length()
-	if length < 1.0:
+	var distance := span.length()
+	if distance < 1.0:
 		return
-	var dir := span / length
-	var side := Vector2(-dir.y, dir.x)
-	canvas.draw_line(from, to, outline, 6.0)
-	canvas.draw_line(from, to, color, 3.0)
-	var steps := int(length / 16.0)
-	for i in range(1, steps):
-		var at := from + dir * (i * 16.0)
-		var flip := 1.0 if i % 2 == 0 else -1.0
-		var tip := at + side * flip * 9.0 + dir * 4.0
-		canvas.draw_colored_polygon(PackedVector2Array([at, tip + side * flip * -2.0 - dir * 3.0, tip, tip + dir * 4.0]), outline)
-		canvas.draw_colored_polygon(PackedVector2Array([at + dir, tip - dir * 2.0, tip - side * flip * 1.0 + dir * 2.0]), leaf if i % 3 else leaf_dark)
-	canvas.draw_circle(from, 9.0, outline)
-	canvas.draw_circle(from, 7.0, leaf_dark)
-	canvas.draw_circle(from + Vector2(-3.0, -2.0), 3.0, leaf)
-	canvas.draw_circle(to, 6.0, outline)
-	canvas.draw_circle(to, 4.0, leaf)
+	var steps := maxi(1, int(ceilf(distance / 2.0)))
+	# Rasterize the rope on the same two-pixel grid as terrain and characters.
+	for i in range(steps + 1):
+		var at := LevelSkin.snap(from.lerp(to, float(i) / float(steps)))
+		canvas.draw_rect(Rect2(at - Vector2(4, 2), Vector2(8, 6)), JunglePalette.OUTLINE)
+	for i in range(steps + 1):
+		var at := LevelSkin.snap(from.lerp(to, float(i) / float(steps)))
+		canvas.draw_rect(Rect2(at - Vector2(2, 0), Vector2(4, 2)), JunglePalette.BARK_LIGHT)
+		canvas.draw_rect(Rect2(at, Vector2(2, 2)), color)
+		if i % 13 == 6:
+			var side := -1.0 if (i / 13) % 2 == 0 else 1.0
+			canvas.draw_rect(Rect2(at + Vector2(side * 4 - 2, 0), Vector2(6, 4)), JunglePalette.LEAF_DARK)
+			canvas.draw_rect(Rect2(at + Vector2(side * 6 - 2, -2), Vector2(4, 2)), JunglePalette.LEAF_LIGHT)
+	var anchor := LevelSkin.snap(from)
+	canvas.draw_rect(Rect2(anchor - Vector2(8, 6), Vector2(16, 12)), JunglePalette.OUTLINE)
+	canvas.draw_rect(Rect2(anchor - Vector2(6, 4), Vector2(12, 8)), JunglePalette.BARK)
+	canvas.draw_rect(Rect2(anchor - Vector2(6, 4), Vector2(8, 2)), JunglePalette.LEAF_LIGHT)

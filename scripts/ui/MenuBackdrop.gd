@@ -35,9 +35,27 @@ func _process(delta: float) -> void:
 		queue_redraw()
 
 
+## The approved jungle panorama, baked to the art grid. Drawn at a whole
+## number scale (never smoothed) to cover the screen, temple in view.
+const PANORAMA := "res://assets/environment/approved/jungle-panorama-px.png"
+const PANORAMA_PAD := 420
+static var _panorama: Texture2D = null
+
+
 func _draw() -> void:
 	var w := size.x
 	var h := size.y
+	if _panorama == null:
+		_panorama = MonkeySprite.load_art(PANORAMA)
+	if _panorama != null:
+		texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		var art := _panorama.get_size() - Vector2(0, PANORAMA_PAD)
+		var zoom := ceilf(maxf(w / art.x, h / art.y))
+		var shown := art * zoom
+		var at := Vector2(floorf((w - shown.x) * 0.5), floorf((h - shown.y) * 0.35))
+		draw_texture_rect_region(_panorama, Rect2(at, shown), Rect2(Vector2(0, PANORAMA_PAD), art))
+		_draw_fireflies(w, h)
+		return
 	draw_polygon(
 		PackedVector2Array([Vector2(0, 0), Vector2(w, 0), Vector2(w, h * 0.55), Vector2(0, h * 0.55)]),
 		PackedColorArray([TOP, TOP, MIDDLE, MIDDLE])
@@ -97,3 +115,13 @@ func _draw() -> void:
 		]), CANOPY)
 		x += 30.0
 		i += 1
+
+
+## Fireflies drifting over the panorama: square, whole pixels, slow.
+func _draw_fireflies(w: float, h: float) -> void:
+	for n in 18:
+		var x := fmod(n * 181.0 + sin(_time * 0.4 + n) * 30.0, w)
+		var y := fmod(n * 97.0 + h * 0.3 + cos(_time * 0.3 + n * 2.0) * 24.0, h)
+		var pulse := 0.35 + 0.35 * sin(_time * 2.0 + n)
+		var at := (Vector2(x, y) / 4.0).floor() * 4.0
+		draw_rect(Rect2(at, Vector2(4, 4)), Color(1.0, 0.86, 0.35, pulse))

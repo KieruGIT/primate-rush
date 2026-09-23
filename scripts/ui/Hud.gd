@@ -102,13 +102,13 @@ func _build_key_strip() -> void:
 	strip.add_theme_constant_override(&"separation", 14)
 	strip.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	strip.modulate = Color(1, 1, 1, 0.85)
-	for pair in [["A D", "MOVE"], ["SPACE / W", "JUMP + CLIMB"], ["SHIFT", "SPRINT"], ["L", "DASH"], ["LEFT CLICK", "SLAP"], ["E", "SKILL"], ["ESC", "PAUSE"]]:
+	for pair in [["A D", "MOVE"], ["SPACE", "JUMP x2 / HOLD GRAB"], ["W S", "ARM IN / OUT"], ["S", "SLIDE"], ["LEFT CLICK", "PUNCH"], ["E", "SKILL"], ["ESC", "PAUSE"]]:
 		var item := HBoxContainer.new()
 		item.add_theme_constant_override(&"separation", 6)
 		var chip := PanelContainer.new()
 		var box := StyleBoxFlat.new()
-		box.bg_color = Color(0.94, 0.95, 0.92)
-		box.border_color = Color(0.13, 0.11, 0.10)
+		box.bg_color = UiTheme.PANEL_HI
+		box.border_color = UiTheme.EDGE
 		box.set_border_width_all(2)
 		box.border_width_bottom = 4
 		box.set_corner_radius_all(6)
@@ -120,7 +120,7 @@ func _build_key_strip() -> void:
 		var key := Label.new()
 		key.text = pair[0]
 		key.add_theme_font_size_override(&"font_size", 13)
-		key.add_theme_color_override(&"font_color", Color(0.15, 0.13, 0.12))
+		key.add_theme_color_override(&"font_color", UiTheme.BANANA)
 		chip.add_child(key)
 		item.add_child(chip)
 		var what := Label.new()
@@ -356,4 +356,6 @@ func _state_text(state: int) -> String:
 			return "swing"
 		Player.State.STUN:
 			return "stunned"
+		Player.State.SLIDE:
+			return "slide"
 	return "?"

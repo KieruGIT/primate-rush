@@ -40,7 +40,7 @@ const WIDTH: int = 640
 ## Tall enough to cover a zoomed-out arena camera, not just a race camera.
 ## At 440 the arena maps showed bare sky above the canopy, because they are
 ## framed wider than the race maps are.
-const HEIGHT: int = 640
+const HEIGHT: int = 960
 ## World pixels per art pixel. Whole number, always - a fractional zoom is
 ## how pixel art gets uneven pixels, and there is no fixing it downstream.
 const ZOOM: int = 2
@@ -92,74 +92,72 @@ static func layer(kind: StringName, seed_value: int) -> ImageTexture:
 ## in the haze, and a couple of light shafts coming down through the gap.
 ## Almost no interior detail - a far layer that competes flattens the scene.
 static func _paint_far(canvas: PixelCanvas, rng: RandomNumberGenerator) -> void:
-	var tint := JunglePalette.at_distance(JunglePalette.CANOPY_FAR, 0.62)
-	var light := JunglePalette.at_distance(JunglePalette.LEAF_LIGHT, 0.78)
-	var base: int = canopy_line(&"far")
-	var far_crowns := base + 30
-	# Trunks first so a crown always caps the one under it. Drawn the other
-	# way round, a trunk whose crown was sparse stood in the sky like a post.
-	var trunks: Array = []
-	var x := -20
-	while x < WIDTH + 20:
-		var radius := rng.randi_range(24, 44)
-		var y := base + rng.randi_range(-16, 12)
-		trunks.append([x, y, radius])
-		if rng.randf() < 0.35:
-			canvas.trunk(x, y, HEIGHT, 3, JunglePalette.at_distance(JunglePalette.BARK, 0.72).lerp(tint, 0.7), tint, false)
-		x += int(radius * rng.randf_range(0.85, 1.2))
-	for entry in trunks:
-		_crown(canvas, entry[0], entry[1], JungleFoliageArt.CROWN_SMALL, JunglePalette.HAZE, 0.62)
-	canvas.fill_under_canopy(far_crowns + 40, tint)
-	for i in 3:
-		canvas.sunshaft(rng.randi_range(40, WIDTH - 40), rng.randi_range(50, 96), rng.randf_range(0.10, 0.18), JunglePalette.SUNSHAFT)
+	var air := JunglePalette.HAZE
+	var tint := JunglePalette.CANOPY_FAR.lerp(air, 0.35)
+	var base := canopy_line(&"far")
+	# Giant trunks continue through the view. Gaps preserve the blue air.
+	for i in 16:
+		var x := i * 44 + rng.randi_range(-14, 14)
+		var y := base + rng.randi_range(-75, 80)
+		var width := rng.randi_range(7, 18)
+		canvas.trunk(x, y, HEIGHT, width, tint, air, false)
+		for tier in 4:
+			_crown(canvas, x + (tier % 2 * 2 - 1) * 14, y + tier * 15, JungleFoliageArt.CROWN_BIG, tint, 0.94)
+	# A distant stepped temple, deliberately lower contrast than terrain.
+	var stone := tint.lerp(JunglePalette.SKY_HIGH, 0.22)
+	for tier in 7:
+		var half := 10 + tier * 9
+		canvas.rect(438 - half, base + 55 + tier * 12, half * 2, 13, stone)
+		canvas.band(438 - half, base + 55 + tier * 12, half * 2, stone.lerp(air, 0.22))
+	canvas.rect(433, base + 38, 10, 18, stone)
+	canvas.rect(437, base + 29, 3, 9, JunglePalette.BANANA_DARK.lerp(air, 0.7))
+	# Distant waterfall ribbons, stepped and subdued in the haze.
+	for fall: Vector2i in [Vector2i(174, 335), Vector2i(505, 393)]:
+		canvas.rect(fall.x - 23, fall.y - 5, 54, 9, tint)
+		for strand in 5:
+			var x: int = fall.x + strand * 3
+			var water := JunglePalette.WATER_GLINT.lerp(air, 0.73 + strand * 0.035)
+			canvas.rect(x, fall.y, 2, HEIGHT - fall.y, water)
+			for y in range(fall.y + strand * 11, HEIGHT, 39):
+				canvas.rect(x, y, 2, 7, air)
 
 
-## The layer that carries the detail: whole trees with bark, crowns lit
-## along their tops, and vines hanging between them.
 static func _paint_mid(canvas: PixelCanvas, rng: RandomNumberGenerator) -> void:
-	var tint := JunglePalette.at_distance(JunglePalette.CANOPY_MID, 0.26)
-	var light := JunglePalette.at_distance(JunglePalette.LEAF_LIGHT, 0.34)
-	# Pushed most of the way to the canopy colour. A trunk back here only has
-	# to say "there is a tree"; drawn at its own contrast it reads as a post
-	# standing in front of the jungle instead of inside it.
-	var bark := JunglePalette.at_distance(JunglePalette.BARK, 0.26).lerp(tint, 0.55)
-	var base: int = canopy_line(&"mid")
-	var mid_crowns := base + 40
-	var trees: Array = []
-	var x := -16
-	while x < WIDTH + 16:
-		var radius := rng.randi_range(26, 46)
-		var y := base + rng.randi_range(-24, 16)
-		canvas.trunk(x, y, HEIGHT, rng.randi_range(5, 9), bark, tint, false)
-		trees.append([x, y, radius])
-		x += int(radius * rng.randf_range(0.80, 1.12))
-	for entry in trees:
-		_crown(canvas, entry[0], entry[1], JungleFoliageArt.CROWN_BIG, JunglePalette.HAZE, 0.26)
-	# Vines hang out of the crowns, never out of open sky.
-	for entry in trees:
-		if rng.randf() < 0.45:
-			canvas.vine(entry[0] + rng.randi_range(-entry[2] / 2, entry[2] / 2), entry[1] + entry[2] / 2, rng.randi_range(30, 90), tint, light)
-	canvas.fill_under_canopy(mid_crowns + 50, tint)
+	var tint := JunglePalette.CANOPY_MID
+	var bark := JunglePalette.BARK.lerp(tint, 0.78)
+	var base := canopy_line(&"mid")
+	# Sparse ancient trees, rather than a horizontal hedge of little crowns.
+	for i in 6:
+		var x := i * 123 + rng.randi_range(-24, 24)
+		var top := base - rng.randi_range(20, 100)
+		var width := rng.randi_range(19, 32)
+		canvas.trunk(x, top, HEIGHT, width, bark, tint, false)
+		for bark_y in range(top, HEIGHT, 18):
+			canvas.stamp_art(x - width / 2 + 2, bark_y, JungleTileArt.TRUNK_M, JungleTileArt.ink, tint, 0.88)
+		for seam in 3:
+			var sx := x - width / 2 + 4 + seam * 7
+			canvas.rect(sx, top + seam * 17, 2, HEIGHT - top, bark.lerp(tint, 0.5))
+		# Branches taper in pixel steps and carry foliage at their ends.
+		for branch in 3:
+			var y := top + 30 + branch * 99
+			var side := -1 if (i + branch) % 2 == 0 else 1
+			for step in 24:
+				canvas.rect(x + side * step * 2, y - step / 2, 3, maxi(2, 8 - step / 4), bark)
+			_crown(canvas, x + side * 39, y - 9, JungleFoliageArt.CROWN_BIG, tint, 0.84)
+			canvas.vine(x + side * 41, y, 45 + branch * 15, tint, JunglePalette.CANOPY_FAR)
+		for offset in [-26, 0, 27]:
+			_crown(canvas, x + offset, top + absi(offset) / 2, JungleFoliageArt.CROWN_BIG, tint, 0.82)
+		canvas.vine(x - width / 2, top + 16, 150, tint, JunglePalette.LEAF_DARK)
 
 
-## The near frame: a dark canopy hanging into the top of the screen with
-## fronds dropping out of it, and unlit undergrowth along the bottom that
-## the level stands in front of. Flat and dark on purpose - this is the
-## inside of the frame, not scenery to read.
 static func _paint_near(canvas: PixelCanvas, rng: RandomNumberGenerator) -> void:
 	var tint := JunglePalette.CANOPY_FRAME
 	var light := JunglePalette.CANOPY_NEAR
 	var x := -30
 	while x < WIDTH + 30:
-		_crown(canvas, x, canopy_line(&"near") + rng.randi_range(-6, 18), JungleFoliageArt.CROWN_BIG, tint, 0.82)
+		_crown(canvas, x, canopy_line(&"near") + rng.randi_range(-6, 18), JungleFoliageArt.CROWN_BIG, tint, 0.92)
 		x += rng.randi_range(34, 50)
-	for i in 11:
-		canvas.frond(rng.randi_range(0, WIDTH), rng.randi_range(8, 44), rng.randi_range(26, 74), tint, light, rng)
-	for i in 7:
-		canvas.vine(rng.randi_range(0, WIDTH), rng.randi_range(0, 30), rng.randi_range(40, 120), tint, light)
-	# Undergrowth along the bottom, tall enough to sit behind a ground but
-	# never so tall it reaches a platform the player has to read.
-	var u := -20
-	while u < WIDTH + 20:
-		_crown(canvas, u, HEIGHT - rng.randi_range(0, 20), JungleFoliageArt.CROWN_SMALL, tint, 0.78)
-		u += rng.randi_range(26, 40)
+	for i in 9:
+		canvas.frond(rng.randi_range(0, WIDTH), rng.randi_range(8, 30), rng.randi_range(18, 48), tint, light, rng)
+	for i in 6:
+		canvas.vine(rng.randi_range(0, WIDTH), 10, rng.randi_range(50, 100), tint, light)
