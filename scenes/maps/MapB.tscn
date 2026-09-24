@@ -1,4 +1,4 @@
-[gd_scene load_steps=25 format=3]
+[gd_scene load_steps=28 format=3]
 
 [ext_resource type="Script" path="res://scripts/world/MapData.gd" id="1_map"]
 [ext_resource type="PackedScene" path="res://scenes/Vine.tscn" id="2_vine"]
@@ -12,52 +12,61 @@
 size = Vector2(2000, 100)
 
 [sub_resource type="RectangleShape2D" id="Rect_Bound2"]
-size = Vector2(48, 2900)
+size = Vector2(48, 3300)
 
 [sub_resource type="RectangleShape2D" id="Rect_Bound3"]
-size = Vector2(48, 2900)
+size = Vector2(48, 3300)
 
 [sub_resource type="RectangleShape2D" id="Rect_Ledge4"]
-size = Vector2(170, 32)
+size = Vector2(160, 32)
 
 [sub_resource type="RectangleShape2D" id="Rect_Ledge5"]
-size = Vector2(170, 32)
+size = Vector2(160, 32)
 
 [sub_resource type="RectangleShape2D" id="Rect_Ledge6"]
-size = Vector2(170, 32)
+size = Vector2(160, 32)
 
-[sub_resource type="RectangleShape2D" id="Rect_Ledge7"]
-size = Vector2(170, 32)
+[sub_resource type="RectangleShape2D" id="Rect_Ground7"]
+size = Vector2(560, 60)
 
-[sub_resource type="RectangleShape2D" id="Rect_Ledge8"]
-size = Vector2(170, 32)
+[sub_resource type="RectangleShape2D" id="Rect_Wall8"]
+size = Vector2(48, 370)
 
 [sub_resource type="RectangleShape2D" id="Rect_Ledge9"]
-size = Vector2(170, 32)
+size = Vector2(280, 32)
 
 [sub_resource type="RectangleShape2D" id="Rect_Ground10"]
-size = Vector2(440, 60)
+size = Vector2(840, 60)
 
-[sub_resource type="RectangleShape2D" id="Rect_Ground11"]
-size = Vector2(968, 60)
+[sub_resource type="RectangleShape2D" id="Rect_Wall11"]
+size = Vector2(48, 380)
 
-[sub_resource type="RectangleShape2D" id="Rect_Wall12"]
-size = Vector2(64, 510)
+[sub_resource type="RectangleShape2D" id="Rect_Ledge12"]
+size = Vector2(180, 32)
 
-[sub_resource type="RectangleShape2D" id="Rect_Ground13"]
-size = Vector2(440, 60)
+[sub_resource type="RectangleShape2D" id="Rect_Ledge13"]
+size = Vector2(180, 32)
 
 [sub_resource type="RectangleShape2D" id="Rect_Ledge14"]
-size = Vector2(240, 32)
+size = Vector2(160, 32)
 
-[sub_resource type="RectangleShape2D" id="Rect_Ledge15"]
-size = Vector2(170, 32)
+[sub_resource type="RectangleShape2D" id="Rect_Ground15"]
+size = Vector2(540, 60)
 
-[sub_resource type="RectangleShape2D" id="Rect_Ledge16"]
-size = Vector2(170, 32)
+[sub_resource type="RectangleShape2D" id="Rect_Ground16"]
+size = Vector2(840, 60)
 
-[sub_resource type="RectangleShape2D" id="Rect_Ground17"]
-size = Vector2(880, 60)
+[sub_resource type="RectangleShape2D" id="Rect_Ledge17"]
+size = Vector2(160, 32)
+
+[sub_resource type="RectangleShape2D" id="Rect_Ledge18"]
+size = Vector2(160, 32)
+
+[sub_resource type="RectangleShape2D" id="Rect_Wall19"]
+size = Vector2(48, 400)
+
+[sub_resource type="RectangleShape2D" id="Rect_Ground20"]
+size = Vector2(900, 60)
 
 [node name="MapB" type="Node2D"]
 script = ExtResource("1_map")
@@ -85,226 +94,273 @@ color = Color(0.22, 0.26, 0.24, 1)
 mouse_filter = 2
 
 [node name="ColBound2" type="CollisionShape2D" parent="Level"]
-position = Vector2(-1024, -950)
+position = Vector2(-1024, -1150)
 shape = SubResource("Rect_Bound2")
 
 [node name="VisBound2" type="ColorRect" parent="Level"]
 offset_left = -1048
-offset_top = -2400
+offset_top = -2800
 offset_right = -1000
 offset_bottom = 500
 color = Color(0.22, 0.26, 0.24, 1)
 mouse_filter = 2
 
 [node name="ColBound3" type="CollisionShape2D" parent="Level"]
-position = Vector2(1024, -950)
+position = Vector2(1024, -1150)
 shape = SubResource("Rect_Bound3")
 
 [node name="VisBound3" type="ColorRect" parent="Level"]
 offset_left = 1000
-offset_top = -2400
+offset_top = -2800
 offset_right = 1048
 offset_bottom = 500
 color = Color(0.22, 0.26, 0.24, 1)
 mouse_filter = 2
 
 [node name="ColLedge4" type="CollisionShape2D" parent="Level"]
-position = Vector2(-555, 446)
+position = Vector2(-680, 446)
 shape = SubResource("Rect_Ledge4")
 
 [node name="VisLedge4" type="ColorRect" parent="Level"]
-offset_left = -640
+offset_left = -760
 offset_top = 430
-offset_right = -470
+offset_right = -600
 offset_bottom = 462
 color = Color(0.22, 0.26, 0.24, 1)
 mouse_filter = 2
 
 [node name="ColLedge5" type="CollisionShape2D" parent="Level"]
-position = Vector2(-355, 376)
+position = Vector2(-480, 376)
 shape = SubResource("Rect_Ledge5")
 
 [node name="VisLedge5" type="ColorRect" parent="Level"]
-offset_left = -440
+offset_left = -560
 offset_top = 360
-offset_right = -270
+offset_right = -400
 offset_bottom = 392
 color = Color(0.22, 0.26, 0.24, 1)
 mouse_filter = 2
 
 [node name="ColLedge6" type="CollisionShape2D" parent="Level"]
-position = Vector2(-155, 306)
+position = Vector2(-280, 306)
 shape = SubResource("Rect_Ledge6")
 
 [node name="VisLedge6" type="ColorRect" parent="Level"]
-offset_left = -240
+offset_left = -360
 offset_top = 290
-offset_right = -70
+offset_right = -200
 offset_bottom = 322
 color = Color(0.22, 0.26, 0.24, 1)
 mouse_filter = 2
 
-[node name="ColLedge7" type="CollisionShape2D" parent="Level"]
-position = Vector2(45, 236)
-shape = SubResource("Rect_Ledge7")
+[node name="ColGround7" type="CollisionShape2D" parent="Level"]
+position = Vector2(120, 250)
+shape = SubResource("Rect_Ground7")
 
-[node name="VisLedge7" type="ColorRect" parent="Level"]
-offset_left = -40
+[node name="VisGround7" type="ColorRect" parent="Level"]
+offset_left = -160
 offset_top = 220
-offset_right = 130
-offset_bottom = 252
+offset_right = 400
+offset_bottom = 280
 color = Color(0.22, 0.26, 0.24, 1)
 mouse_filter = 2
 
-[node name="ColLedge8" type="CollisionShape2D" parent="Level"]
-position = Vector2(245, 166)
-shape = SubResource("Rect_Ledge8")
+[node name="ColWall8" type="CollisionShape2D" parent="Level"]
+position = Vector2(440, 35)
+shape = SubResource("Rect_Wall8")
 
-[node name="VisLedge8" type="ColorRect" parent="Level"]
-offset_left = 160
-offset_top = 150
-offset_right = 330
-offset_bottom = 182
+[node name="VisWall8" type="ColorRect" parent="Level"]
+offset_left = 416
+offset_top = -150
+offset_right = 464
+offset_bottom = 220
 color = Color(0.22, 0.26, 0.24, 1)
 mouse_filter = 2
 
 [node name="ColLedge9" type="CollisionShape2D" parent="Level"]
-position = Vector2(445, 96)
+position = Vector2(640, -134)
 shape = SubResource("Rect_Ledge9")
 
 [node name="VisLedge9" type="ColorRect" parent="Level"]
-offset_left = 360
-offset_top = 80
-offset_right = 530
-offset_bottom = 112
+offset_left = 500
+offset_top = -150
+offset_right = 780
+offset_bottom = -118
 color = Color(0.22, 0.26, 0.24, 1)
 mouse_filter = 2
 
 [node name="ColGround10" type="CollisionShape2D" parent="Level"]
-position = Vector2(780, 40)
+position = Vector2(120, -590)
 shape = SubResource("Rect_Ground10")
 
 [node name="VisGround10" type="ColorRect" parent="Level"]
-offset_left = 560
-offset_top = 10
-offset_right = 1000
-offset_bottom = 70
+offset_left = -300
+offset_top = -620
+offset_right = 540
+offset_bottom = -560
 color = Color(0.22, 0.26, 0.24, 1)
 mouse_filter = 2
 
-[node name="ColGround11" type="CollisionShape2D" parent="Level"]
-position = Vector2(216, -420)
-shape = SubResource("Rect_Ground11")
+[node name="ColWall11" type="CollisionShape2D" parent="Level"]
+position = Vector2(-340, -810)
+shape = SubResource("Rect_Wall11")
 
-[node name="VisGround11" type="ColorRect" parent="Level"]
-offset_left = -268
-offset_top = -450
-offset_right = 700
-offset_bottom = -390
+[node name="VisWall11" type="ColorRect" parent="Level"]
+offset_left = -364
+offset_top = -1000
+offset_right = -316
+offset_bottom = -620
 color = Color(0.22, 0.26, 0.24, 1)
 mouse_filter = 2
 
-[node name="ColWall12" type="CollisionShape2D" parent="Level"]
-position = Vector2(-300, -645)
-shape = SubResource("Rect_Wall12")
+[node name="ColLedge12" type="CollisionShape2D" parent="Level"]
+position = Vector2(-190, -984)
+shape = SubResource("Rect_Ledge12")
 
-[node name="VisWall12" type="ColorRect" parent="Level"]
-offset_left = -332
-offset_top = -900
-offset_right = -268
-offset_bottom = -390
+[node name="VisLedge12" type="ColorRect" parent="Level"]
+offset_left = -280
+offset_top = -1000
+offset_right = -100
+offset_bottom = -968
 color = Color(0.22, 0.26, 0.24, 1)
 mouse_filter = 2
 
-[node name="ColGround13" type="CollisionShape2D" parent="Level"]
-position = Vector2(40, -870)
-shape = SubResource("Rect_Ground13")
+[node name="ColLedge13" type="CollisionShape2D" parent="Level"]
+position = Vector2(30, -1054)
+shape = SubResource("Rect_Ledge13")
 
-[node name="VisGround13" type="ColorRect" parent="Level"]
-offset_left = -180
-offset_top = -900
-offset_right = 260
-offset_bottom = -840
+[node name="VisLedge13" type="ColorRect" parent="Level"]
+offset_left = -60
+offset_top = -1070
+offset_right = 120
+offset_bottom = -1038
 color = Color(0.22, 0.26, 0.24, 1)
 mouse_filter = 2
 
 [node name="ColLedge14" type="CollisionShape2D" parent="Level"]
-position = Vector2(-680, -744)
+position = Vector2(240, -1124)
 shape = SubResource("Rect_Ledge14")
 
 [node name="VisLedge14" type="ColorRect" parent="Level"]
-offset_left = -800
-offset_top = -760
-offset_right = -560
-offset_bottom = -728
+offset_left = 160
+offset_top = -1140
+offset_right = 320
+offset_bottom = -1108
 color = Color(0.22, 0.26, 0.24, 1)
 mouse_filter = 2
 
-[node name="ColLedge15" type="CollisionShape2D" parent="Level"]
-position = Vector2(375, -954)
-shape = SubResource("Rect_Ledge15")
+[node name="ColGround15" type="CollisionShape2D" parent="Level"]
+position = Vector2(630, -1180)
+shape = SubResource("Rect_Ground15")
 
-[node name="VisLedge15" type="ColorRect" parent="Level"]
-offset_left = 290
-offset_top = -970
-offset_right = 460
-offset_bottom = -938
+[node name="VisGround15" type="ColorRect" parent="Level"]
+offset_left = 360
+offset_top = -1210
+offset_right = 900
+offset_bottom = -1150
 color = Color(0.22, 0.26, 0.24, 1)
 mouse_filter = 2
 
-[node name="ColLedge16" type="CollisionShape2D" parent="Level"]
-position = Vector2(575, -1024)
-shape = SubResource("Rect_Ledge16")
+[node name="ColGround16" type="CollisionShape2D" parent="Level"]
+position = Vector2(220, -1730)
+shape = SubResource("Rect_Ground16")
 
-[node name="VisLedge16" type="ColorRect" parent="Level"]
-offset_left = 490
-offset_top = -1040
-offset_right = 660
-offset_bottom = -1008
+[node name="VisGround16" type="ColorRect" parent="Level"]
+offset_left = -200
+offset_top = -1760
+offset_right = 640
+offset_bottom = -1700
 color = Color(0.22, 0.26, 0.24, 1)
 mouse_filter = 2
 
-[node name="ColGround17" type="CollisionShape2D" parent="Level"]
-position = Vector2(100, -1530)
-shape = SubResource("Rect_Ground17")
+[node name="ColLedge17" type="CollisionShape2D" parent="Level"]
+position = Vector2(-320, -1814)
+shape = SubResource("Rect_Ledge17")
 
-[node name="VisGround17" type="ColorRect" parent="Level"]
-offset_left = -340
-offset_top = -1560
-offset_right = 540
-offset_bottom = -1500
+[node name="VisLedge17" type="ColorRect" parent="Level"]
+offset_left = -400
+offset_top = -1830
+offset_right = -240
+offset_bottom = -1798
+color = Color(0.22, 0.26, 0.24, 1)
+mouse_filter = 2
+
+[node name="ColLedge18" type="CollisionShape2D" parent="Level"]
+position = Vector2(-520, -1884)
+shape = SubResource("Rect_Ledge18")
+
+[node name="VisLedge18" type="ColorRect" parent="Level"]
+offset_left = -600
+offset_top = -1900
+offset_right = -440
+offset_bottom = -1868
+color = Color(0.22, 0.26, 0.24, 1)
+mouse_filter = 2
+
+[node name="ColWall19" type="CollisionShape2D" parent="Level"]
+position = Vector2(-700, -2100)
+shape = SubResource("Rect_Wall19")
+
+[node name="VisWall19" type="ColorRect" parent="Level"]
+offset_left = -724
+offset_top = -2300
+offset_right = -676
+offset_bottom = -1900
+color = Color(0.22, 0.26, 0.24, 1)
+mouse_filter = 2
+
+[node name="ColGround20" type="CollisionShape2D" parent="Level"]
+position = Vector2(-150, -2270)
+shape = SubResource("Rect_Ground20")
+
+[node name="VisGround20" type="ColorRect" parent="Level"]
+offset_left = -600
+offset_top = -2300
+offset_right = 300
+offset_bottom = -2240
 color = Color(0.22, 0.26, 0.24, 1)
 mouse_filter = 2
 
 [node name="Climbables" type="Node2D" parent="."]
 
 [node name="Climbable1" parent="Climbables" instance=ExtResource("3_climb")]
-position = Vector2(-300, -655)
-size = Vector2(112, 530)
+position = Vector2(440, 25)
+size = Vector2(96, 390)
+
+[node name="Climbable2" parent="Climbables" instance=ExtResource("3_climb")]
+position = Vector2(-340, -820)
+size = Vector2(96, 400)
+
+[node name="Climbable3" parent="Climbables" instance=ExtResource("3_climb")]
+position = Vector2(-700, -2110)
+size = Vector2(96, 420)
 
 [node name="Vines" type="Node2D" parent="."]
 
 [node name="Vine1" parent="Vines" instance=ExtResource("2_vine")]
-position = Vector2(-560, -760)
-length = 200
+position = Vector2(-600, -1400)
+length = 220
 
 [node name="Vine2" parent="Vines" instance=ExtResource("2_vine")]
-position = Vector2(-620, -1520)
+position = Vector2(500, -2560)
 length = 220
 
 [node name="Checkpoints" type="Node2D" parent="."]
 
 [node name="Checkpoint1" parent="Checkpoints" instance=ExtResource("4_check")]
-position = Vector2(640, -50)
+position = Vector2(0, 160)
 
 [node name="Checkpoint2" parent="Checkpoints" instance=ExtResource("4_check")]
-position = Vector2(200, -510)
+position = Vector2(100, -680)
 
 [node name="Checkpoint3" parent="Checkpoints" instance=ExtResource("4_check")]
-position = Vector2(-60, -960)
+position = Vector2(560, -1270)
+
+[node name="Checkpoint4" parent="Checkpoints" instance=ExtResource("4_check")]
+position = Vector2(250, -1820)
 
 [node name="FinishLine" parent="." instance=ExtResource("5_finish")]
-position = Vector2(0, -1605)
+position = Vector2(0, -2345)
 size = Vector2(260, 90)
 
 [node name="BananaSpawns" type="Node2D" parent="."]
@@ -320,87 +376,115 @@ value = 1
 lucky_chance = 0.1
 
 [node name="Spawn3" parent="BananaSpawns" instance=ExtResource("6_banana")]
-position = Vector2(-475, 320)
+position = Vector2(-480, 320)
 value = 2
 lucky_chance = 0.15
 
 [node name="Spawn4" parent="BananaSpawns" instance=ExtResource("6_banana")]
-position = Vector2(125, 110)
+position = Vector2(200, 180)
 value = 2
 lucky_chance = 0.15
 
 [node name="Spawn5" parent="BananaSpawns" instance=ExtResource("6_banana")]
-position = Vector2(880, -340)
+position = Vector2(650, -440)
 value = 4
 lucky_chance = 0.3
 
 [node name="Spawn6" parent="BananaSpawns" instance=ExtResource("6_banana")]
-position = Vector2(-680, -800)
+position = Vector2(-190, -1040)
+value = 3
+lucky_chance = 0.2
+
+[node name="Spawn7" parent="BananaSpawns" instance=ExtResource("6_banana")]
+position = Vector2(-600, -1190)
 value = 5
 lucky_chance = 0.35
+
+[node name="Spawn8" parent="BananaSpawns" instance=ExtResource("6_banana")]
+position = Vector2(820, -1540)
+value = 4
+lucky_chance = 0.3
 
 [node name="Pads" type="Node2D" parent="."]
 
 [node name="Pad1" parent="Pads" instance=ExtResource("7_pad")]
-position = Vector2(880, 10)
-strength = 1450
+position = Vector2(720, -150)
+strength = 1500
 
 [node name="Pad2" parent="Pads" instance=ExtResource("7_pad")]
-position = Vector2(610, -1040)
-strength = 1500
+position = Vector2(820, -1210)
+strength = 1550
 
 [node name="Route" type="Node2D" parent="."]
 
 [node name="Point1" type="Marker2D" parent="Route"]
-position = Vector2(-555, 394)
+position = Vector2(-680, 394)
 
 [node name="Point2" type="Marker2D" parent="Route"]
-position = Vector2(-355, 324)
+position = Vector2(-480, 324)
 
 [node name="Point3" type="Marker2D" parent="Route"]
-position = Vector2(-155, 254)
+position = Vector2(-280, 254)
 
 [node name="Point4" type="Marker2D" parent="Route"]
-position = Vector2(45, 184)
+position = Vector2(-120, 184)
 
 [node name="Point5" type="Marker2D" parent="Route"]
-position = Vector2(245, 114)
+position = Vector2(380, 184)
 
 [node name="Point6" type="Marker2D" parent="Route"]
-position = Vector2(445, 44)
+position = Vector2(440, -186)
 
 [node name="Point7" type="Marker2D" parent="Route"]
-position = Vector2(640, -26)
+position = Vector2(560, -186)
 
 [node name="Point8" type="Marker2D" parent="Route"]
-position = Vector2(880, -26)
+position = Vector2(720, -186)
 
 [node name="Point9" type="Marker2D" parent="Route"]
-position = Vector2(560, -486)
+position = Vector2(460, -656)
 
 [node name="Point10" type="Marker2D" parent="Route"]
-position = Vector2(-120, -486)
+position = Vector2(-260, -656)
 
 [node name="Point11" type="Marker2D" parent="Route"]
-position = Vector2(-250, -486)
+position = Vector2(-340, -1036)
 
 [node name="Point12" type="Marker2D" parent="Route"]
-position = Vector2(-110, -936)
+position = Vector2(-190, -1036)
 
 [node name="Point13" type="Marker2D" parent="Route"]
-position = Vector2(200, -936)
+position = Vector2(30, -1106)
 
 [node name="Point14" type="Marker2D" parent="Route"]
-position = Vector2(375, -1006)
+position = Vector2(240, -1176)
 
 [node name="Point15" type="Marker2D" parent="Route"]
-position = Vector2(575, -1076)
+position = Vector2(400, -1246)
 
 [node name="Point16" type="Marker2D" parent="Route"]
-position = Vector2(610, -1076)
+position = Vector2(780, -1246)
 
 [node name="Point17" type="Marker2D" parent="Route"]
-position = Vector2(300, -1596)
+position = Vector2(820, -1246)
 
 [node name="Point18" type="Marker2D" parent="Route"]
-position = Vector2(0, -1596)
+position = Vector2(560, -1796)
+
+[node name="Point19" type="Marker2D" parent="Route"]
+position = Vector2(-160, -1796)
+
+[node name="Point20" type="Marker2D" parent="Route"]
+position = Vector2(-320, -1866)
+
+[node name="Point21" type="Marker2D" parent="Route"]
+position = Vector2(-520, -1936)
+
+[node name="Point22" type="Marker2D" parent="Route"]
+position = Vector2(-700, -2336)
+
+[node name="Point23" type="Marker2D" parent="Route"]
+position = Vector2(-560, -2336)
+
+[node name="Point24" type="Marker2D" parent="Route"]
+position = Vector2(0, -2336)

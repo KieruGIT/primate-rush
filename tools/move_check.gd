@@ -84,25 +84,28 @@ func _run() -> void:
 	# Holding down at speed slides instead of stopping.
 	await _reset(Vector2(0, FLOOR_TOP - 40))
 	_player.velocity.x = 640.0
+	var trace := PackedStringArray()
 	for i in 12:
 		await _tick(Vector2(0, 1))
+		trace.append("%s:%.0f" % [Player.State.keys()[_player.state], _player.velocity.x])
+	print("SLIDETRACE ", " ".join(trace))
 	_check("down at speed slides", _player.state == Player.State.SLIDE and _player.velocity.x > 450.0,
-		"state %s, vx %.0f" % [Player.State.keys()[_player.state], _player.velocity.x])
+		"state %s, vx %.0f  %s" % [Player.State.keys()[_player.state], _player.velocity.x, " ".join(trace)])
 
-	# Jump and swing are separate: holding jump next to a vine never grabs.
+	# Jump alone never grabs, even held: grabbing is its own button now.
 	await _reset(Vector2(VINE_X, 120))
-	var jump_grabbed := false
+	var tapped := false
 	for i in 14:
 		await _tick(Vector2.ZERO, true)
-		jump_grabbed = jump_grabbed or _player.state == Player.State.SWING
-	_check("jump does not grab", not jump_grabbed, "")
+		tapped = tapped or _player.state == Player.State.SWING
+	_check("held jump does not grab", not tapped, "")
 	await _reset(Vector2(VINE_X, 120))
 	var held := false
 	for i in 14:
 		await _tick(Vector2.ZERO, false, false, true)
 		held = held or _player.state == Player.State.SWING
-	_check("grab button grabs a vine", held, "")
-	# The grab button is the grip: letting go of it lets go of the vine.
+	_check("hold grab grabs a vine", held, "")
+	# The button is the grip: letting go of grab lets go of the vine.
 	for i in 20:
 		await _tick(Vector2(1, 0), false, false, true)
 	await _tick(Vector2(1, 0))
@@ -117,6 +120,21 @@ func _run() -> void:
 	await _tick(Vector2(1, 0), true, false, true)
 	_check("jump leaps off a swing", _player.state != Player.State.SWING and _player.velocity.y < -200.0,
 		"state %s, vy %.0f" % [Player.State.keys()[_player.state], _player.velocity.y])
+
+	# Let go of the stick at full speed and the monkey stops, on the ground
+	# and in the air.
+	await _reset(Vector2(0, FLOOR_TOP - 40))
+	for i in 40:
+		await _tick(Vector2(1, 0))
+	for i in 20:
+		await _tick(Vector2.ZERO)
+	var ground_vx := absf(_player.velocity.x)
+	await _reset(Vector2(0, FLOOR_TOP - 400))
+	_player.velocity = Vector2(500, 0)
+	for i in 20:
+		await _tick(Vector2.ZERO)
+	var air_vx := absf(_player.velocity.x)
+	_check("stops when you let go", ground_vx < 1.0 and air_vx < 20.0, "ground vx %.0f after 1/3 s, air vx %.0f" % [ground_vx, air_vx])
 
 	# One-way platform: jump up through it from below and land on top.
 	await _reset(Vector2(PLATFORM_X, FLOOR_TOP - 40))

@@ -33,6 +33,9 @@ extends Resource
 ## long-armed monkey is long-armed at everything it does with its arms.
 @export_range(0.8, 2.0, 0.05) var arm_length: float = 1.0
 
+## Attack pace. Above 1 winds up, recovers and cools down faster.
+@export_range(0.5, 2.0, 0.05) var attack_speed: float = 1.0
+
 @export_group("Skill")
 ## Identifier consumed by the skill system. Empty means no skill yet.
 @export var skill_id: StringName = &""
@@ -70,6 +73,12 @@ func knockback_taken(incoming: float) -> float:
 ## 0.0 means a swing bleeds speed fast, 1.0 means it keeps almost everything.
 func swing_retention() -> float:
 	return clampf(0.985 + (swing - 1.0) * 0.012, 0.95, 0.999)
+
+
+## How far the normal slap reaches, as a share of the base reach. Arm length
+## as before, but a small body no longer reaches as far as a gorilla's.
+func slap_reach_scale() -> float:
+	return arm_length * clampf(body_size.x / 32.0, 0.75, 1.0)
 
 
 func air_control() -> float:

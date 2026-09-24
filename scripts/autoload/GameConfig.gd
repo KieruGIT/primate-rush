@@ -85,7 +85,7 @@ func rank_for(rp: int) -> Dictionary:
 	var low := int(RANK_TIERS[tier][1])
 	var last := tier == RANK_TIERS.size() - 1
 	if last:
-		return {"name": String(RANK_TIERS[tier][0]), "progress": 1.0, "next": -1}
+		return {"name": String(RANK_TIERS[tier][0]), "progress": 1.0, "next": -1, "tier": tier, "division": -1}
 	var high := int(RANK_TIERS[tier + 1][1])
 	var step := float(high - low) / 3.0
 	var division := clampi(int(float(rp - low) / step), 0, 2)
@@ -95,7 +95,18 @@ func rank_for(rp: int) -> Dictionary:
 		"name": "%s %s" % [RANK_TIERS[tier][0], ["III", "II", "I"][division]],
 		"progress": clampf(float(rp - from) / maxf(float(next - from), 1.0), 0.0, 1.0),
 		"next": next,
+		"tier": tier,
+		"division": division,
 	}
+
+
+## Rank points by finishing place in a full four-monkey ranked match, for
+## the ranks screen: 1st +30, 2nd +15, 3rd 0, 4th -15.
+func ranked_placement_table() -> Array:
+	var out: Array = []
+	for place in range(1, NET_MAX_PLAYERS + 1):
+		out.append(ranked_delta(Mode.RACE, place, NET_MAX_PLAYERS, {}))
+	return out
 
 
 ## Rank points for one finished ranked match. First place in a full field is
@@ -115,20 +126,23 @@ const MAP_PATHS: Dictionary = {
 	&"map_a": "res://scenes/maps/MapA.tscn",
 	&"map_b": "res://scenes/maps/MapB.tscn",
 	&"map_c": "res://scenes/maps/SlapArena.tscn",
+	&"map_d": "res://scenes/maps/BananaGrove.tscn",
 }
 
 const MAP_NAMES: Dictionary = {
 	&"map_a": "Jungle Run",
 	&"map_b": "Canopy Climb",
 	&"map_c": "Slap Island",
+	&"map_d": "Banana Grove",
 }
 
 ## Which maps a mode can be played on. A race needs a finish line, and a
 ## slap fight needs an island small enough that the edge is always close.
 const MODE_MAPS: Dictionary = {
-	Mode.FREE_PLAY: [&"map_a", &"map_b", &"map_c"],
+	Mode.FREE_PLAY: [&"map_a", &"map_b", &"map_c", &"map_d"],
 	Mode.RACE: [&"map_a", &"map_b"],
-	Mode.HOARD: [&"map_a", &"map_b"],
+	# The hoard has its own map: one big square jungle, not a race course.
+	Mode.HOARD: [&"map_d"],
 	Mode.SLAP: [&"map_c"],
 }
 
@@ -137,8 +151,10 @@ const MODE_MAPS: Dictionary = {
 ## AI partner against two AI; in a party the first two people team up.
 const TEAM_NAMES: Array[String] = ["Banana", "Coconut"]
 const TEAM_COLORS: Array[Color] = [Color(1.0, 0.80, 0.10), Color(0.35, 0.70, 0.95)]
-const SLAP_TARGET_KOS: int = 5
-const SLAP_ROUND_SECONDS: float = 150.0
+## 2v2 is played in rounds, one life each per round: best of three.
+const SLAP_ROUNDS_TO_WIN: int = 2
+## Time limit on one round.
+const SLAP_ROUND_SECONDS: float = 75.0
 
 ## Falling costs time, never a life. Short enough to sting without making
 ## someone put the phone down.
@@ -211,6 +227,31 @@ const HATS: Dictionary = {
 	&"band": {"name": "Headband", "style": &"band", "color": Color(0.30, 0.65, 0.85), "premium": false},
 	&"crown": {"name": "Crown", "style": &"crown", "color": Color(0.95, 0.80, 0.25), "premium": true},
 	&"tophat": {"name": "Top hat", "style": &"tophat", "color": Color(0.15, 0.15, 0.20), "premium": true},
+	&"shades": {"name": "Shades", "style": &"shades", "color": Color(0.08, 0.08, 0.1), "premium": false},
+	&"flower": {"name": "Flower", "style": &"flower", "color": Color(1.0, 0.45, 0.65), "premium": false},
+	&"headphones": {"name": "Headphones", "style": &"headphones", "color": Color(0.25, 0.75, 0.95), "premium": false},
+	&"party": {"name": "Party hat", "style": &"party", "color": Color(0.55, 0.35, 0.95), "premium": false},
+	&"halo": {"name": "Halo", "style": &"halo", "color": Color(1.0, 0.9, 0.4), "premium": true},
+}
+
+# --- Skins ---
+# Recolours of the monkey art (see scripts/player/MonkeySkins.gd). params go
+# straight to the recolour shader: target_hue 0..1, hue_mix, sat_add,
+# sat_mul, val_mul. swatch is the colour shown on the button.
+const SKINS: Dictionary = {
+	&"natural": {"name": "Natural", "premium": false, "swatch": Color8(150, 106, 64), "params": {}},
+	&"lava": {"name": "Lava", "premium": false, "swatch": Color8(226, 74, 40),
+		"params": {"target_hue": 0.02, "hue_mix": 1.0, "sat_add": 0.45, "sat_mul": 1.0, "val_mul": 1.05}},
+	&"toxic": {"name": "Toxic", "premium": false, "swatch": Color8(110, 220, 70),
+		"params": {"target_hue": 0.28, "hue_mix": 1.0, "sat_add": 0.45, "sat_mul": 1.0, "val_mul": 1.08}},
+	&"snow": {"name": "Snow", "premium": false, "swatch": Color8(225, 235, 245),
+		"params": {"target_hue": 0.58, "hue_mix": 1.0, "sat_add": 0.0, "sat_mul": 0.18, "val_mul": 1.4}},
+	&"bubblegum": {"name": "Bubblegum", "premium": false, "swatch": Color8(255, 130, 200),
+		"params": {"target_hue": 0.9, "hue_mix": 1.0, "sat_add": 0.3, "sat_mul": 1.0, "val_mul": 1.15}},
+	&"golden": {"name": "Golden", "premium": true, "swatch": Color8(255, 200, 58),
+		"params": {"target_hue": 0.12, "hue_mix": 1.0, "sat_add": 0.4, "sat_mul": 1.0, "val_mul": 1.2}},
+	&"midnight": {"name": "Midnight", "premium": true, "swatch": Color8(60, 70, 150),
+		"params": {"target_hue": 0.66, "hue_mix": 1.0, "sat_add": 0.25, "sat_mul": 1.0, "val_mul": 0.8}},
 }
 
 var _cache: Dictionary = {}
@@ -270,6 +311,22 @@ func bot_names(count: int) -> Array[String]:
 	return picked
 
 
+func skin_ids() -> Array[StringName]:
+	var ids: Array[StringName] = []
+	for key in SKINS.keys():
+		ids.append(key)
+	return ids
+
+
+func get_skin(id: StringName) -> Dictionary:
+	return SKINS.get(id, SKINS[&"natural"])
+
+
+## A premium skin or hat is yours with Monkey Plus, or if the gacha gave it.
+func is_skin_unlocked(id: StringName) -> bool:
+	return not bool(get_skin(id).get("premium", false)) or Purchases.has_premium() or Loot.owns_look(&"skin", id)
+
+
 func hat_ids() -> Array[StringName]:
 	var ids: Array[StringName] = []
 	for key in HATS.keys():
@@ -282,7 +339,7 @@ func get_hat(id: StringName) -> Dictionary:
 
 
 func is_hat_unlocked(id: StringName) -> bool:
-	return not bool(get_hat(id).get("premium", false)) or Purchases.has_premium()
+	return not bool(get_hat(id).get("premium", false)) or Purchases.has_premium() or Loot.owns_look(&"hat", id)
 
 
 func map_ids() -> Array[StringName]:

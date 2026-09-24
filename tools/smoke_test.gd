@@ -136,6 +136,13 @@ func _spawn_of(id: int) -> Vector2:
 
 
 func _report() -> void:
+	var lines: PackedStringArray = []
+	for note in _notes:
+		lines.append(note)
+	lines.append("SMOKE OK" if _failures.is_empty() else "SMOKE FAILURES:")
+	for failure in _failures:
+		lines.append("  - " + failure)
+	preload("res://tools/qa_log.gd").write("smoke", lines)
 	print("--- smoke results ---")
 	for note in _notes:
 		print("  " + note)

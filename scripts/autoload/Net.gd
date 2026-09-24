@@ -19,6 +19,8 @@ extends Node
 signal roster_changed
 signal peer_joined(peer_id: int)
 signal match_started
+## The 10 second monkey pick before a match. Host and clients alike.
+signal pick_started(seconds: float)
 signal match_ended
 signal config_changed
 signal connection_failed
@@ -34,6 +36,7 @@ var link: int = Link.OFFLINE
 var roster: Dictionary = {}          # peer_id -> {"monkey": StringName, "hat": StringName, "slot": int}
 var local_monkey: StringName = &"gorilla"
 var local_hat: StringName = &"none"
+var local_skin: StringName = &"natural"
 ## Match setup. Host owns it; clients receive it and never edit it, so two
 ## people cannot load two different maps into the same match.
 var map_id: StringName = &"map_a"
@@ -87,7 +90,7 @@ func host_game(port: int = GameConfig.NET_DEFAULT_PORT) -> String:
 	multiplayer.multiplayer_peer = _peer
 	link = Link.HOST
 	roster.clear()
-	roster[1] = {"monkey": local_monkey, "hat": local_hat, "slot": 0}
+	roster[1] = {"monkey": local_monkey, "hat": local_hat, "skin": local_skin, "slot": 0}
 	roster_changed.emit()
 	return ""
 
@@ -152,7 +155,7 @@ func _on_peer_disconnected(id: int) -> void:
 
 
 func _on_connected_to_server() -> void:
-	_register_player.rpc_id(1, String(local_monkey), String(local_hat))
+	_register_player.rpc_id(1, String(local_monkey), String(local_hat), String(local_skin))
 
 
 func _on_connection_failed() -> void:
@@ -166,20 +169,23 @@ func _on_server_disconnected() -> void:
 
 
 @rpc("any_peer", "reliable")
-func _register_player(monkey_id: String, hat_id: String) -> void:
+func _register_player(monkey_id: String, hat_id: String, skin_id: String = "natural") -> void:
 	if not is_host():
 		return
 	var id := multiplayer.get_remote_sender_id()
 	if not roster.has(id):
-		roster[id] = {"monkey": StringName(monkey_id), "hat": StringName(hat_id), "slot": roster.size()}
+		roster[id] = {"monkey": StringName(monkey_id), "hat": StringName(hat_id), "skin": StringName(skin_id), "slot": roster.size()}
 	else:
 		roster[id]["monkey"] = StringName(monkey_id)
 		roster[id]["hat"] = StringName(hat_id)
+		roster[id]["skin"] = StringName(skin_id)
 	_broadcast_roster()
 
 
+## Switching monkey brings that monkey's saved skin with it.
 func set_local_monkey(id: StringName) -> void:
 	local_monkey = id
+	local_skin = Profile.skin_for(id)
 	_push_local_choice()
 
 
@@ -188,13 +194,19 @@ func set_local_hat(id: StringName) -> void:
 	_push_local_choice()
 
 
+func set_local_skin(id: StringName) -> void:
+	local_skin = id
+	_push_local_choice()
+
+
 func _push_local_choice() -> void:
 	if link == Link.HOST:
 		roster[1]["monkey"] = local_monkey
 		roster[1]["hat"] = local_hat
+		roster[1]["skin"] = local_skin
 		_broadcast_roster()
 	elif link == Link.CLIENT and multiplayer.has_multiplayer_peer():
-		_register_player.rpc_id(1, String(local_monkey), String(local_hat))
+		_register_player.rpc_id(1, String(local_monkey), String(local_hat), String(local_skin))
 
 
 func _broadcast_roster() -> void:
@@ -211,6 +223,7 @@ func roster_wire() -> Dictionary:
 		wire[str(id)] = {
 			"monkey": String(roster[id]["monkey"]),
 			"hat": String(roster[id].get("hat", &"none")),
+			"skin": String(roster[id].get("skin", &"natural")),
 			"slot": int(roster[id]["slot"]),
 			"bot": bool(roster[id].get("bot", false)),
 			"name": String(roster[id].get("name", "")),
@@ -224,6 +237,7 @@ func apply_roster_wire(wire: Dictionary) -> void:
 		roster[int(key)] = {
 			"monkey": StringName(wire[key]["monkey"]),
 			"hat": StringName(wire[key].get("hat", "none")),
+			"skin": StringName(wire[key].get("skin", "natural")),
 			"slot": int(wire[key]["slot"]),
 			"bot": bool(wire[key].get("bot", false)),
 			"name": String(wire[key].get("name", "")),
@@ -273,6 +287,19 @@ func _sync_config(wire_map: String, wire_mode: int, wire_bots: int, wire_skill: 
 	config_changed.emit()
 
 
+## Opens the monkey pick for everyone in the room (just this machine when
+## offline). The host starts the match itself when the time is up.
+func begin_pick(seconds: float) -> void:
+	if is_online() and is_host():
+		_begin_pick.rpc(seconds)
+	pick_started.emit(seconds)
+
+
+@rpc("authority", "reliable")
+func _begin_pick(seconds: float) -> void:
+	pick_started.emit(seconds)
+
+
 ## Works offline too, so solo play and a hosted match take the same path
 ## instead of the lobby having two ways to start the same thing.
 func start_match() -> void:
@@ -281,7 +308,7 @@ func start_match() -> void:
 		# Offline still builds a roster, so the arena has one way to spawn a
 		# field instead of a solo path and a networked path that drift.
 		roster.clear()
-		roster[1] = {"monkey": local_monkey, "hat": local_hat, "slot": 0}
+		roster[1] = {"monkey": local_monkey, "hat": local_hat, "skin": local_skin, "slot": 0}
 		_assign_bots()
 		_start_match()
 		return
@@ -453,6 +480,23 @@ func broadcast_ability(target_id: int, ability_id: StringName, duration: float) 
 	if not is_host():
 		return
 	_push_ability.rpc(target_id, String(ability_id), duration)
+
+
+## Host only. A gorilla catching someone: every machine has to agree the
+## victim is being carried, or the one being carried keeps running on its
+## own screen.
+func broadcast_grab(target_id: int, attacker_id: int, seconds: float) -> void:
+	if not is_host():
+		return
+	_push_grab.rpc(target_id, attacker_id, seconds)
+
+
+@rpc("authority", "reliable")
+func _push_grab(target_id: int, attacker_id: int, seconds: float) -> void:
+	if is_host() or arena == null:
+		return
+	if arena.has_method(&"apply_remote_grab"):
+		arena.call(&"apply_remote_grab", target_id, attacker_id, seconds)
 
 
 @rpc("authority", "reliable")

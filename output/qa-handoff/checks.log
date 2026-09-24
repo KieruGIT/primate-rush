@@ -158,3 +158,390 @@
 2026-09-23T17:07:53  PLAY on ledge: y 354 top 380 floor true platform true
 2026-09-23T17:07:53  PLAY after down: y 474 (below top: true)
 2026-09-23T17:07:53  PLAY PROBE DONE
+2026-09-23T20:35:14  MOVE ok    double jump goes higher  single 143 px, double 241 px
+2026-09-23T20:35:15  MOVE ok    jump adds momentum  vx 671 after jump, run 420
+2026-09-23T20:35:15  MOVE ok    bunny hop keeps speed  vx 777 after hop
+2026-09-23T20:35:16  MOVE ok    no hop brakes to top speed  vx 546 after landing, top 546
+2026-09-23T20:35:16  MOVE ok    early press waits for the ground  vx 777, double jump still ready: true
+2026-09-23T20:35:17  MOVE FAIL  down at speed slides  state SLIDE, vx 406
+2026-09-23T20:35:17  MOVE ok    tap jump does not grab  
+2026-09-23T20:35:17  MOVE ok    hold jump grabs a vine  
+2026-09-23T20:35:18  MOVE ok    letting go of jump lets go  state AIR
+2026-09-23T20:35:18  MOVE ok    jump leaps off a swing  state AIR, vy -648
+2026-09-23T20:35:20  MOVE ok    stops when you let go  ground vx 0 after 1/3 s, air vx 0
+2026-09-23T20:35:21  MOVE ok    jump up through a platform  y 348, platform top 380
+2026-09-23T20:35:22  MOVE ok    platform holds when not pressing down  y 348
+2026-09-23T20:35:22  MOVE ok    down drops through a platform  y 468
+2026-09-23T20:35:23  MOVE CHECK FAIL (1)
+2026-09-23T20:38:09  SKILL gorilla: dummy moved 811 px, state then STUN, my skill timer 2.7
+2026-09-23T20:38:09  SKILL orangutan: dummy moved 225 px, state then GROUND, my skill timer 3.8
+2026-09-23T20:38:09  SKILL macaque: dummy moved 594 px, state then STUN, my skill timer 2.1
+2026-09-23T20:38:09  SKILL gibbon: dummy moved 736 px, state then AIR, my skill timer 0.0
+2026-09-23T20:38:09  SKILL capuchin: dummy moved 28 px, state then STUN, my skill timer 2.6
+2026-09-23T20:38:09  SKILL PROBE DONE
+2026-09-23T20:38:56  MOVE ok    double jump goes higher  single 143 px, double 241 px
+2026-09-23T20:38:57  MOVE ok    jump adds momentum  vx 671 after jump, run 420
+2026-09-23T20:38:58  MOVE ok    bunny hop keeps speed  vx 777 after hop
+2026-09-23T20:38:58  MOVE ok    no hop brakes to top speed  vx 546 after landing, top 546
+2026-09-23T20:38:59  MOVE ok    early press waits for the ground  vx 777, double jump still ready: true
+2026-09-23T20:38:59  MOVE FAIL  down at speed slides  state SLIDE, vx 438
+2026-09-23T20:38:59  MOVE ok    tap jump does not grab  
+2026-09-23T20:39:00  MOVE ok    hold jump grabs a vine  
+2026-09-23T20:39:00  MOVE ok    letting go of jump lets go  state AIR
+2026-09-23T20:39:00  MOVE ok    jump leaps off a swing  state AIR, vy -648
+2026-09-23T20:39:02  MOVE ok    stops when you let go  ground vx 0 after 1/3 s, air vx 0
+2026-09-23T20:39:04  MOVE ok    jump up through a platform  y 348, platform top 380
+2026-09-23T20:39:04  MOVE ok    platform holds when not pressing down  y 348
+2026-09-23T20:39:05  MOVE ok    down drops through a platform  y 468
+2026-09-23T20:39:05  MOVE CHECK FAIL (1)
+2026-09-23T20:41:51  SMOKE --- smoke results ---
+2026-09-23T20:41:51  SMOKE   instanced every scene under res://scenes
+2026-09-23T20:41:51  SMOKE   map_a / Free play: 4 monkeys, 4 moved
+2026-09-23T20:41:51  SMOKE   map_b / Free play: 4 monkeys, 4 moved
+2026-09-23T20:41:51  SMOKE   map_c / Free play: 4 monkeys, 3 moved
+2026-09-23T20:41:51  SMOKE   map_a / Race: 4 monkeys, 3 moved
+2026-09-23T20:41:51  SMOKE   map_b / Race: 4 monkeys, 4 moved
+2026-09-23T20:41:51  SMOKE   map_a / Banana Hoard: 4 monkeys, 4 moved
+2026-09-23T20:41:52  SMOKE   map_b / Banana Hoard: 4 monkeys, 4 moved
+2026-09-23T20:41:52  SMOKE   map_c / 2v2 Slap: 4 monkeys, 3 moved
+2026-09-23T20:41:52  SMOKE SMOKE OK
+2026-09-23T20:42:27  TREE MapA ok   branches=12 trees=12 latched=true on_tree=true held=CrownGrab58
+2026-09-23T20:42:27  TREE MapB ok   branches=10 trees=11 latched=true on_tree=true held=CrownGrab40
+2026-09-23T20:42:28  TREE SlapArena ok   branches=2 trees=2 latched=true on_tree=true held=CrownGrab15
+2026-09-23T20:42:28  TREE GRAB CHECK OK
+2026-09-23T20:43:18  CLIMB grabbed=true climbed=1072  CLIMB CHECK OK
+2026-09-23T20:46:44  MOVE ok    double jump goes higher  single 143 px, double 241 px
+2026-09-23T20:46:45  MOVE ok    jump adds momentum  vx 671 after jump, run 420
+2026-09-23T20:46:45  MOVE ok    bunny hop keeps speed  vx 777 after hop
+2026-09-23T20:46:46  MOVE ok    no hop brakes to top speed  vx 546 after landing, top 546
+2026-09-23T20:46:46  MOVE ok    early press waits for the ground  vx 777, double jump still ready: true
+2026-09-23T20:46:46  MOVE FAIL  down at speed slides  state SLIDE, vx 438
+2026-09-23T20:46:47  MOVE ok    tap jump does not grab  
+2026-09-23T20:46:47  MOVE ok    hold jump grabs a vine  
+2026-09-23T20:46:47  MOVE ok    letting go of jump lets go  state AIR
+2026-09-23T20:46:48  MOVE ok    jump leaps off a swing  state AIR, vy -648
+2026-09-23T20:46:49  MOVE ok    stops when you let go  ground vx 0 after 1/3 s, air vx 0
+2026-09-23T20:46:51  MOVE ok    jump up through a platform  y 348, platform top 380
+2026-09-23T20:46:51  MOVE ok    platform holds when not pressing down  y 348
+2026-09-23T20:46:52  MOVE ok    down drops through a platform  y 468
+2026-09-23T20:46:52  MOVE CHECK FAIL (1)
+2026-09-23T21:33:37  PERF map_a: 43 fps, process 42.46 ms, physics 17.34 ms, draw calls 127, worst frame 61.0 ms, nodes 588, objects 14478
+2026-09-23T21:33:37  PERF map_b: 36 fps, process 30.56 ms, physics 8.69 ms, draw calls 124, worst frame 41.3 ms, nodes 424, objects 13624
+2026-09-23T21:33:37  PERF map_c: 55 fps, process 24.90 ms, physics 7.32 ms, draw calls 114, worst frame 35.9 ms, nodes 249, objects 11090
+2026-09-23T21:38:37  PERF baseline: process 38.96 ms, physics 13.75 ms, primitives 15476
+2026-09-23T21:38:37  PERF GameInput.gd x1: saves process -9.85 ms, physics 2.96 ms, primitives 10
+2026-09-23T21:38:37  PERF Net.gd x1: saves process -0.46 ms, physics 4.71 ms, primitives -29
+2026-09-23T21:38:37  PERF Discovery.gd x1: saves process -120.78 ms, physics 4.08 ms, primitives 52
+2026-09-23T21:38:37  PERF PortMap.gd x1: saves process 6.61 ms, physics -26.56 ms, primitives -3
+2026-09-23T21:38:37  PERF Purchases.gd x1: saves process -80.25 ms, physics 4.31 ms, primitives 53
+2026-09-23T21:38:37  PERF Profile.gd x1: saves process 9.17 ms, physics 7.08 ms, primitives 98
+2026-09-23T21:38:37  PERF Sfx.gd x1: saves process 10.67 ms, physics 6.94 ms, primitives 246
+2026-09-23T21:38:37  PERF MapData.gd x1: saves process 14.00 ms, physics 8.10 ms, primitives 11008
+2026-09-23T21:38:37  PERF LevelSkin.gd x1: saves process 14.65 ms, physics 5.37 ms, primitives 11012
+2026-09-23T21:38:37  PERF Node2D(@Node2D@16) x2: saves process 3.90 ms, physics 4.74 ms, primitives 5507
+2026-09-23T21:38:37  PERF Node2D(@Node2D@24) x1: saves process 10.42 ms, physics 4.69 ms, primitives 5412
+2026-09-23T21:38:37  PERF Node2D(@Node2D@26) x1: saves process 6.61 ms, physics 3.44 ms, primitives 4024
+2026-09-23T21:38:37  PERF Torch.gd x15: saves process 7.13 ms, physics 5.31 ms, primitives 76
+2026-09-23T21:38:37  PERF Climbable.gd x108: saves process 11.42 ms, physics 6.18 ms, primitives 66
+2026-09-23T21:38:37  PERF Node2D(@Node2D@28) x1: saves process 5.14 ms, physics 6.22 ms, primitives 126
+2026-09-23T21:38:37  PERF Node2D(@Node2D@12) x2: saves process -6.01 ms, physics -1.90 ms, primitives 1142
+2026-09-23T21:38:37  PERF Vine.gd x9: saves process 2.60 ms, physics 6.55 ms, primitives 1456
+2026-09-23T21:38:37  PERF Checkpoint.gd x7: saves process 8.17 ms, physics 3.77 ms, primitives 1443
+2026-09-23T21:38:37  PERF FinishLine.gd x1: saves process 12.99 ms, physics 8.66 ms, primitives 1442
+2026-09-23T21:38:37  PERF BananaSpawn.gd x25: saves process 15.14 ms, physics 9.62 ms, primitives 1448
+2026-09-23T21:38:37  PERF BouncePad.gd x2: saves process 18.59 ms, physics 10.55 ms, primitives 1442
+2026-09-23T21:38:37  PERF Player.gd x4: saves process 2.36 ms, physics 11.96 ms, primitives 1503
+2026-09-23T21:38:37  PERF MonkeySprite.gd x4: saves process 7.40 ms, physics 8.38 ms, primitives 1460
+2026-09-23T21:38:37  PERF Headwear.gd x4: saves process 4.27 ms, physics 4.98 ms, primitives 1421
+2026-09-23T21:38:37  PERF SlapFist.gd x4: saves process 15.40 ms, physics 9.82 ms, primitives 1153
+2026-09-23T21:38:37  PERF RaceDirector.gd x1: saves process 14.58 ms, physics 8.88 ms, primitives 66
+2026-09-23T21:38:37  PERF HoardDirector.gd x1: saves process 18.47 ms, physics 9.07 ms, primitives 141
+2026-09-23T21:38:37  PERF SlapDirector.gd x1: saves process 17.37 ms, physics 10.20 ms, primitives 75
+2026-09-23T21:38:37  PERF Hud.gd x1: saves process 12.89 ms, physics 7.17 ms, primitives 602
+2026-09-23T21:38:37  PERF Control(@Control@44) x1: saves process 20.87 ms, physics 8.16 ms, primitives 1472
+2026-09-23T21:38:37  PERF Control(SkillIcon) x1: saves process 16.43 ms, physics 6.52 ms, primitives 1529
+2026-09-23T21:38:37  PERF TouchControls.gd x1: saves process 11.08 ms, physics 8.77 ms, primitives 1218
+2026-09-23T21:38:37  PERF TouchSurface.gd x1: saves process 16.18 ms, physics 6.76 ms, primitives 164
+2026-09-23T21:39:23  PERF map_a: 66 fps, process 26.80 ms, physics 12.52 ms, draw calls 0, worst frame 79.8 ms, nodes 585, objects 0
+2026-09-23T21:39:23  PERF map_b: 61 fps, process 31.39 ms, physics 18.60 ms, draw calls 0, worst frame 64.9 ms, nodes 424, objects 0
+2026-09-23T21:39:23  PERF map_c: 106 fps, process 33.16 ms, physics 15.31 ms, draw calls 0, worst frame 65.6 ms, nodes 242, objects 0
+2026-09-23T21:40:11  PERF map_a: 34 fps, process 29.01 ms, physics 9.93 ms, draw calls 126, worst frame 38.8 ms, nodes 587, objects 14501
+2026-09-23T21:40:11  PERF map_b: 29 fps, process 75.73 ms, physics 10.85 ms, draw calls 130, worst frame 222.9 ms, nodes 424, objects 13661
+2026-09-23T21:40:11  PERF map_c: 36 fps, process 30.02 ms, physics 8.64 ms, draw calls 126, worst frame 47.8 ms, nodes 239, objects 11104
+2026-09-23T21:43:23  PERF map_a: 62 fps, process 18.93 ms, physics 9.51 ms, draw calls 130, worst frame 24.7 ms, nodes 588, objects 11606
+2026-09-23T21:43:23  PERF map_b: 62 fps, process 26.53 ms, physics 8.91 ms, draw calls 116, worst frame 59.4 ms, nodes 433, objects 9845
+2026-09-23T21:43:23  PERF map_c: 66 fps, process 25.08 ms, physics 12.39 ms, draw calls 140, worst frame 36.7 ms, nodes 252, objects 7776
+2026-09-23T21:43:55  PERF map_a: 58 fps, process 19.22 ms, physics 16.38 ms, draw calls 125, worst frame 54.7 ms, nodes 676, objects 6548
+2026-09-23T21:43:55  PERF map_b: 60 fps, process 16.29 ms, physics 7.14 ms, draw calls 134, worst frame 24.9 ms, nodes 479, objects 7629
+2026-09-23T21:43:55  PERF map_c: 60 fps, process 16.35 ms, physics 7.76 ms, draw calls 133, worst frame 23.0 ms, nodes 266, objects 7140
+2026-09-23T21:44:22  DEBLOAT moved assets/opp_jungle
+2026-09-23T21:44:22  DEBLOAT moved assets/freegameassets
+2026-09-23T21:44:22  DEBLOAT moved assets/environment/approved
+2026-09-23T21:44:22  DEBLOAT moved assets/monkeys/crisp
+2026-09-23T21:44:22  DEBLOAT moved assets/monkeys/locked
+2026-09-23T21:44:22  DEBLOAT moved assets/monkeys/gorilla
+2026-09-23T21:44:22  DEBLOAT moved assets/monkeys/capuchin
+2026-09-23T21:44:22  DEBLOAT moved assets/monkeys/gibbon
+2026-09-23T21:44:22  DEBLOAT moved assets/monkeys/macaque
+2026-09-23T21:44:22  DEBLOAT moved assets/monkeys/orangutan
+2026-09-23T21:44:22  DEBLOAT moved assets/monkeys/macaque_moss
+2026-09-23T21:44:22  DEBLOAT moved assets/monkeys/macaque_rose
+2026-09-23T21:44:22  DEBLOAT moved assets/kenney_ui-pack
+2026-09-23T21:44:22  DEBLOAT moved assets/kenney_sounds/ui_switch_002.ogg
+2026-09-23T21:44:22  DEBLOAT moved assets/kenney_sounds/ui_switch_002.ogg.import
+2026-09-23T21:44:22  DEBLOAT moved scripts/world/OppSkin.gd
+2026-09-23T21:44:22  DEBLOAT moved scripts/world/OppSkin.gd.uid
+2026-09-23T21:44:22  DEBLOAT moved tools/art_mock.gd
+2026-09-23T21:44:22  DEBLOAT moved tools/art_mock.gd.uid
+2026-09-23T21:44:22  DEBLOAT moved tools/ArtMock.tscn
+2026-09-23T21:44:22  DEBLOAT kept kenney_ui-pack/PNG/Extra/Default/input_rectangle.png
+2026-09-23T21:44:22  DEBLOAT kept kenney_ui-pack/PNG/Extra/Default/input_rectangle.png.import
+2026-09-23T21:44:22  DEBLOAT kept kenney_ui-pack/PNG/Blue/Default/slide_hangle.png
+2026-09-23T21:44:22  DEBLOAT kept kenney_ui-pack/PNG/Blue/Default/slide_hangle.png.import
+2026-09-23T21:44:22  DEBLOAT kept kenney_ui-pack/PNG/Green/Default/check_square_color_checkmark.png
+2026-09-23T21:44:22  DEBLOAT kept kenney_ui-pack/PNG/Green/Default/check_square_color_checkmark.png.import
+2026-09-23T21:44:22  DEBLOAT kept kenney_ui-pack/PNG/Grey/Default/check_square_grey.png
+2026-09-23T21:44:22  DEBLOAT kept kenney_ui-pack/PNG/Grey/Default/check_square_grey.png.import
+2026-09-23T21:44:22  DEBLOAT kept kenney_ui-pack/License.txt
+2026-09-23T21:48:40  SKILL gorilla: dummy moved 774 px, state then STUN, my skill timer 2.8
+2026-09-23T21:48:40  SKILL orangutan: dummy moved 617 px, state then GROUND, my skill timer 3.8
+2026-09-23T21:48:40  SKILL macaque: dummy moved 157 px, state then GROUND, my skill timer 2.1
+2026-09-23T21:48:40  SKILL gibbon: dummy moved 101 px, state then STUN, my skill timer 1.1
+2026-09-23T21:48:40  SKILL capuchin: dummy moved 3 px, state then STUN, my skill timer 2.6
+2026-09-23T21:48:40  SKILL PROBE DONE
+2026-09-23T21:50:01  SMOKE --- smoke results ---
+2026-09-23T21:50:01  SMOKE   instanced every scene under res://scenes
+2026-09-23T21:50:01  SMOKE   map_a / Free play: 4 monkeys, 4 moved
+2026-09-23T21:50:01  SMOKE   map_b / Free play: 4 monkeys, 4 moved
+2026-09-23T21:50:01  SMOKE   map_c / Free play: 4 monkeys, 4 moved
+2026-09-23T21:50:01  SMOKE   map_a / Race: 4 monkeys, 4 moved
+2026-09-23T21:50:01  SMOKE   map_b / Race: 4 monkeys, 4 moved
+2026-09-23T21:50:01  SMOKE   map_a / Banana Hoard: 4 monkeys, 3 moved
+2026-09-23T21:50:01  SMOKE   map_b / Banana Hoard: 4 monkeys, 3 moved
+2026-09-23T21:50:01  SMOKE   map_c / 2v2 Slap: 4 monkeys, 3 moved
+2026-09-23T21:50:01  SMOKE SMOKE OK
+2026-09-23T21:50:53  MOVE ok    double jump goes higher  single 143 px, double 241 px
+2026-09-23T21:50:54  MOVE ok    jump adds momentum  vx 671 after jump, run 420
+2026-09-23T21:50:54  MOVE ok    bunny hop keeps speed  vx 777 after hop
+2026-09-23T21:50:55  MOVE ok    no hop brakes to top speed  vx 546 after landing, top 546
+2026-09-23T21:50:55  MOVE ok    early press waits for the ground  vx 777, double jump still ready: true
+2026-09-23T21:50:56  MOVE FAIL  down at speed slides  state SLIDE, vx 438
+2026-09-23T21:50:56  MOVE ok    tap jump does not grab  
+2026-09-23T21:50:56  MOVE ok    hold jump grabs a vine  
+2026-09-23T21:50:56  MOVE ok    letting go of jump lets go  state AIR
+2026-09-23T21:50:57  MOVE ok    jump leaps off a swing  state AIR, vy -648
+2026-09-23T21:50:58  MOVE ok    stops when you let go  ground vx 0 after 1/3 s, air vx 0
+2026-09-23T21:51:00  MOVE ok    jump up through a platform  y 348, platform top 380
+2026-09-23T21:51:00  MOVE ok    platform holds when not pressing down  y 348
+2026-09-23T21:51:01  MOVE ok    down drops through a platform  y 468
+2026-09-23T21:51:01  MOVE CHECK FAIL (1)
+2026-09-23T21:51:17  TREE MapA ok   branches=12 trees=12 latched=true on_tree=true held=CrownGrab58
+2026-09-23T21:51:18  TREE MapB ok   branches=10 trees=11 latched=true on_tree=true held=CrownGrab40
+2026-09-23T21:51:18  TREE SlapArena ok   branches=2 trees=2 latched=true on_tree=true held=CrownGrab15
+2026-09-23T21:51:18  TREE GRAB CHECK OK
+2026-09-23T21:52:05  CLIMB grabbed=true climbed=1072  CLIMB CHECK OK
+2026-09-23T22:03:30  SMOKE --- smoke results ---
+2026-09-23T22:03:30  SMOKE   instanced every scene under res://scenes
+2026-09-23T22:03:30  SMOKE   map_a / Free play: 4 monkeys, 4 moved
+2026-09-23T22:03:30  SMOKE   map_b / Free play: 4 monkeys, 4 moved
+2026-09-23T22:03:30  SMOKE   map_c / Free play: 4 monkeys, 3 moved
+2026-09-23T22:03:30  SMOKE   map_a / Race: 4 monkeys, 3 moved
+2026-09-23T22:03:30  SMOKE   map_b / Race: 4 monkeys, 3 moved
+2026-09-23T22:03:30  SMOKE   map_a / Banana Hoard: 4 monkeys, 4 moved
+2026-09-23T22:03:30  SMOKE   map_b / Banana Hoard: 4 monkeys, 3 moved
+2026-09-23T22:03:30  SMOKE   map_c / 2v2 Slap: 4 monkeys, 2 moved
+2026-09-23T22:03:30  SMOKE SMOKE OK
+2026-09-23T22:10:32  PERF map_a bots=3: 60 fps, process 16.03 ms, physics 5.86 ms, draw calls 128, worst frame 22.4 ms, nodes 745, objects 501
+2026-09-23T22:10:32  PERF map_b bots=3: 60 fps, process 16.04 ms, physics 5.45 ms, draw calls 145, worst frame 22.0 ms, nodes 523, objects 983
+2026-09-23T22:10:32  PERF map_c bots=3: 60 fps, process 15.98 ms, physics 4.85 ms, draw calls 144, worst frame 21.0 ms, nodes 282, objects 1064
+2026-09-23T22:10:32  PERF map_a bots=0: 60 fps, process 17.95 ms, physics 1.20 ms, draw calls 120, worst frame 20.9 ms, nodes 681, objects 571
+2026-09-23T22:11:48  PERF map_a bots=3: 60 fps, process 16.19 ms, physics 3.95 ms, draw calls 122, worst frame 21.9 ms, nodes 746, objects 501
+2026-09-23T22:11:48  PERF map_b bots=3: 60 fps, process 16.99 ms, physics 4.96 ms, draw calls 145, worst frame 20.5 ms, nodes 520, objects 587
+2026-09-23T22:11:48  PERF map_c bots=3: 60 fps, process 16.19 ms, physics 4.53 ms, draw calls 138, worst frame 21.9 ms, nodes 275, objects 921
+2026-09-23T22:11:48  PERF map_a bots=0: 60 fps, process 17.34 ms, physics 1.34 ms, draw calls 120, worst frame 19.1 ms, nodes 681, objects 571
+2026-09-23T22:15:55  PERF map_a bots=3: 60 fps, process 16.11 ms, physics 7.49 ms, draw calls 145, worst frame 25.8 ms, nodes 740, objects 628
+2026-09-23T22:15:55  PERF map_b bots=3: 60 fps, process 16.65 ms, physics 5.88 ms, draw calls 133, worst frame 23.9 ms, nodes 522, objects 989
+2026-09-23T22:15:55  PERF map_c bots=3: 60 fps, process 16.52 ms, physics 4.42 ms, draw calls 131, worst frame 21.0 ms, nodes 278, objects 896
+2026-09-23T22:15:55  PERF map_a bots=0: 60 fps, process 18.00 ms, physics 1.39 ms, draw calls 120, worst frame 21.0 ms, nodes 681, objects 571
+2026-09-23T22:17:55  PERF baseline: process 29.78 ms, physics 5.23 ms, primitives 740
+2026-09-23T22:17:55  PERF GameConfig.gd x1: saves process 1.84 ms, physics 2.55 ms, primitives -14
+2026-09-23T22:17:55  PERF GameInput.gd x1: saves process 12.99 ms, physics 2.95 ms, primitives 51
+2026-09-23T22:17:55  PERF Net.gd x1: saves process 12.35 ms, physics 2.54 ms, primitives 74
+2026-09-23T22:17:55  PERF Discovery.gd x1: saves process 13.34 ms, physics 0.60 ms, primitives 46
+2026-09-23T22:17:55  PERF PortMap.gd x1: saves process 13.67 ms, physics 2.17 ms, primitives -24
+2026-09-23T22:17:55  PERF Purchases.gd x1: saves process 13.63 ms, physics 1.20 ms, primitives 27
+2026-09-23T22:17:55  PERF Profile.gd x1: saves process 12.88 ms, physics 2.65 ms, primitives 42
+2026-09-23T22:17:55  PERF Sfx.gd x1: saves process 13.09 ms, physics 1.31 ms, primitives 114
+2026-09-23T22:17:55  PERF MapData.gd x1: saves process 13.44 ms, physics 3.58 ms, primitives 245
+2026-09-23T22:17:55  PERF LevelSkin.gd x1: saves process 13.10 ms, physics 1.71 ms, primitives 274
+2026-09-23T22:17:55  PERF Node2D(@Node2D@19) x2: saves process 13.25 ms, physics 1.70 ms, primitives 192
+2026-09-23T22:17:55  PERF Node2D(@Node2D@27) x1: saves process 13.23 ms, physics 2.72 ms, primitives 145
+2026-09-23T22:17:55  PERF Node2D(@Node2D@37) x1: saves process 13.16 ms, physics 2.06 ms, primitives 108
+2026-09-23T22:17:55  PERF Torch.gd x15: saves process 12.50 ms, physics 1.43 ms, primitives 202
+2026-09-23T22:17:55  PERF Climbable.gd x108: saves process 12.45 ms, physics 3.92 ms, primitives 34
+2026-09-23T22:17:55  PERF Node2D(@Node2D@83) x1: saves process 13.51 ms, physics 3.61 ms, primitives -872
+2026-09-23T22:17:55  PERF Node2D(@Node2D@15) x2: saves process 12.36 ms, physics 2.20 ms, primitives -243
+2026-09-23T22:17:55  PERF Vine.gd x9: saves process 11.51 ms, physics 1.27 ms, primitives -255
+2026-09-23T22:17:55  PERF Checkpoint.gd x7: saves process 12.97 ms, physics 2.50 ms, primitives -917
+2026-09-23T22:17:55  PERF FinishLine.gd x1: saves process 13.58 ms, physics 2.08 ms, primitives -776
+2026-09-23T22:17:55  PERF BananaSpawn.gd x25: saves process 13.18 ms, physics 3.98 ms, primitives -808
+2026-09-23T22:17:55  PERF BouncePad.gd x2: saves process 1.47 ms, physics 3.10 ms, primitives -743
+2026-09-23T22:17:55  PERF Player.gd x4: saves process 10.76 ms, physics 2.76 ms, primitives -805
+2026-09-23T22:17:55  PERF MonkeySprite.gd x4: saves process 10.30 ms, physics 1.21 ms, primitives -683
+2026-09-23T22:17:55  PERF Headwear.gd x4: saves process 13.35 ms, physics 0.86 ms, primitives -543
+2026-09-23T22:17:55  PERF SlapFist.gd x4: saves process 13.38 ms, physics 1.54 ms, primitives -962
+2026-09-23T22:17:55  PERF RaceDirector.gd x1: saves process 13.52 ms, physics 0.87 ms, primitives -901
+2026-09-23T22:17:55  PERF HoardDirector.gd x1: saves process 13.73 ms, physics -0.92 ms, primitives -1208
+2026-09-23T22:17:55  PERF SlapDirector.gd x1: saves process 13.50 ms, physics 2.57 ms, primitives -919
+2026-09-23T22:17:55  PERF Hud.gd x1: saves process 13.52 ms, physics 1.53 ms, primitives -914
+2026-09-23T22:17:55  PERF Control(@Control@201) x1: saves process 13.43 ms, physics 0.70 ms, primitives -711
+2026-09-23T22:17:55  PERF Control(SkillIcon) x1: saves process 13.19 ms, physics 0.50 ms, primitives -562
+2026-09-23T22:17:55  PERF TouchControls.gd x1: saves process 13.58 ms, physics 1.17 ms, primitives -912
+2026-09-23T22:17:55  PERF TouchSurface.gd x1: saves process 13.08 ms, physics 1.17 ms, primitives -807
+2026-09-23T22:18:59  SMOKE --- smoke results ---
+2026-09-23T22:18:59  SMOKE   instanced every scene under res://scenes
+2026-09-23T22:18:59  SMOKE   map_a / Free play: 4 monkeys, 4 moved
+2026-09-23T22:18:59  SMOKE   map_b / Free play: 4 monkeys, 4 moved
+2026-09-23T22:18:59  SMOKE   map_c / Free play: 4 monkeys, 3 moved
+2026-09-23T22:18:59  SMOKE   map_a / Race: 4 monkeys, 4 moved
+2026-09-23T22:18:59  SMOKE   map_b / Race: 4 monkeys, 4 moved
+2026-09-23T22:18:59  SMOKE   map_a / Banana Hoard: 4 monkeys, 4 moved
+2026-09-23T22:18:59  SMOKE   map_b / Banana Hoard: 4 monkeys, 4 moved
+2026-09-23T22:18:59  SMOKE   map_c / 2v2 Slap: 4 monkeys, 2 moved
+2026-09-23T22:18:59  SMOKE SMOKE OK
+2026-09-23T22:19:18  MOVE ok    double jump goes higher  single 143 px, double 241 px
+2026-09-23T22:19:19  MOVE ok    jump adds momentum  vx 671 after jump, run 420
+2026-09-23T22:19:19  MOVE ok    bunny hop keeps speed  vx 777 after hop
+2026-09-23T22:19:20  MOVE ok    no hop brakes to top speed  vx 546 after landing, top 546
+2026-09-23T22:19:20  MOVE ok    early press waits for the ground  vx 777, double jump still ready: true
+2026-09-23T22:19:21  MOVE FAIL  down at speed slides  state SLIDE, vx 438
+2026-09-23T22:19:21  MOVE ok    tap jump does not grab  
+2026-09-23T22:19:21  MOVE ok    hold jump grabs a vine  
+2026-09-23T22:19:22  MOVE ok    letting go of jump lets go  state AIR
+2026-09-23T22:19:22  MOVE ok    jump leaps off a swing  state AIR, vy -648
+2026-09-23T22:19:24  MOVE ok    stops when you let go  ground vx 0 after 1/3 s, air vx 0
+2026-09-23T22:19:25  MOVE ok    jump up through a platform  y 348, platform top 380
+2026-09-23T22:19:26  MOVE ok    platform holds when not pressing down  y 348
+2026-09-23T22:19:27  MOVE ok    down drops through a platform  y 468
+2026-09-23T22:19:27  MOVE CHECK FAIL (1)
+2026-09-23T22:19:58  TREE MapA ok   branches=12 trees=12 latched=true on_tree=true held=CrownGrab58
+2026-09-23T22:19:59  TREE MapB ok   branches=10 trees=11 latched=true on_tree=true held=CrownGrab40
+2026-09-23T22:19:59  TREE SlapArena ok   branches=2 trees=2 latched=true on_tree=true held=CrownGrab15
+2026-09-23T22:19:59  TREE GRAB CHECK OK
+2026-09-23T22:20:38  CLIMB grabbed=true climbed=1072  CLIMB CHECK OK
+2026-09-23T22:22:08  MOVE ok    double jump goes higher  single 143 px, double 241 px
+2026-09-23T22:22:09  MOVE ok    jump adds momentum  vx 671 after jump, run 420
+2026-09-23T22:22:09  MOVE ok    bunny hop keeps speed  vx 777 after hop
+2026-09-23T22:22:10  MOVE ok    no hop brakes to top speed  vx 546 after landing, top 546
+2026-09-23T22:22:10  MOVE ok    early press waits for the ground  vx 777, double jump still ready: true
+2026-09-23T22:22:11  MOVE FAIL  down at speed slides  state SLIDE, vx 438
+2026-09-23T22:22:11  MOVE ok    tap jump does not grab  
+2026-09-23T22:22:11  MOVE ok    hold jump grabs a vine  
+2026-09-23T22:22:12  MOVE ok    letting go of jump lets go  state AIR
+2026-09-23T22:22:12  MOVE ok    jump leaps off a swing  state AIR, vy -648
+2026-09-23T22:22:14  MOVE ok    stops when you let go  ground vx 0 after 1/3 s, air vx 0
+2026-09-23T22:22:15  MOVE ok    jump up through a platform  y 348, platform top 380
+2026-09-23T22:22:16  MOVE ok    platform holds when not pressing down  y 348
+2026-09-23T22:22:17  MOVE ok    down drops through a platform  y 468
+2026-09-23T22:22:17  MOVE CHECK FAIL (1)
+2026-09-23T22:23:44  MOVE ok    double jump goes higher  single 143 px, double 241 px
+2026-09-23T22:23:45  MOVE ok    jump adds momentum  vx 671 after jump, run 420
+2026-09-23T22:23:46  MOVE ok    bunny hop keeps speed  vx 777 after hop
+2026-09-23T22:23:46  MOVE ok    no hop brakes to top speed  vx 546 after landing, top 546
+2026-09-23T22:23:46  MOVE ok    early press waits for the ground  vx 777, double jump still ready: true
+2026-09-23T22:23:47  MOVE FAIL  down at speed slides  state SLIDE, vx 438
+2026-09-23T22:23:47  MOVE ok    tap jump does not grab  
+2026-09-23T22:23:48  MOVE ok    hold jump grabs a vine  
+2026-09-23T22:23:48  MOVE ok    letting go of jump lets go  state AIR
+2026-09-23T22:23:48  MOVE ok    jump leaps off a swing  state AIR, vy -648
+2026-09-23T22:23:50  MOVE ok    stops when you let go  ground vx 0 after 1/3 s, air vx 0
+2026-09-23T22:23:51  MOVE ok    jump up through a platform  y 348, platform top 380
+2026-09-23T22:23:52  MOVE ok    platform holds when not pressing down  y 348
+2026-09-23T22:23:53  MOVE ok    down drops through a platform  y 468
+2026-09-23T22:23:53  MOVE CHECK FAIL (1)
+2026-09-23T22:25:01  MOVE ok    double jump goes higher  single 143 px, double 241 px
+2026-09-23T22:25:02  MOVE ok    jump adds momentum  vx 671 after jump, run 420
+2026-09-23T22:25:02  MOVE ok    bunny hop keeps speed  vx 777 after hop
+2026-09-23T22:25:03  MOVE ok    no hop brakes to top speed  vx 546 after landing, top 546
+2026-09-23T22:25:03  MOVE ok    early press waits for the ground  vx 777, double jump still ready: true
+2026-09-23T22:25:04  MOVE FAIL  down at speed slides  state SLIDE, vx 438
+2026-09-23T22:25:04  MOVE ok    tap jump does not grab  
+2026-09-23T22:25:04  MOVE ok    hold jump grabs a vine  
+2026-09-23T22:25:05  MOVE ok    letting go of jump lets go  state AIR
+2026-09-23T22:25:05  MOVE ok    jump leaps off a swing  state AIR, vy -648
+2026-09-23T22:25:07  MOVE ok    stops when you let go  ground vx 0 after 1/3 s, air vx 0
+2026-09-23T22:25:08  MOVE ok    jump up through a platform  y 348, platform top 380
+2026-09-23T22:25:09  MOVE ok    platform holds when not pressing down  y 348
+2026-09-23T22:25:09  MOVE ok    down drops through a platform  y 468
+2026-09-23T22:25:09  MOVE CHECK FAIL (1)
+2026-09-23T22:25:31  MOVE ok    double jump goes higher  single 143 px, double 241 px
+2026-09-23T22:25:32  MOVE ok    jump adds momentum  vx 671 after jump, run 420
+2026-09-23T22:25:32  MOVE ok    bunny hop keeps speed  vx 777 after hop
+2026-09-23T22:25:33  MOVE ok    no hop brakes to top speed  vx 546 after landing, top 546
+2026-09-23T22:25:33  MOVE ok    early press waits for the ground  vx 777, double jump still ready: true
+2026-09-23T22:25:33  MOVE FAIL  down at speed slides  state SLIDE, vx 438
+2026-09-23T22:25:34  MOVE ok    tap jump does not grab  
+2026-09-23T22:25:34  MOVE ok    hold jump grabs a vine  
+2026-09-23T22:25:34  MOVE ok    letting go of jump lets go  state AIR
+2026-09-23T22:25:35  MOVE ok    jump leaps off a swing  state AIR, vy -648
+2026-09-23T22:25:36  MOVE ok    stops when you let go  ground vx 0 after 1/3 s, air vx 0
+2026-09-23T22:25:38  MOVE ok    jump up through a platform  y 348, platform top 380
+2026-09-23T22:25:38  MOVE ok    platform holds when not pressing down  y 348
+2026-09-23T22:25:39  MOVE ok    down drops through a platform  y 468
+2026-09-23T22:25:39  MOVE CHECK FAIL (1)
+2026-09-23T22:26:59  MOVE ok    double jump goes higher  single 143 px, double 241 px
+2026-09-23T22:27:00  MOVE ok    jump adds momentum  vx 671 after jump, run 420
+2026-09-23T22:27:01  MOVE ok    bunny hop keeps speed  vx 777 after hop
+2026-09-23T22:27:01  MOVE ok    no hop brakes to top speed  vx 546 after landing, top 546
+2026-09-23T22:27:02  MOVE ok    early press waits for the ground  vx 777, double jump still ready: true
+2026-09-23T22:27:02  MOVE ok    down at speed slides  state SLIDE, vx 485  GROUND:555 SLIDE:548 SLIDE:542 SLIDE:536 SLIDE:529 SLIDE:523 SLIDE:517 SLIDE:510 SLIDE:504 SLIDE:498 SLIDE:491 SLIDE:485
+2026-09-23T22:27:02  MOVE ok    tap jump does not grab  
+2026-09-23T22:27:03  MOVE ok    hold jump grabs a vine  
+2026-09-23T22:27:03  MOVE ok    letting go of jump lets go  state AIR
+2026-09-23T22:27:03  MOVE ok    jump leaps off a swing  state AIR, vy -648
+2026-09-23T22:27:05  MOVE ok    stops when you let go  ground vx 0 after 1/3 s, air vx 0
+2026-09-23T22:27:07  MOVE ok    jump up through a platform  y 348, platform top 380
+2026-09-23T22:27:07  MOVE ok    platform holds when not pressing down  y 348
+2026-09-23T22:27:08  MOVE ok    down drops through a platform  y 468
+2026-09-23T22:27:08  MOVE CHECK OK
+2026-09-23T23:59:44  MOVE ok    double jump goes higher  single 143 px, double 241 px
+2026-09-23T23:59:45  MOVE ok    jump adds momentum  vx 671 after jump, run 420
+2026-09-23T23:59:46  MOVE ok    bunny hop keeps speed  vx 777 after hop
+2026-09-23T23:59:46  MOVE ok    no hop brakes to top speed  vx 546 after landing, top 546
+2026-09-23T23:59:47  MOVE ok    early press waits for the ground  vx 777, double jump still ready: true
+2026-09-23T23:59:47  MOVE ok    down at speed slides  state SLIDE, vx 485  GROUND:555 SLIDE:548 SLIDE:542 SLIDE:536 SLIDE:529 SLIDE:523 SLIDE:517 SLIDE:510 SLIDE:504 SLIDE:498 SLIDE:491 SLIDE:485
+2026-09-23T23:59:47  MOVE ok    tap jump does not grab  
+2026-09-23T23:59:48  MOVE ok    hold jump grabs a vine  
+2026-09-23T23:59:48  MOVE ok    letting go of jump lets go  state AIR
+2026-09-23T23:59:48  MOVE ok    jump leaps off a swing  state AIR, vy -648
+2026-09-23T23:59:50  MOVE ok    stops when you let go  ground vx 0 after 1/3 s, air vx 0
+2026-09-23T23:59:52  MOVE ok    jump up through a platform  y 348, platform top 380
+2026-09-23T23:59:52  MOVE ok    platform holds when not pressing down  y 348
+2026-09-23T23:59:53  MOVE ok    down drops through a platform  y 468
+2026-09-23T23:59:53  MOVE CHECK OK
+2026-09-24T00:00:14  CLIMB grabbed=true climbed=1114  CLIMB CHECK OK
+2026-09-24T00:00:32  TREE MapA ok   branches=11 trees=12 latched=true on_tree=true held=CrownGrab45
+2026-09-24T00:00:32  TREE MapB ok   branches=12 trees=13 latched=true on_tree=true held=CrownGrab47
+2026-09-24T00:00:33  TREE SlapArena ok   branches=3 trees=3 latched=true on_tree=true held=CrownGrab20
+2026-09-24T00:00:33  TREE GRAB CHECK OK
+2026-09-24T00:01:17  SKILL gorilla: dummy moved 4376 px, state then STUN, my skill timer 2.8
+2026-09-24T00:01:17  SKILL orangutan: dummy moved 4491 px, state then GROUND, my skill timer 3.8
+2026-09-24T00:01:17  SKILL macaque: dummy moved 51 px, state then STUN, my skill timer 2.1
+2026-09-24T00:01:17  SKILL gibbon: dummy moved 287 px, state then AIR, my skill timer 0.0
+2026-09-24T00:01:17  SKILL capuchin: dummy moved 3 px, state then STUN, my skill timer 2.6
+2026-09-24T00:01:17  SKILL PROBE DONE
+2026-09-24T00:27:23  MOVE ok    double jump goes higher  single 143 px, double 241 px
+2026-09-24T00:27:24  MOVE ok    jump adds momentum  vx 671 after jump, run 420
+2026-09-24T00:27:24  MOVE ok    bunny hop keeps speed  vx 777 after hop
+2026-09-24T00:27:25  MOVE ok    no hop brakes to top speed  vx 546 after landing, top 546
+2026-09-24T00:27:25  MOVE ok    early press waits for the ground  vx 777, double jump still ready: true
+2026-09-24T00:27:26  MOVE ok    down at speed slides  state SLIDE, vx 485  GROUND:555 SLIDE:548 SLIDE:542 SLIDE:536 SLIDE:529 SLIDE:523 SLIDE:517 SLIDE:510 SLIDE:504 SLIDE:498 SLIDE:491 SLIDE:485
+2026-09-24T00:27:26  MOVE ok    held jump does not grab  
+2026-09-24T00:27:26  MOVE ok    hold grab grabs a vine  
+2026-09-24T00:27:27  MOVE ok    letting go of grab lets go  state AIR
+2026-09-24T00:27:27  MOVE ok    jump leaps off a swing  state AIR, vy -648
+2026-09-24T00:27:29  MOVE ok    stops when you let go  ground vx 0 after 1/3 s, air vx 0
+2026-09-24T00:27:30  MOVE ok    jump up through a platform  y 348, platform top 380
+2026-09-24T00:27:31  MOVE ok    platform holds when not pressing down  y 348
+2026-09-24T00:27:32  MOVE ok    down drops through a platform  y 468
+2026-09-24T00:27:32  MOVE CHECK OK

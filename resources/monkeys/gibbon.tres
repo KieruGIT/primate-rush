@@ -14,5 +14,6 @@ weight = 0.55
 power = 0.7
 climb = 1.0
 swing = 1.8
+attack_speed = 1.25
 skill_id = &"air_launch"
 skill_cooldown = 2.0

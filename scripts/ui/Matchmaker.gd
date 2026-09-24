@@ -19,7 +19,10 @@ extends Node
 
 signal changed
 
-enum Stage { IDLE, LISTEN, JOINING, JOINED, HOSTING, STARTING }
+enum Stage { IDLE, LISTEN, JOINING, JOINED, HOSTING, STARTING, PICKING }
+
+## Once the room is settled everyone gets this long to choose a monkey.
+const PICK_SECONDS: float = 10.0
 
 const JOIN_TIMEOUT: float = 5.0
 
@@ -30,11 +33,14 @@ var status: String = ""
 
 var _listen_left: float = 0.0
 var _join_left: float = 0.0
+## Seconds left in the monkey pick.
+var pick_left: float = 0.0
 
 
 func _ready() -> void:
 	Net.connection_failed.connect(_on_join_failed)
 	Net.roster_changed.connect(_on_roster_changed)
+	Net.pick_started.connect(_on_pick_started)
 
 
 func is_active() -> bool:
@@ -89,6 +95,14 @@ func _process(delta: float) -> void:
 			changed.emit()
 		Stage.JOINED:
 			changed.emit()
+		Stage.PICKING:
+			pick_left = maxf(pick_left - delta, 0.0)
+			changed.emit()
+			# The host (or a solo player) starts when time is up. A client
+			# waits for the host's start, which frees this menu.
+			if pick_left <= 0.0 and (not Net.is_online() or Net.is_host()):
+				stage = Stage.STARTING
+				Net.start_match()
 		Stage.HOSTING:
 			time_left = maxf(time_left - delta, 0.0)
 			var found := people()
@@ -131,6 +145,18 @@ func _host() -> void:
 	_say("Waiting for players to join...")
 
 
+## Skips the search: a party that is already full of friends goes straight
+## to the monkey pick.
+func start_now() -> void:
+	_start()
+
+
+## Everyone chooses early: end the pick now. Only the host (or solo) can.
+func finish_pick() -> void:
+	if stage == Stage.PICKING and (not Net.is_online() or Net.is_host()):
+		pick_left = 0.0
+
+
 func _start() -> void:
 	stage = Stage.STARTING
 	Net.searching = false
@@ -141,7 +167,18 @@ func _start() -> void:
 		Net.bot_skill = GameConfig.BotSkill.FIERCE
 	if Net.is_online() and not Net.is_host():
 		return
-	Net.start_match()
+	stage = Stage.PICKING
+	pick_left = PICK_SECONDS
+	_say("Pick your monkey!")
+	Net.begin_pick(PICK_SECONDS)
+
+
+func _on_pick_started(seconds: float) -> void:
+	if stage == Stage.IDLE:
+		return
+	stage = Stage.PICKING
+	pick_left = seconds
+	changed.emit()
 
 
 func _on_roster_changed() -> void:

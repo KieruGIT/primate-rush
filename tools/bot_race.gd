@@ -29,10 +29,24 @@ var _done: bool = false
 var _slap: bool = false
 
 
+var _lines: PackedStringArray = []
+
+
+func _say(line: Variant) -> void:
+	print(line)
+	_lines.append(str(line))
+	preload("res://tools/qa_log.gd").write("bot_race_%s" % _map, _lines)
+
+
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	var skill := GameConfig.BotSkill.NORMAL
-	for argument in OS.get_cmdline_user_args():
+	var arguments := OS.get_cmdline_user_args()
+	# Launched without arguments (from an editor or a remote runner), read
+	# them from output/qa/bot_race_args.txt instead, one line, space separated.
+	if arguments.is_empty() and FileAccess.file_exists("res://output/qa/bot_race_args.txt"):
+		arguments = FileAccess.get_file_as_string("res://output/qa/bot_race_args.txt").strip_edges().split(" ", false)
+	for argument in arguments:
 		if argument.begins_with("--map="):
 			_map = StringName(argument.trim_prefix("--map="))
 		elif argument.begins_with("--seconds="):
@@ -61,28 +75,28 @@ func _ready() -> void:
 	if _slap:
 		var slap: SlapDirector = _arena.get(&"slap")
 		slap.scores_changed.connect(func(scores: Array) -> void:
-			print("  KO!  %s %d - %d %s   at %.1fs" % [GameConfig.TEAM_NAMES[0], scores[0], scores[1], GameConfig.TEAM_NAMES[1], _elapsed])
+			_say("  KO!  %s %d - %d %s   at %.1fs" % [GameConfig.TEAM_NAMES[0], scores[0], scores[1], GameConfig.TEAM_NAMES[1], _elapsed])
 			var table: Dictionary = _arena.get(&"players")
 			for id in table.keys():
 				var p := table[id] as Player
-				print("      %-10s team %d  at %s  v %s  %s  dmg %d" % [_name(id), p.team, p.global_position.round(), p.velocity.round(), Player.State.keys()[p.state], int(p.slap_damage)]))
+				_say("      %-10s team %d  at %s  v %s  %s  dmg %d" % [_name(id), p.team, p.global_position.round(), p.velocity.round(), Player.State.keys()[p.state], int(p.slap_damage)]))
 		slap.slap_over.connect(func(results: Array) -> void:
-			print("SLAP OVER at %.0fs: %s" % [_elapsed, results])
+			_say("SLAP OVER at %.0fs: %s" % [_elapsed, results])
 			_done = true
 			get_tree().quit(0))
-		print("slap: %s" % ", ".join(_cast))
+		_say("slap: %s" % ", ".join(_cast))
 		return
 	var race: RaceDirector = _arena.get(&"race")
 	# Nobody gets cut off by the grace timer: the question is whether each
 	# bot can finish at all, not whether it beat the leader by enough.
 	race.set(&"grace_seconds", 100000.0)
 	race.player_finished.connect(_on_finished)
-	print("bot race: %s, %s, %.0fs limit" % [_map, ", ".join(_cast), _limit_seconds])
+	_say("bot race: %s, %s, %.0fs limit" % [_map, ", ".join(_cast), _limit_seconds])
 
 
 func _on_finished(player_id: int, place: int, seconds: float) -> void:
 	_finished[player_id] = seconds
-	print("  finished  %-10s  place %d  %6.1fs" % [_name(player_id), place, seconds])
+	_say("  finished  %-10s  place %d  %6.1fs" % [_name(player_id), place, seconds])
 
 
 func _physics_process(delta: float) -> void:
@@ -105,7 +119,7 @@ func _physics_process(delta: float) -> void:
 			(_trail[id] as Array).append([_elapsed, player.global_position.round()])
 	if _slap:
 		if _elapsed >= _limit_seconds + 10.0:
-			print("SLAP never ended")
+			_say("SLAP never ended")
 			get_tree().quit(1)
 		return
 	if _finished.size() >= players.size() or _elapsed >= _limit_seconds:
@@ -116,25 +130,25 @@ func _report(players: Dictionary, map: MapData) -> void:
 	_done = true
 	var finish := map.finish_line()
 	var goal := map.progress_of(finish.global_position) if finish != null else 0.0
-	print("--- bot race results (%.0fs simulated) ---" % _elapsed)
+	_say("--- bot race results (%.0fs simulated) ---" % _elapsed)
 	for id in players.keys():
 		var status := "FINISHED %.1fs" % float(_finished[id]) if _finished.has(id) else "stuck"
-		print("  %-10s %-16s best %6.0f / %6.0f   falls %d" % [_name(id), status, float(_best.get(id, 0.0)), goal, int(_falls.get(id, 0))])
+		_say("  %-10s %-16s best %6.0f / %6.0f   falls %d" % [_name(id), status, float(_best.get(id, 0.0)), goal, int(_falls.get(id, 0))])
 		if not _finished.has(id):
 			var trail: Array = _trail.get(id, [])
 			var tail := trail.slice(maxi(trail.size() - 8, 0))
 			var points: PackedStringArray = []
 			for sample in tail:
 				points.append("%s" % [sample[1]])
-			print("      last positions: %s" % "  ".join(points))
+			_say("      last positions: %s" % "  ".join(points))
 			var brain: BotBrain = (_arena.get(&"bots") as Dictionary).get(id)
 			var player := players[id] as Player
 			if brain != null:
-				print("      state %s  route point %d  target %s  velocity %s  input %s" % [Player.State.keys()[player.state], int(brain.get(&"_route_index")), brain.get(&"_target"), player.velocity.round(), (player.get(&"_input") as InputFrame).move])
+				_say("      state %s  route point %d  target %s  velocity %s  input %s" % [Player.State.keys()[player.state], int(brain.get(&"_route_index")), brain.get(&"_target"), player.velocity.round(), (player.get(&"_input") as InputFrame).move])
 				for c in player.get_slide_collision_count():
 					var hit := player.get_slide_collision(c)
-					print("      touching %s at %s normal %s" % [hit.get_collider().name if hit.get_collider() else "?", hit.get_position().round(), hit.get_normal()])
-	print("BOT RACE %s: %d of %d finished" % ["OK" if _finished.size() == players.size() else "PARTIAL", _finished.size(), players.size()])
+					_say("      touching %s at %s normal %s" % [hit.get_collider().name if hit.get_collider() else "?", hit.get_position().round(), hit.get_normal()])
+	_say("BOT RACE %s: %d of %d finished" % ["OK" if _finished.size() == players.size() else "PARTIAL", _finished.size(), players.size()])
 	get_tree().quit(0 if _finished.size() == players.size() else 1)
 
 

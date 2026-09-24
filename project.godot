@@ -14,7 +14,7 @@ config/name="Monkey Slap"
 config/description="Multiplayer party game about monkeys. Nobody dies, you just get knocked around."
 run/main_scene="res://scenes/Boot.tscn"
 config/features=PackedStringArray("4.7", "GL Compatibility")
-config/icon="res://icon.svg"
+config/icon="res://icon.png"
 
 [autoload]
 
@@ -23,9 +23,11 @@ GameInput="*res://scripts/autoload/GameInput.gd"
 Net="*res://scripts/autoload/Net.gd"
 Discovery="*res://scripts/autoload/Discovery.gd"
 PortMap="*res://scripts/autoload/PortMap.gd"
+Loot="*res://scripts/autoload/Loot.gd"
 Purchases="*res://scripts/autoload/Purchases.gd"
 Profile="*res://scripts/autoload/Profile.gd"
 Sfx="*res://scripts/autoload/Sfx.gd"
+PerfOverlay="*res://scripts/autoload/PerfOverlay.gd"
 
 [display]
 
@@ -34,7 +36,8 @@ window/size/viewport_height=720
 window/stretch/mode="canvas_items"
 window/stretch/aspect="expand"
 window/stretch/scale_mode="integer"
-window/handheld/orientation=1
+window/stretch/scale_mode.mobile="fractional"
+window/handheld/orientation=4
 
 [input]
 
@@ -81,8 +84,7 @@ skill={
 }
 sprint={
 "deadzone": 0.2,
-"events": [Object(InputEventKey,"resource_local_to_scene":false,"resource_name":"","device":-1,"window_id":0,"alt_pressed":false,"shift_pressed":false,"ctrl_pressed":false,"meta_pressed":false,"pressed":false,"keycode":0,"physical_keycode":4194325,"key_label":0,"unicode":0,"location":0,"echo":false,"script":null)
-]
+"events": []
 }
 dash={
 "deadzone": 0.2,

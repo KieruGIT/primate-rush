@@ -31,6 +31,16 @@ var _gain: Dictionary = {}
 var _pool: Array[AudioStreamPlayer] = []
 var _next: int = 0
 
+## Background music: one looping track at a time, crossfaded. "lobby" for
+## the menus and results, "battle" in a match. Jungle loops made for this
+## game (tools/music/compose_jungle.py), so there is nothing to license.
+const MUSIC_DIR := "res://assets/music"
+## Music sits under the effects, so a slap is never lost in it.
+const MUSIC_DB: float = -9.0
+var _music: AudioStreamPlayer = null
+var _music_id: StringName = &""
+var _music_tween: Tween = null
+
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
@@ -40,7 +50,52 @@ func _ready() -> void:
 		player.bus = &"Master"
 		add_child(player)
 		_pool.append(player)
+	_music = AudioStreamPlayer.new()
+	_music.bus = &"Master"
+	_music.volume_db = -80.0
+	add_child(_music)
 	set_volume(float(Profile.get_stat("volume", 0.7)))
+
+
+## Starts a track (fading from whatever was playing). Same track: nothing.
+func play_music(id: StringName) -> void:
+	if id == _music_id or _music == null:
+		return
+	var stream := _load_music(id)
+	if stream == null:
+		return
+	_music_id = id
+	if _music_tween != null:
+		_music_tween.kill()
+	_music_tween = create_tween()
+	if _music.playing:
+		_music_tween.tween_property(_music, "volume_db", -40.0, 0.35)
+	_music_tween.tween_callback(func() -> void:
+		_music.stream = stream
+		_music.volume_db = -40.0
+		_music.play())
+	_music_tween.tween_property(_music, "volume_db", MUSIC_DB, 0.6)
+
+
+func stop_music() -> void:
+	_music_id = &""
+	if _music != null:
+		_music.stop()
+
+
+func _load_music(id: StringName) -> AudioStream:
+	var path := "%s/music_%s.ogg" % [MUSIC_DIR, id]
+	var stream: AudioStreamOggVorbis = null
+	if ResourceLoader.exists(path):
+		stream = load(path) as AudioStreamOggVorbis
+	elif FileAccess.file_exists(path):
+		# Not imported yet (fresh from git): read the file itself.
+		stream = AudioStreamOggVorbis.load_from_file(ProjectSettings.globalize_path(path))
+	if stream == null:
+		push_warning("Music missing: %s" % path)
+		return null
+	stream.loop = true
+	return stream
 
 
 func _exit_tree() -> void:
@@ -50,6 +105,9 @@ func _exit_tree() -> void:
 	for player in _pool:
 		player.stop()
 		player.stream = null
+	if _music != null:
+		_music.stop()
+		_music.stream = null
 	_sounds.clear()
 
 

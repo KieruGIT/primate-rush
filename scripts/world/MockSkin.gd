@@ -43,12 +43,12 @@ static func _hash(a: int, b: int) -> int:
 	return posmod((a * 73856093) ^ (b * 19349663), 1000003)
 
 
-static func _block(canvas: CanvasItem, x: float, y: float, w: float, h: float, color: Color) -> void:
+static func _block(canvas: Variant, x: float, y: float, w: float, h: float, color: Color) -> void:
 	canvas.draw_rect(Rect2(x, y, w, h), color)
 
 
 ## Grass-topped dirt with pebbles, like the mock's ground strip.
-static func ground(canvas: CanvasItem, rect: Rect2) -> void:
+static func ground(canvas: Variant, rect: Rect2) -> void:
 	var x0 := rect.position.x
 	var y0 := rect.position.y
 	var w := rect.size.x
@@ -78,7 +78,7 @@ static func ground(canvas: CanvasItem, rect: Rect2) -> void:
 
 
 ## Mossy stone-brick ledge, or a wood plank on every other ledge.
-static func ledge(canvas: CanvasItem, rect: Rect2, index: int) -> void:
+static func ledge(canvas: Variant, rect: Rect2, index: int) -> void:
 	if index % 3 == 2:
 		plank(canvas, rect)
 		return
@@ -117,7 +117,7 @@ static func ledge(canvas: CanvasItem, rect: Rect2, index: int) -> void:
 			_block(canvas, x0 + cx * P, y0 + P * 2.0, P, P * float(1 + k % 3), GRASS)
 
 
-static func plank(canvas: CanvasItem, rect: Rect2) -> void:
+static func plank(canvas: Variant, rect: Rect2) -> void:
 	var x0 := rect.position.x
 	var y0 := rect.position.y
 	var w := rect.size.x
@@ -140,12 +140,12 @@ static func plank(canvas: CanvasItem, rect: Rect2) -> void:
 
 
 ## A climb wall: bark column with vertical grain.
-static func column(canvas: CanvasItem, rect: Rect2, bottom: float) -> void:
+static func column(canvas: Variant, rect: Rect2, bottom: float) -> void:
 	var r := Rect2(rect.position, Vector2(rect.size.x, bottom - rect.position.y))
 	trunk(canvas, r)
 
 
-static func trunk(canvas: CanvasItem, r: Rect2) -> void:
+static func trunk(canvas: Variant, r: Rect2) -> void:
 	_block(canvas, r.position.x - P, r.position.y, r.size.x + P * 2.0, r.size.y, INK)
 	_block(canvas, r.position.x, r.position.y, r.size.x, r.size.y, BARK)
 	_block(canvas, r.position.x, r.position.y, P, r.size.y, BARK_LIT)
@@ -159,7 +159,7 @@ static func trunk(canvas: CanvasItem, r: Rect2) -> void:
 
 
 ## A round clump of leaves on the art grid: ink rim, dark body, lit top-left.
-static func clump(canvas: CanvasItem, center: Vector2, radius: int) -> void:
+static func clump(canvas: Variant, center: Vector2, radius: int) -> void:
 	for layer in 3:
 		var r := radius + 1 - layer
 		var color: Color = [LEAF_INK, LEAF_DARK, LEAF][layer]
@@ -175,7 +175,7 @@ static func clump(canvas: CanvasItem, center: Vector2, radius: int) -> void:
 
 ## A grab tree: trunk, a leaf crown of clumps, and a branch with gold grip
 ## rings on the real anchor side.
-static func tree(canvas: CanvasItem, foot: Vector2, height: float, side: float, branch_length: float, branch_y: float) -> void:
+static func tree(canvas: Variant, foot: Vector2, height: float, side: float, branch_length: float, branch_y: float) -> void:
 	var width := P * 6.0
 	trunk(canvas, Rect2(foot.x - width * 0.5, foot.y - height, width, height))
 	# roots
@@ -190,7 +190,7 @@ static func tree(canvas: CanvasItem, foot: Vector2, height: float, side: float, 
 	clump(canvas, top + Vector2(0.0, -P * 5.0), 8)
 
 
-static func branch(canvas: CanvasItem, foot: Vector2, side: float, length: float, y: float) -> void:
+static func branch(canvas: Variant, foot: Vector2, side: float, length: float, y: float) -> void:
 	var x0 := foot.x if side > 0.0 else foot.x - length
 	var body := Rect2(x0, y - P * 1.5, length, P * 3.0)
 	_block(canvas, body.position.x - P, body.position.y - P, body.size.x + P * 2.0, body.size.y + P * 2.0, INK)
@@ -206,7 +206,7 @@ static func branch(canvas: CanvasItem, foot: Vector2, side: float, length: float
 	clump(canvas, Vector2(foot.x + side * length, y - P), 3)
 
 
-static func bush(canvas: CanvasItem, foot: Vector2, big: bool) -> void:
+static func bush(canvas: Variant, foot: Vector2, big: bool) -> void:
 	var r := 4 if big else 3
 	clump(canvas, foot + Vector2(-P * 3.0, -P * float(r - 1)), r)
 	clump(canvas, foot + Vector2(P * 3.0, -P * float(r - 1)), r - 1)

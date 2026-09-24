@@ -17,7 +17,10 @@ extends Control
 @export var rim: Color = Color(0, 0, 0, 0)
 
 var monkey_id: StringName = &""
+var skin_id: StringName = &"natural"
+var hat_id: StringName = &"none"
 var _sprite: MonkeySprite = null
+var _hat: Headwear = null
 var _locked: bool = false
 
 
@@ -27,14 +30,19 @@ func _ready() -> void:
 	resized.connect(_place)
 
 
-func set_monkey(id: StringName, locked: bool = false) -> void:
+func set_monkey(id: StringName, locked: bool = false, skin: StringName = &"natural", hat: StringName = &"none") -> void:
 	monkey_id = id
+	skin_id = skin
+	hat_id = hat
 	_locked = locked
 	if _sprite == null:
 		_sprite = MonkeySprite.new()
 		add_child(_sprite)
+	if _hat == null:
+		_hat = Headwear.new()
+		_sprite.add_child(_hat)
 	# Menus show the monkey facing you.
-	_sprite.setup(id, true)
+	_sprite.setup(id, true, skin if not locked else &"natural")
 	# Low-detail art is already 3 atlas px per art px, so menus use a third
 	# of the scale (whole numbers only) to keep the chunky pixels mock-sized.
 	_sprite.scale = Vector2.ONE * float(maxi(1, roundi(pixel_scale / 2.0))) * float(MonkeySprite.MENU_SIZE.get(id, 1.0))
@@ -43,6 +51,12 @@ func set_monkey(id: StringName, locked: bool = false) -> void:
 	# the glass panel on dim phone screens and looked like a missing asset.
 	_sprite.modulate = Color(0.34, 0.39, 0.35, 0.92) if locked else Color.WHITE
 	_sprite.play(&"idle")
+	# The accessory rides on the sprite, so it bobs with the cheer hop. In
+	# sprite space one unit is one atlas pixel and the head top is HEIGHTS up.
+	var info: Dictionary = GameConfig.get_hat(hat if not locked else &"none")
+	_hat.apply(info["style"], info["color"], 24.0)
+	_hat.scale = Vector2.ONE / MonkeySprite.pixel_for(id)
+	_hat.position = Vector2(0.0, -float(MonkeyFrames.HEIGHTS.get(id, 46)) + 4.0 / MonkeySprite.pixel_for(id))
 	_place()
 	queue_redraw()
 

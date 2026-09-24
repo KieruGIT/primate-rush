@@ -75,6 +75,26 @@ func record_ranked(delta: int) -> void:
 	stats_changed.emit()
 
 
+## Chosen look. The skin is per monkey (a golden gorilla and a snow gibbon
+## at once); the accessory is one choice worn by whoever you pick.
+func skin_for(monkey: StringName) -> StringName:
+	return StringName(str(data.get("skin_%s" % monkey, "natural")))
+
+
+func set_skin_for(monkey: StringName, skin: StringName) -> void:
+	data["skin_%s" % monkey] = String(skin)
+	_save()
+
+
+func accessory() -> StringName:
+	return StringName(str(data.get("hat", "none")))
+
+
+func set_accessory(hat: StringName) -> void:
+	data["hat"] = String(hat)
+	_save()
+
+
 func best_time(map_id: StringName) -> float:
 	return float(data.get("best_%s" % map_id, 0.0))
 

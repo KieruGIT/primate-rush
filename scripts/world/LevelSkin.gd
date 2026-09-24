@@ -38,8 +38,11 @@ const BRANCH_LENGTH: float = 96.0
 ## Low-detail branch: levels are painted in the Primate Rush mock style
 ## (scripts/world/MockSkin.gd) instead of the jungle tile art.
 const LOW_DETAIL: bool = true
+## How far the water surface sits under the top of the lowest ground.
+const WATER_BELOW_GROUND: float = 140.0
 const Mock = preload("res://scripts/world/MockSkin.gd")
 const MockLayers = preload("res://scripts/world/MockLayers.gd")
+const RectBake = preload("res://scripts/world/RectBake.gd")
 const PANORAMA := "res://assets/environment/simple/backdrop-px.png"
 
 ## Seed for decoration placement, so every machine in a match - and every
@@ -56,20 +59,65 @@ var _thin: Array[Rect2] = []
 var _decor: Array = []         # [tile, world position, flip]
 var _bounds: Rect2 = Rect2()
 var _water_y: float = 0.0
+var _back_layer: CanvasLayer = null
 
 
 func _ready() -> void:
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	z_index = -5
-	_tiles = JungleTiles.atlas()
+	# The tile atlas is only the high-detail art; the low-detail skin paints
+	# its own blocks, so it skips the bake entirely (a slow startup step).
+	if not LOW_DETAIL:
+		_tiles = JungleTiles.atlas()
 	var map := get_parent()
 	_collect(map)
 	_hide_graybox(map)
 	_restyle_props(map)
 	_build_backdrop()
 	_plan_decor()
-	Atmosphere.install(self, seed_value)
+	# Low detail: the canopy frame already carries the fireflies, so only
+	# the vignette is added, not a second layer of per-frame motes.
+	Atmosphere.install(self, seed_value, not LOW_DETAIL)
+	if LOW_DETAIL:
+		_build_pieces()
 	queue_redraw()
+
+
+## Low detail: every platform, tree and bush is its own small node instead
+## of one giant drawing. Godot skips nodes that are off screen, so a long
+## level only sends what the camera can see to the GPU (it was sending all
+## ~11,000 blocks every frame). Order matches the old single drawing.
+func _build_pieces() -> void:
+	for item in _decor:
+		if bool(item[3]):
+			_piece(func(c) -> void: _draw_decor(item, c))
+	# Water stays a live drawing: it is a few wide bands, and it is the one
+	# piece with see-through glints that a bake would flatten.
+	var water := Piece.new()
+	water.painter = _draw_water.bind(false)
+	add_child(water)
+	# Glints are their own node so they can be switched off on their own.
+	var glints := Piece.new()
+	glints.painter = func(c) -> void: _draw_surface_glints(_water_left(), _water_right(), c)
+	add_child(glints)
+	PerfOverlay.track(glints, &"water_glints")
+	for rect in _thick:
+		_piece(func(c) -> void: Mock.ground(c, rect))
+	for rect in _columns:
+		var bottom := rect.end.y if _rests_on_ground(rect) else maxf(rect.end.y, _water_y + TILE)
+		_piece(func(c) -> void: Mock.column(c, rect, bottom))
+	for i in _thin.size():
+		var rect: Rect2 = _thin[i]
+		_piece(func(c) -> void: Mock.ledge(c, rect, i))
+	for item in _decor:
+		if not bool(item[3]):
+			_piece(func(c) -> void: _draw_decor(item, c))
+
+
+## Each piece is baked into one texture (see RectBake): one quad on screen
+## instead of hundreds of blocks, and still skipped when off screen.
+func _piece(painter: Callable) -> void:
+	add_child(RectBake.bake(painter))
 
 
 # --- Reading the gray box ------------------------------------------
@@ -99,10 +147,17 @@ func _collect(map: Node) -> void:
 		_bounds = _bounds.merge(rect)
 	# Water under the lowest ground, so a missed jump reads as a splash
 	# rather than as falling out of the world.
+	# Just under the lowest ground (grounds are 100 deep), so islands sit in
+	# the water instead of floating over a band of empty backdrop.
 	var lowest_top := -INF
 	for rect in _thick:
 		lowest_top = maxf(lowest_top, rect.position.y)
-	_water_y = (lowest_top if lowest_top > -INF else _bounds.end.y) + 260.0
+	for rect in _thin:
+		lowest_top = maxf(lowest_top, rect.position.y)
+	_water_y = (lowest_top if lowest_top > -INF else _bounds.end.y) + WATER_BELOW_GROUND
+	# A fall ends at the splash, not a long way under the surface.
+	if map is MapData:
+		(map as MapData).kill_depth = minf((map as MapData).kill_depth, _water_y + 110.0)
 
 
 ## Rounds a rectangle onto the art grid.
@@ -141,7 +196,8 @@ func _restyle_props(map: Node) -> void:
 # --- Terrain -------------------------------------------------------
 
 func _draw() -> void:
-	if _tiles == null:
+	if LOW_DETAIL or _tiles == null:
+		# Low detail draws through the Piece children (see _build_pieces).
 		return
 	for item in _decor:
 		if bool(item[3]):
@@ -360,7 +416,17 @@ func _rests_on_ground(rect: Rect2) -> bool:
 	return false
 
 
-func _draw_water() -> void:
+func _water_left() -> float:
+	return floorf((_bounds.position.x - 3000.0) / TILE) * TILE
+
+
+func _water_right() -> float:
+	return _bounds.end.x + 3000.0
+
+
+func _draw_water(canvas: CanvasItem = null, glints: bool = true) -> void:
+	if canvas == null:
+		canvas = self
 	# The Kenney water tiles are a flat cyan that fights the jungle greens, so
 	# the surface is drawn instead: a lit rim, a ramp into the depths, and a
 	# scatter of glints where light through the canopy breaks on it.
@@ -368,18 +434,21 @@ func _draw_water() -> void:
 	var right := _bounds.end.x + 3000.0
 	var width := right - left
 
-	draw_rect(Rect2(left, _water_y, width, 6.0), Color(JunglePalette.WATER_GLINT, 0.55))
+	canvas.draw_rect(Rect2(left, _water_y, width, 6.0), Color(JunglePalette.WATER_GLINT, 0.55))
 	for band in 20:
 		var tone := JunglePalette.WATER.lerp(JunglePalette.WATER_DEEP, float(band) / 19.0)
-		draw_rect(Rect2(left, _water_y + 6.0 + band * 32.0, width, 32.0), tone)
-	draw_rect(Rect2(left, _water_y + 620.0, width, 4000.0), JunglePalette.WATER_DEEP)
-	_draw_surface_glints(left, right)
+		canvas.draw_rect(Rect2(left, _water_y + 6.0 + band * 32.0, width, 32.0), tone)
+	canvas.draw_rect(Rect2(left, _water_y + 620.0, width, 4000.0), JunglePalette.WATER_DEEP)
+	if glints:
+		_draw_surface_glints(left, right, canvas)
 
 
 ## Light broken on the surface: a column of glints down the middle of the
 ## level, brightest at the top. Seeded, so it is the same on every machine in
 ## a match and never flickers between two clients.
-func _draw_surface_glints(left: float, right: float) -> void:
+func _draw_surface_glints(left: float, right: float, canvas: CanvasItem = null) -> void:
+	if canvas == null:
+		canvas = self
 	var rng := RandomNumberGenerator.new()
 	rng.seed = seed_value * 977 + 41
 	var centre := (_bounds.position.x + _bounds.end.x) * 0.5
@@ -393,7 +462,7 @@ func _draw_surface_glints(left: float, right: float) -> void:
 			var x := centre + rng.randf_range(-spread, spread) - w * 0.5
 			if x + w < left or x > right:
 				continue
-			draw_rect(snap_rect(Rect2(x, y, w, 2.0)), Color(JunglePalette.WATER_GLINT, 0.30 * fade))
+			canvas.draw_rect(snap_rect(Rect2(x, y, w, 2.0)), Color(JunglePalette.WATER_GLINT, 0.30 * fade))
 
 
 # --- Decoration ----------------------------------------------------
@@ -409,7 +478,7 @@ func _plan_decor() -> void:
 		var x := rect.position.x + rng.randf_range(60.0, 200.0)
 		while x < rect.end.x - 120.0:
 			var roll := rng.randf()
-			if roll < 0.46:
+			if roll < 0.62:
 				# Grab trees: real world-space anchors in the swing system,
 				# spaced inside one arm-swing of each other so they chain.
 				var foot := Vector2(x, rect.position.y)
@@ -420,8 +489,8 @@ func _plan_decor() -> void:
 				_add_branch_climbable(foot, height, side)
 				# The leafy crown too: anything you can see, you can grab.
 				_add_grab("Crown", foot - Vector2(0.0, height + TILE * 0.4), Vector2(TILE * 2.4, TILE * 1.4))
-				x += rng.randf_range(220.0, 340.0)
-			elif roll < 0.50:
+				x += rng.randf_range(180.0, 280.0)
+			elif roll < 0.68:
 				var foot := Vector2(x, rect.position.y)
 				_decor.append([&"palm", foot, rng.randf() < 0.5, true])
 				_add_tree_climbable(foot, TILE * 5.8, TILE * 0.7)
@@ -429,12 +498,22 @@ func _plan_decor() -> void:
 				x += rng.randf_range(160.0, 260.0)
 			else:
 				# Undergrowth sits in front of the player's feet, so it is
-				# drawn late and never hides a platform edge.
+				# drawn late and never hides a platform edge. Not a hand-hold:
+				# bushes (and torches) snagged every low jump.
 				_decor.append([&"fern" if rng.randf() < 0.70 else &"shrub", Vector2(x, rect.position.y), rng.randf() < 0.5, false])
-				_add_grab("Bush", Vector2(x, rect.position.y - 16.0), Vector2(44.0, 32.0))
 				x += rng.randf_range(90.0, 200.0)
+	# Wide ledges get a grab tree of their own now and then, so the
+	# climbable trees are not only on the big grounds.
 	for rect in _thin:
-		if rect.size.x >= 180.0 and rng.randf() < 0.6:
+		if rect.size.x >= 260.0 and rng.randf() < 0.5:
+			var foot := Vector2(snappedf(rng.randf_range(rect.position.x + 60.0, rect.end.x - 60.0), TILE), rect.position.y)
+			var height := TILE * float(rng.randi_range(3, 5))
+			var side := -1.0 if rng.randf() < 0.5 else 1.0
+			_decor.append([&"tree", foot, rng.randf() < 0.5, true, side, height])
+			_add_tree_climbable(foot, height, TILE * 0.8)
+			_add_branch_climbable(foot, height, side)
+			_add_grab("Crown", foot - Vector2(0.0, height + TILE * 0.4), Vector2(TILE * 2.4, TILE * 1.4))
+		elif rect.size.x >= 180.0 and rng.randf() < 0.6:
 			var at := Vector2(rng.randf_range(rect.position.x + 30.0, rect.end.x - 60.0), rect.position.y)
 			_decor.append([&"fern", at, rng.randf() < 0.5, false])
 	_add_level_grabs()
@@ -477,7 +556,6 @@ func _light_ground(rect: Rect2, rng: RandomNumberGenerator) -> void:
 		torch.phase = rng.randf_range(0.0, 6.0)
 		torch.reach = rng.randf_range(150.0, 200.0)
 		add_child(torch)
-		_add_grab("Torch", Vector2(x, rect.position.y - 40.0), Vector2(24.0, 80.0))
 		x += rng.randf_range(TORCH_SPACING.x, TORCH_SPACING.y)
 
 
@@ -519,7 +597,9 @@ func _draw_branch(foot: Vector2, height: float, side: float) -> void:
 	_prop(&"fern", Vector2(foot.x + side * BRANCH_LENGTH, y + 4.0), side < 0.0)
 
 
-func _draw_decor(item: Array) -> void:
+func _draw_decor(item: Array, canvas: Variant = null) -> void:
+	if canvas == null:
+		canvas = self
 	var kind: StringName = item[0]
 	var foot: Vector2 = item[1]
 	var flip: bool = bool(item[2])
@@ -528,11 +608,11 @@ func _draw_decor(item: Array) -> void:
 			&"tree":
 				var height: float = float(item[5]) if item.size() > 5 else TILE * 3.0
 				var side: float = float(item[4]) if item.size() > 4 else 0.0
-				Mock.tree(self, foot, height, side, BRANCH_LENGTH, foot.y - height + TILE * 1.5)
+				Mock.tree(canvas, foot, height, side, BRANCH_LENGTH, foot.y - height + TILE * 1.5)
 			&"palm":
-				Mock.tree(self, foot, TILE * 5.5, 0.0, 0.0, 0.0)
+				Mock.tree(canvas, foot, TILE * 5.5, 0.0, 0.0, 0.0)
 			_:
-				Mock.bush(self, foot, kind == &"shrub")
+				Mock.bush(canvas, foot, kind == &"shrub")
 		return
 	match kind:
 		&"tree":
@@ -606,6 +686,13 @@ func _build_backdrop() -> void:
 	sky_layer.layer = -100
 	add_child(sky_layer)
 	sky_layer.add_child(_sky())
+	# Every parallax plane lives in screen space. They used to be world
+	# nodes that chased the camera each frame, and reading a smoothed camera
+	# a frame late made the painted treetops bob up and down whenever the
+	# monkey jumped or fell. Here nothing but the sideways scroll moves.
+	_back_layer = CanvasLayer.new()
+	_back_layer.layer = -50
+	add_child(_back_layer)
 
 	# Anchored to where the camera actually looks, not to the water line.
 	# Water is derived from a map's lowest ground, which says nothing about
@@ -643,7 +730,8 @@ func _mock_layers(eye: float) -> void:
 	plane.anchor_y = eye
 	plane.z_index = -24
 	plane.z_as_relative = false
-	add_child(plane)
+	_back_layer.add_child(plane)
+	PerfOverlay.track(plane, &"bg_trees")
 	var trees := MockLayers.Silhouettes.new()
 	trees.span = 1600.0
 	trees.ground_y = eye + 140.0
@@ -693,7 +781,8 @@ func _panorama_band(eye: float, reach: float) -> bool:
 	plane.anchor_y = eye
 	plane.z_index = -31
 	plane.z_as_relative = false
-	add_child(plane)
+	_back_layer.add_child(plane)
+	PerfOverlay.track(plane, &"panorama")
 	# Painted part starts ~0.6 reach above eye; the dark pad above covers
 	# zoomed-out arena cameras.
 	var top := eye - reach * 0.6 - 420.0 * zoom
@@ -721,7 +810,7 @@ func _band(kind: StringName, scroll: Vector2, canopy_y: float, z: int) -> void:
 	plane.anchor_y = _eye_level()
 	plane.z_index = z
 	plane.z_as_relative = false
-	add_child(plane)
+	_back_layer.add_child(plane)
 	# Four copies side by side: enough to cover a 1280 screen at any offset,
 	# once the plane has wrapped itself to a whole multiple of the span.
 	var top := canopy_y - float(JungleBackdrop.canopy_line(kind) * JungleBackdrop.ZOOM)
@@ -749,20 +838,33 @@ func _band(kind: StringName, scroll: Vector2, canopy_y: float, z: int) -> void:
 ## at -camera * scroll_scale relative to the camera. That is one line, it
 ## rounds cleanly, and wrapping to a whole multiple of the span keeps the
 ## tiled copies on the grid too.
+## One part of the level art, drawn once by a painter callback and culled
+## by Godot when it is off screen.
+class Piece extends Node2D:
+	var painter: Callable
+
+	func _draw() -> void:
+		painter.call(self)
+
+
 class SnappedParallax extends Node2D:
 	var scroll_scale: Vector2 = Vector2.ONE
 	var span: float = 1280.0
 	var anchor_y: float = 0.0
 
+	## Screen space (the plane sits in a CanvasLayer): the world point
+	## anchor_y is pinned to the middle of the screen vertically, and only
+	## the sideways scroll follows the camera.
 	func _process(_delta: float) -> void:
+		var half := get_viewport().get_visible_rect().size * 0.5
+		var eye_x := 0.0
 		var camera := get_viewport().get_camera_2d()
-		if camera == null:
-			return
-		var eye := camera.get_screen_center_position()
+		if camera != null:
+			eye_x = camera.get_screen_center_position().x
 		# Keep copies near the camera while retaining each layer's scroll
 		# phase. Rounding the offset to a whole span erased the parallax and
 		# eventually left long maps outside the four copies altogether.
-		var base := Vector2(eye.x - fposmod(eye.x * scroll_scale.x, span), (eye.y - anchor_y) * (1.0 - scroll_scale.y))
+		var base := Vector2(half.x - fposmod(eye_x * scroll_scale.x, span), half.y - anchor_y)
 		position = LevelSkin.snap(base)
 
 

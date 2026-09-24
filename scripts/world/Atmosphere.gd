@@ -27,9 +27,12 @@ const VIGNETTE_LAYER: int = 3
 
 
 ## Builds the whole stack under `host`. Called once, by LevelSkin.
-static func install(host: Node, seed_value: int) -> void:
-	_layer(host, MOTE_LAYER).add_child(Motes.new(seed_value))
-	_layer(host, VIGNETTE_LAYER).add_child(_vignette())
+static func install(host: Node, seed_value: int, motes: bool = true) -> void:
+	if motes:
+		_layer(host, MOTE_LAYER).add_child(Motes.new(seed_value))
+	var vignette := _vignette()
+	_layer(host, VIGNETTE_LAYER).add_child(vignette)
+	PerfOverlay.track(vignette, &"vignette")
 
 
 static func _layer(host: Node, index: int) -> CanvasLayer:

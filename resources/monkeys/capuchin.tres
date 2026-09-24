@@ -14,5 +14,6 @@ weight = 0.5
 power = 0.45
 climb = 1.4
 swing = 1.4
+attack_speed = 1.35
 skill_id = &"snatch"
 skill_cooldown = 3.5

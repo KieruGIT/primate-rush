@@ -1,5 +1,10 @@
 extends CanvasLayer
 
+## Preloaded rather than used by class name, so a fresh checkout runs before
+## the editor has rebuilt its class list.
+const RankBadgeUI = preload("res://scripts/ui/RankBadge.gd")
+const COSMETIC_FX = preload("res://scripts/player/CosmeticFx.gd")
+
 # ============================================================
 # RESULTS - the match-over screen from the Primate Rush mock.
 #
@@ -31,6 +36,7 @@ var _rank_label: Label = null
 var _rank_gain: Label = null
 var _rank_bar: ProgressBar = null
 var _rank_note: Label = null
+var _rank_badge: RankBadgeUI = null
 
 
 func _ready() -> void:
@@ -114,6 +120,10 @@ func _build() -> void:
 	box.add_child(_stats)
 	var rank_row := HBoxContainer.new()
 	box.add_child(rank_row)
+	_rank_badge = RankBadgeUI.new()
+	_rank_badge.custom_minimum_size = Vector2(32, 38)
+	_rank_badge.visible = false
+	rank_row.add_child(_rank_badge)
 	_rank_label = _text("", 13, UiTheme.INK)
 	_rank_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	rank_row.add_child(_rank_label)
@@ -166,6 +176,13 @@ func show_results(results: Array) -> void:
 	_build_podium(entries)
 	_fill_stats(place, mine, entries.size())
 	_fill_rank(place)
+	# Your equipped WIN effect, over everything, when you won.
+	var won := place == 1 or bool(mine.get("won", false))
+	if won and not bool(mine.get("draw", false)):
+		var host := Node2D.new()
+		host.z_index = 50
+		add_child(host)
+		COSMETIC_FX.play_win(host, Loot.equipped_in(&"win"), get_viewport().get_visible_rect().size)
 
 
 func _verdict(place: int, entry: Dictionary) -> String:
@@ -243,7 +260,7 @@ func _fill_stats(place: int, entry: Dictionary, field: int) -> void:
 	var rows: Array = []
 	if entry.has("team"):
 		rows.append(["Team", String(GameConfig.TEAM_NAMES[int(entry.get("team", 0))]), UiTheme.BANANA])
-		rows.append(["Knockouts", str(int(entry.get("score", 0))), UiTheme.BANANA])
+		rows.append(["Rounds won", str(int(entry.get("score", 0))), UiTheme.BANANA])
 	elif entry.has("score"):
 		rows.append(["Bananas collected", str(int(entry.get("score", 0))), UiTheme.BANANA])
 	elif bool(entry.get("finished", false)):
@@ -253,6 +270,8 @@ func _fill_stats(place: int, entry: Dictionary, field: int) -> void:
 	if place > 0:
 		rows.append(["Place", "%d of %d" % [place, field], UiTheme.INK])
 	rows.append(["Monkey", String(GameConfig.get_monkey(_monkey_for(Net.local_id())).display_name) if _monkey_for(Net.local_id()) != &"" else "-", UiTheme.INK])
+	if Loot.last_reward > 0:
+		rows.append(["Bananas earned", "+%d" % Loot.last_reward, UiTheme.BANANA])
 	for row in rows:
 		var line := HBoxContainer.new()
 		line.custom_minimum_size = Vector2(0, 46)
@@ -279,7 +298,14 @@ func _fill_rank(place: int) -> void:
 		var rp := int(Profile.get_stat("rp", 0))
 		var rank: Dictionary = GameConfig.rank_for(rp)
 		var delta := int(Profile.get_stat("rp_last", 0))
+		var before: Dictionary = GameConfig.rank_for(maxi(rp - delta, 0))
+		var moved := String(before["name"]) != String(rank["name"])
+		_rank_badge.visible = true
+		_rank_badge.set_rp(rp)
 		_rank_label.text = String(rank["name"])
+		if moved:
+			# A new division is the moment worth shouting about.
+			_rank_label.text = "%s  %s" % ["PROMOTED!" if delta > 0 else "DOWN TO", String(rank["name"])]
 		_rank_gain.text = "%+d RP" % delta
 		_rank_gain.add_theme_color_override(&"font_color", UiTheme.LEAF if delta >= 0 else UiTheme.CORAL)
 		_rank_bar.value = float(rank["progress"])

@@ -22,6 +22,7 @@ const ANIMS: Dictionary = MonkeyFrames.ANIMS
 const FRONT_POSES: Dictionary = POSES
 const FRONT_ANIMS: Dictionary = ANIMS
 
+const MonkeySkins = preload("res://scripts/player/MonkeySkins.gd")
 static var _sheets: Dictionary = {}
 static var _rig: Dictionary = {}
 var current_pose: StringName = &"idle_0"
@@ -53,6 +54,7 @@ func setup(id: StringName, facing_camera: bool = false, skin_id: StringName = &"
 	offset = Vector2(-CANVAS * 0.5, -CANVAS)
 	scale = Vector2.ONE * pixel_for(id)
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	material = MonkeySkins.material_for(skin_id)
 	anim = &"idle"
 	_clock = 0.0
 	_anim_left = 0.0

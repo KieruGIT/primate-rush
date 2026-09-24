@@ -43,6 +43,9 @@ var _skill_state: Label = null
 var _skill_bar: ProgressBar = null
 var _skill_fill: StyleBoxFlat = null
 var _skill_was_cooling: bool = false
+var _skill_style_id: StringName = &""
+var _skill_style_cooling: int = -1
+var _board_refresh_left: float = 0.0
 
 
 func _ready() -> void:
@@ -248,7 +251,7 @@ func _build_key_strip() -> void:
 	strip.add_theme_constant_override(&"separation", 14)
 	strip.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	strip.modulate = Color(1, 1, 1, 0.85)
-	for pair in [["A D", "MOVE"], ["SPACE", "JUMP x2"], ["L / RIGHT CLICK", "HOLD TO SWING"], ["S", "DROP / SLIDE"], ["LEFT CLICK", "PUNCH"], ["E", "SKILL"], ["ESC", "PAUSE"]]:
+	for pair in [["A D", "MOVE"], ["SPACE", "JUMP x2"], ["SHIFT", "GRAB / SWING"], ["S", "DROP / SLIDE"], ["LEFT CLICK", "PUNCH"], ["E", "SKILL"], ["ESC", "PAUSE"]]:
 		var item := HBoxContainer.new()
 		item.add_theme_constant_override(&"separation", 6)
 		var chip := PanelContainer.new()
@@ -296,6 +299,10 @@ func _build_skill_card() -> void:
 	box.add_child(top)
 	var key := Label.new()
 	key.text = "E"
+	var icon := _SkillIcon.new()
+	icon.custom_minimum_size = Vector2(26, 26)
+	icon.name = "SkillIcon"
+	top.add_child(icon)
 	key.theme_type_variation = &"HudValue"
 	key.add_theme_font_size_override(&"font_size", 14)
 	key.add_theme_color_override(&"font_color", UiTheme.BANANA)
@@ -336,14 +343,22 @@ func _update_skill_card() -> void:
 	var id := _player.stats.skill_id
 	var colour := SkillFx.colour_of(id)
 	_skill_name.text = SkillFx.name_of(id)
-	_skill_name.add_theme_color_override(&"font_color", colour)
-	_skill_fill.bg_color = colour
+	var icon := _skill_card.find_child("SkillIcon", true, false)
+	if icon != null and icon.get(&"skill_id") != id:
+		icon.set(&"skill_id", id)
+		icon.queue_redraw()
+	if _skill_style_id != id:
+		_skill_style_id = id
+		_skill_name.add_theme_color_override(&"font_color", colour)
+		_skill_fill.bg_color = colour
 	var left := _player.skill_timer
 	var total := maxf(_player.stats.skill_cooldown, left)
 	var cooling := left > 0.0
 	_skill_bar.value = 1.0 - (left / total if cooling and total > 0.0 else 0.0)
 	_skill_state.text = "%.1fs" % left if cooling else "READY"
-	_skill_state.add_theme_color_override(&"font_color", UiTheme.INK_DIM if cooling else UiTheme.LEAF)
+	if _skill_style_cooling != int(cooling):
+		_skill_style_cooling = int(cooling)
+		_skill_state.add_theme_color_override(&"font_color", UiTheme.INK_DIM if cooling else UiTheme.LEAF)
 	_skill_card.modulate = Color(1, 1, 1, 0.8) if cooling else Color.WHITE
 	if _skill_was_cooling and not cooling:
 		_skill_card.pivot_offset = _skill_card.size * 0.5
@@ -366,7 +381,10 @@ func _process(delta: float) -> void:
 		if _center_timer <= 0.0:
 			_center.text = ""
 
-	_update_board()
+	_board_refresh_left -= delta
+	if _board_refresh_left <= 0.0:
+		_board_refresh_left = 0.1
+		_update_board()
 	_update_plank()
 	_update_skill_card()
 
@@ -399,8 +417,7 @@ func _info_parts() -> PackedStringArray:
 	return parts
 
 
-## Live standings. Sorted every frame rather than cached, because both
-## orders change constantly: that is what hitting people is for.
+## Live standings sampled at 10 Hz; player simulation remains at full rate.
 func _update_board() -> void:
 	var rows := _board_rows()
 	if rows.is_empty():
@@ -558,6 +575,9 @@ func _bind() -> void:
 			_slap.countdown_changed.connect(_on_countdown)
 			_slap.slap_began.connect(_on_race_began)
 			_slap.scores_changed.connect(_on_slap_scores)
+			_slap.round_won.connect(_on_slap_round_won)
+			_slap.round_reset.connect(_on_slap_round_reset)
+			_slap.player_out.connect(_on_slap_out)
 
 
 ## Live placement is recomputed rather than stored: it changes every time
@@ -589,10 +609,27 @@ func _field_size() -> int:
 
 ## The team score flashed big after every knock-out: the only number in a
 ## 2v2 that anybody needs mid-fight.
-func _on_slap_scores(scores: Array) -> void:
-	_center.text = "%d  -  %d" % [scores[0], scores[1]]
-	_center_timer = 1.1
+func _on_slap_scores(_scores: Array) -> void:
+	pass
+
+
+func _on_slap_round_won(team: int, scores: Array) -> void:
+	var head := "DRAW - REPLAY" if team < 0 else "TEAM %s TAKES THE ROUND" % GameConfig.TEAM_NAMES[team].to_upper()
+	_center.text = "%s\n%d  -  %d" % [head, scores[0], scores[1]]
+	_center_timer = 2.4
 	Sfx.play(&"finish")
+
+
+func _on_slap_round_reset(round_number: int) -> void:
+	_center.text = "ROUND %d" % round_number
+	_center_timer = 1.4
+
+
+func _on_slap_out(player_id: int) -> void:
+	if player_id != Net.local_id():
+		return
+	_center.text = "YOU'RE OUT\nWATCHING YOUR TEAMMATE"
+	_center_timer = 1.8
 
 
 func _on_countdown(value: int) -> void:
@@ -647,3 +684,11 @@ func _state_text(state: int) -> String:
 		Player.State.SLIDE:
 			return "slide"
 	return "?"
+
+
+class _SkillIcon extends Control:
+	var skill_id: StringName = &""
+
+	func _draw() -> void:
+		var r := minf(size.x, size.y)
+		SkillFx.draw_icon(self, skill_id, size * 0.5, r * 0.34, SkillFx.colour_of(skill_id))

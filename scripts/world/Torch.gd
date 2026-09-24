@@ -29,12 +29,25 @@ extends Node2D
 
 var _t: float = 0.0
 var _flicker: float = 1.0
+## Only a torch the camera can see animates. A level has fifteen of them and
+## each redraws a few dozen shapes, which was being paid for every frame.
+var _on_screen: bool = false
 
 
 func _ready() -> void:
 	z_index = 3
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	_t = phase
+	var notifier := VisibleOnScreenNotifier2D.new()
+	notifier.rect = Rect2(-reach * scale_factor, -reach * scale_factor, reach * 2.0 * scale_factor, reach * 2.0 * scale_factor)
+	notifier.screen_entered.connect(func() -> void: _on_screen = true)
+	notifier.screen_exited.connect(func() -> void: _on_screen = false)
+	add_child(notifier)
+	PerfOverlay.track(self, &"torch_glow")
+
+
+func _fx_refresh() -> void:
+	queue_redraw()
 
 
 func _process(delta: float) -> void:
@@ -42,9 +55,15 @@ func _process(delta: float) -> void:
 	# 0.78..1.0, never dark, never a strobe.
 	# Quantised to whole art pixels. A flame whose radius is 13.4 pixels one
 	# frame and 13.9 the next is a flame whose edge never lands on the grid.
+	if not _on_screen:
+		return
 	var raw := 0.89 + sin(_t * 9.3) * 0.07 + sin(_t * 3.7) * 0.04
-	_flicker = roundf(raw * 8.0) / 8.0
-	queue_redraw()
+	var next := roundf(raw * 8.0) / 8.0
+	# The flicker is quantised to eighths, so most frames it has not moved:
+	# redraw only when it actually changes.
+	if next != _flicker:
+		_flicker = next
+		queue_redraw()
 
 
 func _draw() -> void:
@@ -60,6 +79,8 @@ func _draw() -> void:
 ## inside it. Both are the shared glow ramp - flat circles at this size read
 ## as painted rings, which is exactly what a torch must not look like.
 func _draw_pool(at: Vector2) -> void:
+	if not PerfOverlay.fx_on(&"torch_glow"):
+		return
 	var r := reach * _flicker
 	JunglePalette.draw_glow(self, at, r, JunglePalette.torchlight(0.42))
 	JunglePalette.draw_glow(self, at, r * 0.45, Color(JunglePalette.FLAME, 0.30 * _flicker))

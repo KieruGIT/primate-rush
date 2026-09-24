@@ -145,105 +145,123 @@ class Map:
 
 
 # ---------------------------------------------------------------------------
-# JUNGLE RUN - left to right. Meadow, vine valley, cliff climb, plateau,
-# ledge descent, second valley, final sprint. Every vine gap has a slower
-# stepping-stone line underneath, so the vines are the fast way, not the
-# only way, and the heaviest monkey can always finish.
+# Numbers every layout below is built around (base monkey, gorilla in
+# brackets): a jump rises ~136 px (~113), jump + double jump ~230 (~195), a
+# running jump crosses ~280 px (~220). So a plain hop is at most 90 up and
+# 140 across, anything bigger gets a climbable wall or a spring, and every
+# vine gap has stepping stones under it so the vines are the fast way, not
+# the only way.
+# ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
+# JUNGLE RUN - a left-to-right parkour course. Steps, pillar hops over the
+# water, a cliff climb, a treetop run, a drop-through descent, a vine valley,
+# a chimney of climbing walls, a leap down and a sprint to the flag.
 # ---------------------------------------------------------------------------
 
 def jungle_run():
     m = Map('MapA', 'Jungle Run', spawn=(160, 440), kill=1150)
     m.bound(-176, -1400, 600)
-    # 1. Start meadow, a step up, the first gap.
-    m.ground(-200, 1100, 500)
-    m.ledge(700, 900, 380)
-    m.ground(1100, 1520, 440)
-    m.ground(1650, 2120, 460)
-    m.check(1760, 460)
-    m.way(1060, 500); m.way(1480, 440); m.way(1700, 460); m.way(2080, 460)
-    for x in (300, 600, 1300, 1900):
-        m.banana(x, 500 if x < 1100 else 440 if x < 1600 else 460)
-    # 2. Vine valley. Stones under it: vines are the fast way, not the only.
-    for x0, top in [(2180, 530), (2420, 550), (2660, 530)]:
-        m.ledge(x0, x0 + 180, top)
-        m.way(x0 + 90, top)
-        m.banana(x0 + 90, top, 1, 0.1)
-    for x in (2300, 2560, 2820):
-        m.vine(x, 90, 190)
-        m.banana(x, 360, 3, 0.25)
-    m.ground(2910, 3500, 470)
-    m.check(3040, 470)
-    m.way(2990, 470)
-    # 3. The cliff: spring up it, or climb the face.
-    m.pad(3330, 470, 1200)
-    m.way(3330, 470)
-    m.ground(3500, 4380, 140, depth=330)
-    m.climb_face(3500, 140, 470, width=90)
-    m.way(3600, 140); m.way(3800, 140)
-    m.check(3650, 140)
-    m.ledge(3860, 4060, 20)
-    m.banana(3960, 20, 4, 0.3); m.banana(4200, 140, 2, 0.15)
-    # 4. Down the ledges.
-    m.ledge(4480, 4700, 230); m.ledge(4800, 5020, 310)
-    m.way(4340, 140); m.way(4590, 230); m.way(4910, 310)
-    m.banana(4590, 230, 2, 0.15)
-    # 5. Second valley, vines high over the stones.
-    for x0, top in [(5090, 380), (5330, 400), (5570, 380)]:
-        m.ledge(x0, x0 + 170, top)
-        m.way(x0 + 85, top)
-    for x in (5200, 5450, 5700):
-        m.vine(x, -60, 210)
-        m.banana(x, 250, 3, 0.25)
-    m.ground(5810, 6500, 400)
-    m.check(5960, 400)
-    m.way(5900, 400)
-    m.ledge(6000, 6220, 260); m.ledge(6320, 6540, 190)
-    m.banana(6430, 190, 5, 0.35)
-    # 6. Islands and a spring to the high plateau.
-    m.ground(6500, 6780, 340)
-    m.way(6460, 400); m.way(6700, 340)
-    m.ground(6920, 7400, 360)
-    m.check(7000, 360)
-    m.way(6960, 360); m.way(7360, 360)
-    m.ground(7500, 7900, 330)
-    m.way(7560, 330)
-    m.pad(7780, 330, 1300)
-    m.way(7780, 330)
-    m.ground(7900, 8400, 0, depth=300)
-    m.climb_face(7900, 0, 300, width=90)
-    m.check(8000, 0)
-    m.way(8000, 0); m.way(8380, 0)
-    m.banana(8150, 0, 3, 0.2)
-    # 7. Stairs down into the third valley.
-    for x0, top in [(8480, 80), (8780, 160), (9080, 240)]:
-        m.ledge(x0, x0 + 200, top)
-        m.way(x0 + 100, top)
-    for x0, top in [(9340, 330), (9600, 350), (9860, 330)]:
+    # 1. Start meadow.
+    m.ground(-200, 700, 500)
+    for x in (300, 600):
+        m.banana(x, 500)
+    m.way(640, 500)
+    # 2. Steps up onto the first island.
+    for x0, top in [(760, 430), (960, 360), (1160, 290)]:
+        m.ledge(x0, x0 + 150, top)
+        m.way(x0 + 75, top)
+    m.banana(1235, 290, 2, 0.15)
+    m.ground(1360, 1800, 300)
+    m.check(1440, 300)
+    m.way(1420, 300); m.way(1760, 300)
+    # 3. Pillar hops over open water, with vines above for the brave.
+    for x0, top in [(1920, 320), (2160, 300), (2400, 320)]:
+        m.ground(x0, x0 + 120, top)
+        m.way(x0 + 60, top)
+        m.banana(x0 + 60, top, 1, 0.1)
+    # Vine bottoms sit ~290 px over whatever you jump from: close enough
+    # to reach with the double jump, far enough that a plain hop across
+    # does not snag one by accident.
+    for x in (2040, 2280, 2520):
+        m.vine(x, -190, 200)
+        m.banana(x, 60, 3, 0.25)
+    m.ground(2640, 3180, 340)
+    m.check(2720, 340)
+    m.way(2700, 340)
+    # 4. The cliff: climb the face, or take the spring.
+    m.pad(3060, 340, 1200)
+    m.way(3060, 340)
+    m.ground(3180, 3820, 60, depth=280)
+    m.climb_face(3180, 60, 340, width=90)
+    m.check(3300, 60)
+    m.way(3260, 60); m.way(3780, 60)
+    m.banana(3500, 60, 3, 0.2)
+    # 5. Treetop run: short ledges with gaps, high over the jungle floor.
+    for x0, top in [(3920, 20), (4180, -20), (4440, 20), (4700, 60)]:
         m.ledge(x0, x0 + 160, top)
         m.way(x0 + 80, top)
-        m.banana(x0 + 80, top, 1, 0.1)
-    for x in (9440, 9690, 9940):
-        m.vine(x, -120, 220)
-        m.banana(x, 150, 4, 0.3)
-    # 8. Home straight.
-    m.ground(10100, 11000, 380)
-    m.check(10250, 380)
-    m.way(10200, 380)
-    m.finish(10800, 380)
-    m.way(10800, 380)
-    m.banana(10500, 380, 2, 0.2)
-    m.bound(11024, -1400, 480)
+    m.banana(4260, -20, 4, 0.3); m.banana(4780, 60, 2, 0.15)
+    # 6. Drop-through descent: fall ledge to ledge.
+    for x0, top in [(4960, 150), (5140, 240), (5320, 330)]:
+        m.ledge(x0, x0 + 160, top)
+        m.way(x0 + 80, top)
+    m.ground(5480, 5760, 420)
+    m.check(5560, 420)
+    m.way(5540, 420)
+    # 7. Vine valley over stepping stones.
+    for x0, top in [(5860, 450), (6100, 470), (6340, 450)]:
+        m.ledge(x0, x0 + 150, top)
+        m.way(x0 + 75, top)
+        m.banana(x0 + 75, top, 1, 0.1)
+    for x in (5980, 6220, 6460):
+        m.vine(x, -40, 200)
+        m.banana(x, 200, 3, 0.25)
+    m.ground(6560, 7050, 420)
+    m.check(6640, 420)
+    m.way(6620, 420); m.way(7020, 420)
+    # 8. Chimney: climb a pillar, cross a ledge, climb the next pillar.
+    m.wall(7074, 200, 420, width=48)
+    m.way(7074, 200)
+    m.ledge(7140, 7300, 200)
+    m.way(7220, 200)
+    m.wall(7340, -20, 200, width=48)
+    m.way(7340, -20)
+    m.ground(7420, 8000, -20, depth=120)
+    m.check(7500, -20)
+    m.way(7480, -20); m.way(7960, -20)
+    m.banana(7700, -20, 5, 0.35)
+    # 9. The leap down, stair by stair.
+    for x0, top in [(8100, 80), (8360, 180), (8620, 280)]:
+        m.ledge(x0, x0 + 180, top)
+        m.way(x0 + 90, top)
+    m.vine(8480, -330, 200)
+    m.banana(8480, -100, 4, 0.3)
+    m.ground(8900, 9640, 380)
+    m.check(8980, 380)
+    m.way(8960, 380); m.way(9600, 380)
+    # 10. Sprint: one hop over the last gap to the flag.
+    m.ledge(9720, 9840, 400)
+    m.way(9780, 400)
+    m.vine(9800, -100, 200)
+    m.ground(9920, 10700, 380)
+    m.way(9980, 380)
+    m.finish(10500, 380)
+    m.way(10500, 380)
+    m.banana(10200, 380, 2, 0.2)
+    m.bound(10724, -1400, 480)
     return m
 
 
 def canopy_climb():
-    """A spiral up a jungle shaft. Staircases, springs and a climb, and no
-    ledge ever hangs over a place you jump from - a zig-zag of 80 px steps
-    puts the ledge two up right above your head, so every jump bonks."""
+    """Vertical parkour up a jungle shaft: stairs, a climbing pillar, a
+    spring, a wall, more stairs, a big spring and a last pillar to the
+    summit. No ledge hangs over a place you jump from, and every spring
+    lands on a platform that reaches back out over it."""
     m = Map('MapB', 'Canopy Climb', spawn=(-940, 440), axis=(0, -1), kill=900, stride=(60, 0), palette=2)
     m.ground(-1000, 1000, 500)
-    m.bound(-1024, -2400, 500)
-    m.bound(1024, -2400, 500)
+    m.bound(-1024, -2800, 500)
+    m.bound(1024, -2800, 500)
     m.banana(0, 500); m.banana(700, 500)
 
     def stairs(steps):
@@ -251,56 +269,146 @@ def canopy_climb():
             m.ledge(x0, x1, top)
             m.way((x0 + x1) / 2, top)
 
-    # 1. Staircase up and to the right, onto the first landing. Steps rise
-    # 70 with 30 px gaps: the gorilla's full jump is ~106 px, and a stair
-    # it can only just make is a stair it misses half the time.
-    stairs([(-640, -470, 430), (-440, -270, 360), (-240, -70, 290), (-40, 130, 220),
-            (160, 330, 150), (360, 530, 80)])
-    m.ground(560, 1000, 10, depth=60)
-    m.way(640, 10)
-    m.check(640, 10)
-    m.banana(-475, 360, 2, 0.15); m.banana(125, 150, 2, 0.15)
-    # 2. Spring from the landing up to the second, which reaches back out
-    # over the spring so a heavy monkey's short drift still lands on it.
-    m.pad(880, 10, 1450)
-    m.way(880, 10)
-    m.ground(-268, 700, -450, depth=60)
-    m.way(560, -450); m.way(-120, -450)
-    m.check(200, -450)
-    m.vine(-560, -760, 200)
-    m.banana(880, -300, 4, 0.3)
-    # 3. Climb the pillar at the landing's end.
-    m.wall(-300, -900, -390, width=64)
-    m.way(-250, -450)
-    m.ground(-180, 260, -900, depth=60)
-    m.way(-110, -900); m.way(200, -900)
-    m.check(-60, -900)
-    m.ledge(-800, -560, -760)
-    m.banana(-680, -760, 5, 0.35)
-    # 4. Two steps right, then the spring onto the summit.
-    stairs([(290, 460, -970), (490, 660, -1040)])
-    m.pad(610, -1040, 1500)
-    m.way(610, -1040)
-    m.ground(-340, 540, -1560, depth=60)
-    m.way(300, -1560)
-    m.vine(-620, -1520, 220)
-    m.finish(0, -1560, w=260, h=90)
-    m.way(0, -1560)
+    # 1. Stairs up to the first landing. Rise 70, gaps 40.
+    stairs([(-760, -600, 430), (-560, -400, 360), (-360, -200, 290)])
+    m.ground(-160, 400, 220, depth=60)
+    m.way(-120, 220); m.way(380, 220)
+    m.check(0, 220)
+    m.banana(-480, 360, 2, 0.15); m.banana(200, 220, 2, 0.15)
+    # 2. Climb the pillar at the landing's end, then spring from its ledge.
+    m.wall(440, -150, 220, width=48)
+    m.way(440, -150)
+    # The spring sits 180 px out from the landing above, so a light monkey
+    # drifting back in on the way up clears the landing's edge.
+    m.ledge(500, 780, -150)
+    m.way(560, -150)
+    m.pad(720, -150, 1500)
+    m.way(720, -150)
+    m.ground(-300, 540, -620, depth=60)
+    m.way(460, -620); m.way(-260, -620)
+    m.check(100, -620)
+    m.banana(650, -400, 4, 0.3)
+    # 3. The wall on the left end, then stairs back to the right.
+    m.wall(-340, -1000, -620, width=48)
+    m.way(-340, -1000)
+    stairs([(-280, -100, -1000), (-60, 120, -1070), (160, 320, -1140)])
+    m.ground(360, 900, -1210, depth=60)
+    m.way(400, -1210); m.way(780, -1210)
+    m.check(560, -1210)
+    m.banana(-190, -1000, 3, 0.2)
+    m.vine(-600, -1400, 220)
+    m.banana(-600, -1150, 5, 0.35)
+    # 4. The big spring onto the high landing.
+    m.pad(820, -1210, 1550)
+    m.way(820, -1210)
+    m.ground(-200, 640, -1760, depth=60)
+    m.way(560, -1760); m.way(-160, -1760)
+    m.check(250, -1760)
+    m.banana(820, -1500, 4, 0.3)
+    # 5. Stairs left, a last pillar, the summit.
+    stairs([(-400, -240, -1830), (-600, -440, -1900)])
+    m.wall(-700, -2300, -1900, width=48)
+    m.way(-700, -2300)
+    # The summit starts clear of the pillar, so climbing its right face
+    # never bumps the summit's underside.
+    m.ground(-600, 300, -2300, depth=60)
+    m.way(-560, -2300)
+    m.vine(500, -2560, 220)
+    m.finish(0, -2300, w=260, h=90)
+    m.way(0, -2300)
     return m
 
 
 def slap_island():
-    """2v2 Slap. One island, two perches, a top ledge, sea all round.
-    Teams spawn on opposite halves; the middle is where it happens."""
-    m = Map('SlapArena', 'Slap Island', spawn=(-360, 260), kill=720, stride=(240, 0))
-    m.blast = 1250
-    m.zoom = 0.78
+    """2v2 Slap, a platform-fighter stage: one big island in the middle,
+    a small island off each side, floating platforms above, vines to swing
+    across the gaps, and climbable cliff faces so a monkey knocked over the
+    edge can grab on and haul itself back."""
+    m = Map('SlapArena', 'Slap Island', spawn=(-420, 240), kill=720, stride=(280, 0))
+    m.blast = 1450
+    # The main island and its climbable sides.
     m.ground(-560, 560, 300, depth=120)
-    m.ledge(-420, -200, 150); m.ledge(200, 420, 150)
-    m.ledge(-110, 110, 20)
-    m.vine(0, -280, 180)
-    for x, top in [(-300, 300), (300, 300), (-310, 150), (310, 150), (0, 20), (0, 300)]:
+    m.climb_face(-560, 300, 420, width=40)
+    m.climb_face(560, 300, 420, width=40)
+    # Side islands, a little higher, with their inner faces climbable.
+    m.ground(-1080, -780, 240, depth=80)
+    m.ground(780, 1080, 240, depth=80)
+    m.climb_face(-780, 240, 320, width=40)
+    m.climb_face(780, 240, 320, width=40)
+    # Floating platforms: two low, one high in the middle, two over the
+    # side islands.
+    m.ledge(-400, -180, 140); m.ledge(180, 400, 140)
+    m.ledge(-110, 110, -10)
+    m.ledge(-1010, -850, 80); m.ledge(850, 1010, 80)
+    # Vines over the gaps and one over the middle.
+    m.vine(-670, -120, 220)
+    m.vine(670, -120, 220)
+    m.vine(0, -300, 180)
+    for x, top in [(-300, 300), (300, 300), (-290, 140), (290, 140), (0, -10), (0, 300), (-930, 240), (930, 240)]:
         m.banana(x, top, 2, 0.3)
+    m.way(-420, 300); m.way(420, 300)
+    return m
+
+
+def banana_grove():
+    """Banana Hoard. One big square jungle rather than a long run: a full
+    floor, five tiers of platforms stacked above it, climbing walls at both
+    ends, springs to the upper tiers and vines between them. Tiers are 140
+    px apart, so one plain jump reaches the next one; the double jump is
+    spare. Bananas are spread over every tier, richer the higher you go."""
+    m = Map('BananaGrove', 'Banana Grove', spawn=(-150, 460), kill=1100, stride=(100, 0), palette=4)
+    floor, t1, t2, t3, t4, t5 = 520, 380, 240, 100, -40, -180
+    m.bound(-1624, -1400, 620)
+    m.bound(1624, -1400, 620)
+    m.ground(-1600, 1600, floor)
+    # Climbing walls at the ends reach the top tier.
+    m.wall(-1560, t5, floor, width=48)
+    m.wall(1560, t5, floor, width=48)
+    # Springs: two into the middle, two at the ends up to tier 3.
+    for x in (-1300, -480, 480, 1300):
+        m.pad(x, floor, 1350)
+    # Tier 1: four wide ledges.
+    t1_ledges = [(-1400, -1000), (-560, -160), (160, 560), (1000, 1400)]
+    for x0, x1 in t1_ledges:
+        m.ledge(x0, x1, t1)
+    # Tier 2: three islands, thick so trees grow on them.
+    t2_islands = [(-1180, -700), (-260, 260), (700, 1180)]
+    for x0, x1 in t2_islands:
+        m.ground(x0, x1, t2, depth=60)
+    # Tier 3: four ledges.
+    t3_ledges = [(-1480, -1080), (-560, -220), (220, 560), (1080, 1480)]
+    for x0, x1 in t3_ledges:
+        m.ledge(x0, x1, t3)
+    # Tier 4: two islands and a middle ledge.
+    m.ground(-1000, -560, t4, depth=60)
+    m.ground(560, 1000, t4, depth=60)
+    m.ledge(-160, 160, t4)
+    # Tier 5: the top perches, joined to the walls.
+    m.ledge(-1500, -1200, t5)
+    m.ledge(1200, 1500, t5)
+    m.ledge(-220, 220, t5)
+    # Vines over the middle gaps near the top.
+    for x in (-400, 400):
+        m.vine(x, -520, 200)
+    # Bananas everywhere, richer the higher you go.
+    for x in range(-1400, 1500, 200):
+        if abs(abs(x) - 480) > 60 and abs(abs(x) - 1300) > 60:
+            m.banana(x, floor, 1, 0.08)
+    for x0, x1 in t1_ledges:
+        m.banana((x0 + x1) / 2, t1, 2, 0.12)
+    for x0, x1 in t2_islands:
+        m.banana(x0 + 80, t2, 2, 0.15)
+        m.banana(x1 - 80, t2, 2, 0.15)
+    for x0, x1 in t3_ledges:
+        m.banana((x0 + x1) / 2, t3, 3, 0.2)
+    for x in (-780, 780, 0):
+        m.banana(x, t4, 4, 0.25)
+    for x in (-1350, 1350, 0):
+        m.banana(x, t5, 5, 0.35)
+    # A loop for the bots: floor, springs, round the tiers and back.
+    for x, top in [(-1200, floor), (-480, floor), (-600, t1), (-940, t2), (-780, t4), (0, t4), (780, t4),
+                   (940, t2), (480, floor), (0, floor)]:
+        m.way(x, top)
     return m
 
 
@@ -309,4 +417,5 @@ if __name__ == '__main__':
     jungle_run().write(root + '/scenes/maps/MapA.tscn')
     canopy_climb().write(root + '/scenes/maps/MapB.tscn')
     slap_island().write(root + '/scenes/maps/SlapArena.tscn')
+    banana_grove().write(root + '/scenes/maps/BananaGrove.tscn')
     print('maps written')

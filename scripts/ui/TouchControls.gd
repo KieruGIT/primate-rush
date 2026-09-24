@@ -8,8 +8,8 @@ extends CanvasLayer
 # single-focus input model fights that. Tracking touch indices directly is
 # the difference between working multi-touch and a game that eats jumps.
 #
-# SWING is its own button, held: grab whatever is in reach while it is down,
-# let go when it comes up. JUMP only ever jumps (and leaps off a swing).
+# JUMP only jumps (tap again in the air to double jump). GRAB, just up and
+# left of it, grabs whatever is in reach while held and lets go on release.
 #
 # Low-detail look (Primate Rush mock): flat pixel buttons - one face colour,
 # a darker lip underneath, a 3px ink outline and a light top edge. Pressed
@@ -24,7 +24,6 @@ const JUMP_RADIUS: float = 84.0
 const PAUSE_RADIUS: float = 30.0
 const DEAD_ZONE: float = 0.18
 
-const ROUND := "res://assets/kenney_ui-pack/PNG/%s/Double/button_round_%s.png"
 const INK_SHADOW := Color(0.1, 0.08, 0.06, 0.75)
 const OUTLINE := Color8(26, 15, 10)
 ## Face and lip per button colour, from the mock's style sheet.
@@ -50,7 +49,6 @@ var _skill_center: Vector2 = Vector2.ZERO
 var _grab_center: Vector2 = Vector2.ZERO
 var _pause_center: Vector2 = Vector2.ZERO
 
-var _textures: Dictionary = {}
 var _font: Font = null
 
 @onready var _surface: Control = $Surface
@@ -59,11 +57,6 @@ var _font: Font = null
 func _ready() -> void:
 	layer = 10
 	_surface.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	for colour in ["Yellow", "Red", "Blue", "Grey", "Green"]:
-		for kind in ["depth_gloss", "gloss", "depth_flat"]:
-			var path: String = ROUND % [colour, kind]
-			if ResourceLoader.exists(path):
-				_textures["%s_%s" % [colour, kind]] = load(path)
 	_font = UiTheme._font(UiTheme.FONT_DISPLAY)
 	get_viewport().size_changed.connect(_layout)
 	_layout()
@@ -166,8 +159,8 @@ func draw_surface() -> void:
 	var pressed: Array = _button_touches.values()
 	_draw_button(_jump_center, JUMP_RADIUS, "Green", pressed.has(&"jump"), "JUMP", _draw_jump_icon)
 	_draw_button(_attack_center, BUTTON_RADIUS, "Red", pressed.has(&"attack"), "PUNCH", _draw_hit_icon)
-	_draw_button(_skill_center, BUTTON_RADIUS, "Blue", pressed.has(&"skill"), "SKILL", _draw_skill_icon)
-	_draw_button(_grab_center, BUTTON_RADIUS, "Yellow", pressed.has(&"grab"), "SWING", _draw_grab_icon)
+	_draw_button(_skill_center, BUTTON_RADIUS, "Blue", pressed.has(&"skill"), "SKILL", _draw_own_skill_icon)
+	_draw_button(_grab_center, BUTTON_RADIUS, "Yellow", pressed.has(&"grab"), "GRAB", _draw_grab_icon)
 	_draw_cooldown()
 	_draw_button(_pause_center, PAUSE_RADIUS, "Grey", pressed.has(&"pause"), "", _draw_pause_icon)
 
@@ -254,6 +247,15 @@ func _draw_grab_icon(at: Vector2, s: float) -> void:
 		at + Vector2(-s * 0.55, -s * 0.62), at + Vector2(s * 0.55, -s * 0.62), at + Vector2(s * 0.6, s * 0.35),
 		at + Vector2(s * 0.2, s * 0.95), at + Vector2(-s * 0.2, s * 0.95), at + Vector2(-s * 0.6, s * 0.35),
 	]))
+
+
+## The local monkey's own skill icon on the SKILL button.
+func _draw_own_skill_icon(at: Vector2, s: float) -> void:
+	var player := _local_player()
+	if player == null or player.stats == null:
+		_draw_skill_icon(at, s)
+		return
+	SkillFx.draw_icon(_surface, player.stats.skill_id, at, s * 1.1, Color.WHITE)
 
 
 func _draw_pause_icon(at: Vector2, s: float) -> void:

@@ -2,10 +2,10 @@
   instanced every scene under res://scenes
   map_a / Free play: 4 monkeys, 4 moved
   map_b / Free play: 4 monkeys, 4 moved
-  map_c / Free play: 4 monkeys, 4 moved
-  map_a / Race: 4 monkeys, 3 moved
-  map_b / Race: 4 monkeys, 3 moved
-  map_a / Banana Hoard: 4 monkeys, 3 moved
-  map_b / Banana Hoard: 4 monkeys, 3 moved
-  map_c / 2v2 Slap: 4 monkeys, 3 moved
+  map_c / Free play: 4 monkeys, 3 moved
+  map_a / Race: 4 monkeys, 4 moved
+  map_b / Race: 4 monkeys, 4 moved
+  map_a / Banana Hoard: 4 monkeys, 4 moved
+  map_b / Banana Hoard: 4 monkeys, 4 moved
+  map_c / 2v2 Slap: 4 monkeys, 2 moved
 SMOKE OK

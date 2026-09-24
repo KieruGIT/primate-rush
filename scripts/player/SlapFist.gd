@@ -59,9 +59,8 @@ const HAND_LENGTH := 26.0
 ## again as the old one (Player.SLAP_REACH), a fatter arm and a bigger fist.
 const PUNCH_FIST_SCALE: float = 1.5
 const PUNCH_ARM_THICKNESS: float = 1.5
-## The arm rises toward the fist rather than going dead flat: it reads as a
-## thrown punch, not a pole being pushed out.
-const PUNCH_RISE: float = deg_to_rad(-12.0)
+## Dead straight and level: the fist travels flat out at shoulder height.
+const PUNCH_RISE: float = 0.0
 ## White puff cloud at the fist, bigger when the punch actually lands.
 const PUFF_TIME: float = 0.2
 var species: StringName = &""

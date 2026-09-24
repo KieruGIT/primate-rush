@@ -1,5 +1,7 @@
 extends Node2D
 
+const COSMETIC_FX = preload("res://scripts/player/CosmeticFx.gd")
+
 # ============================================================
 # ARENA - owns the monkeys, the map, the respawn rule, and the snapshot wire.
 #
@@ -58,6 +60,11 @@ func _ready() -> void:
 	_spawn_ui()
 	_spawn_all_players()
 	_start_mode()
+	Sfx.play_music(&"battle")
+	# A ranked match takes the banana stake now; any other match has none.
+	Loot.last_stake = {}
+	if Net.queue == GameConfig.Queue.RANKED:
+		Loot.lock_stake()
 
 
 func _exit_tree() -> void:
@@ -104,6 +111,8 @@ func _start_mode() -> void:
 	race.race_over.connect(_on_match_over)
 	hoard.hoard_over.connect(_on_match_over)
 	slap.slap_over.connect(_on_match_over)
+	slap.player_out.connect(_on_slap_out)
+	slap.round_reset.connect(_on_slap_round_reset)
 
 	# Only the host counts down. Clients follow the broadcast, otherwise four
 	# machines each start their own round a few frames apart.
@@ -124,6 +133,7 @@ func _on_match_over(results: Array) -> void:
 	if _over:
 		return
 	_freeze_arena()
+	Sfx.play_music(&"lobby")
 	_record_career(results)
 	var overlay := RESULTS_SCENE.instantiate()
 	add_child(overlay)
@@ -158,6 +168,12 @@ func _record_career(results: Array) -> void:
 			continue
 		var row: Dictionary = entry
 		var place := index + 1
+		# Every match pays bananas for the gacha; a hoard adds what you held.
+		var won := place == 1 or bool(row.get("won", false))
+		var extra := int(row.get("score", 0)) if Net.mode == GameConfig.Mode.HOARD else 0
+		Loot.reward_match(1 if won else place, results.size(), extra)
+		if Net.queue == GameConfig.Queue.RANKED:
+			Loot.settle_stake(place, won, bool(row.get("draw", false)), Net.mode == GameConfig.Mode.SLAP)
 		if Net.queue == GameConfig.Queue.RANKED:
 			Profile.record_ranked(GameConfig.ranked_delta(Net.mode, place, results.size(), row))
 		if Net.mode == GameConfig.Mode.HOARD:
@@ -176,14 +192,15 @@ func _spawn_all_players() -> void:
 	if Net.roster.is_empty():
 		# Arena opened without a roster, which means a solo session that
 		# skipped the lobby. Spawn the one monkey and carry on.
-		_spawn_player(1, Net.local_monkey, 0, Net.local_hat)
+		_spawn_player(1, Net.local_monkey, 0, Net.local_hat, false, "", Net.local_skin)
 		return
 	for peer_id in Net.roster.keys():
 		var entry: Dictionary = Net.roster[peer_id]
 		var is_bot := bool(entry.get("bot", false))
 		_spawn_player(
 			int(peer_id), entry["monkey"], int(entry["slot"]),
-			entry.get("hat", &"none"), is_bot, String(entry.get("name", ""))
+			entry.get("hat", &"none"), is_bot, String(entry.get("name", "")),
+			entry.get("skin", &"natural")
 		)
 		if is_bot and _is_authority():
 			# Difficulty is host-side only, because the brain itself is: a
@@ -193,7 +210,7 @@ func _spawn_all_players() -> void:
 			bots[int(peer_id)] = brain
 
 
-func _spawn_player(id: int, monkey_id: StringName, slot: int, hat_id: StringName = &"none", is_bot: bool = false, bot_name: String = "") -> Player:
+func _spawn_player(id: int, monkey_id: StringName, slot: int, hat_id: StringName = &"none", is_bot: bool = false, bot_name: String = "", skin_id: StringName = &"natural") -> Player:
 	if players.has(id):
 		return players[id]
 	var player := PLAYER_SCENE.instantiate() as Player
@@ -203,7 +220,7 @@ func _spawn_player(id: int, monkey_id: StringName, slot: int, hat_id: StringName
 	player.is_bot = is_bot
 	player.bot_name = bot_name
 	player.team = GameConfig.team_of(slot) if Net.mode == GameConfig.Mode.SLAP else -1
-	player.setup(GameConfig.get_monkey(monkey_id), id, id == _local_id, GameConfig.tint_for_index(slot), hat_id)
+	player.setup(GameConfig.get_monkey(monkey_id), id, id == _local_id, GameConfig.tint_for_index(slot), hat_id, skin_id)
 	player.position = _spawn_position(slot)
 	if map != null and player.camera != null:
 		# Whole numbers only. A zoom of 0.78 puts 1.56 screen pixels on each
@@ -213,6 +230,11 @@ func _spawn_player(id: int, monkey_id: StringName, slot: int, hat_id: StringName
 	_player_root.add_child(player)
 	players[id] = player
 	if id == _local_id:
+		# Equipped trail, punch and climb effects ride on this machine's
+		# own monkey.
+		var fx := COSMETIC_FX.new()
+		fx.setup(player, Loot.equipped)
+		player.add_child(fx)
 		# Career stats track this machine's player only. Each client writes
 		# its own file and none of it is authoritative for anything.
 		player.hit_landed.connect(func(_target_id: int) -> void: Profile.bump("hits_landed"))
@@ -241,6 +263,7 @@ func despawn_player(id: int) -> void:
 # --- Per-tick routing ----------------------------------------------
 
 func _physics_process(delta: float) -> void:
+	_bot_tick += 1
 	if _over:
 		# Still drain the local input queue, so presses made on the results
 		# screen do not pile up and fire in the next round.
@@ -287,8 +310,36 @@ func _route_input(delta: float) -> void:
 func _brain_or_remote_input(id: int, delta: float) -> InputFrame:
 	var brain := bots.get(id) as BotBrain
 	if brain != null:
-		return brain.think(players[id] as Player, self, delta)
+		return _bot_input(id, brain, delta)
 	return Net.take_remote_input(id)
+
+
+## Bots think every other physics tick (30 times a second, staggered so
+## they do not all think on the same tick) and hold their stick and buttons
+## in between. Their reactions are a sixtieth of a second slower, which no
+## one can see, and the bot cost per frame halves - the biggest physics
+## cost left on a phone.
+var _bot_last: Dictionary = {}
+var _bot_tick: int = 0
+
+
+func _bot_input(id: int, brain: BotBrain, delta: float) -> InputFrame:
+	if (_bot_tick + id) % 2 == 0 or not _bot_last.has(id):
+		var frame := brain.think(players[id] as Player, self, delta * 2.0)
+		var held := InputFrame.new()
+		held.move = frame.move
+		held.jump_held = frame.jump_held
+		held.sprint_held = frame.sprint_held
+		held.grab_held = frame.grab_held
+		_bot_last[id] = held
+		return frame
+	var last: InputFrame = _bot_last[id]
+	var copy := InputFrame.new()
+	copy.move = last.move
+	copy.jump_held = last.jump_held
+	copy.sprint_held = last.sprint_held
+	copy.grab_held = last.grab_held
+	return copy
 
 
 ## Counted locally rather than in _begin_respawn, which only runs on the
@@ -330,6 +381,14 @@ func _begin_respawn(id: int) -> void:
 	var player := players.get(id) as Player
 	if player == null:
 		return
+	if Net.mode == GameConfig.Mode.SLAP and slap.is_out(id):
+		# Out for the round: parked out of sight, frozen, until the next
+		# round puts everyone back.
+		player.velocity = Vector2.ZERO
+		player.global_position = Vector2(0.0, (map.kill_depth if map != null else 1400.0) + 4000.0)
+		player.set_physics_process(false)
+		player.visible = false
+		return
 	# Parked far below rather than freed: freeing and reinstancing a body
 	# mid-match invalidates every reference the netcode is holding.
 	var limit := map.kill_depth if map != null else 1400.0
@@ -342,6 +401,42 @@ func _begin_respawn(id: int) -> void:
 		return
 	player.respawn_at(_checkpoints.get(id, _spawn_position(0)))
 	_respawning[id] = false
+
+
+## A monkey knocked out of a 2v2 round. On its own machine the camera moves
+## to the teammate still fighting, so being out is watching, not a black
+## screen.
+func _on_slap_out(id: int) -> void:
+	if id != _local_id:
+		return
+	var me := players.get(id) as Player
+	if me == null:
+		return
+	for other_id in players.keys():
+		var other := players[other_id] as Player
+		if other == me or other.team != me.team or slap.is_out(int(other_id)):
+			continue
+		if other.camera != null:
+			other.camera.enabled = true
+			other.camera.make_current()
+		return
+
+
+## Next round: everyone back on the island at their start, damage reset.
+func _on_slap_round_reset(_round: int) -> void:
+	for id in players.keys():
+		var player := players[id] as Player
+		if player.camera != null:
+			player.camera.enabled = int(id) == _local_id
+			if int(id) == _local_id:
+				player.camera.make_current()
+		if not _is_authority():
+			continue
+		player.set_physics_process(true)
+		player.visible = true
+		var slot := int(Net.roster.get(id, {}).get("slot", 0))
+		player.respawn_at(_spawn_position(slot))
+		_respawning[id] = false
 
 
 ## Called by Checkpoint areas. Host authoritative: a client claiming a
@@ -376,7 +471,8 @@ func apply_snapshot(snapshot: Dictionary) -> void:
 			var entry: Dictionary = Net.roster.get(pid, {"monkey": &"gibbon", "hat": &"none", "slot": players.size()})
 			player = _spawn_player(
 				pid, entry["monkey"], int(entry["slot"]),
-				entry.get("hat", &"none"), bool(entry.get("bot", false))
+				entry.get("hat", &"none"), bool(entry.get("bot", false)), "",
+				entry.get("skin", &"natural")
 			)
 		player.apply_net_state(snapshot[id])
 
@@ -391,6 +487,15 @@ func apply_remote_hit(target_id: int, force: Vector2, stun: float, attacker_id: 
 	# knowable from the host's broadcast.
 	if attacker_id == _local_id:
 		Profile.bump("hits_landed")
+
+
+func apply_remote_grab(target_id: int, attacker_id: int, seconds: float) -> void:
+	if _over:
+		return
+	var target := players.get(target_id) as Player
+	var attacker := players.get(attacker_id) as Player
+	if target != null and attacker != null:
+		target.grabbed_by(attacker, seconds)
 
 
 func apply_remote_ability(target_id: int, ability_id: StringName, duration: float) -> void:
