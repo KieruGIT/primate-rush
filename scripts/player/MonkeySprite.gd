@@ -14,7 +14,9 @@ const PIXEL: float = 4.0 / 3.0
 ## Per-species size on top of PIXEL. 4/3 keeps the low-detail art on an even
 ## grid (3 atlas px per art px x 2 x 4/3 = 8 world px), so the gorilla reads
 ## as the big one without smeared pixels.
-const SIZE: Dictionary = {&"gorilla": 1.25}
+## The chimp and macaque art is drawn small, so they are scaled up to read
+## at a glance, the macaque a touch smaller than the chimp.
+const SIZE: Dictionary = {&"gorilla": 1.25, &"capuchin": 1.125, &"macaque": 1.25}
 ## Menus keep their own size ratio (drawn by MonkeyStage at whole scales).
 const MENU_SIZE: Dictionary = {&"gorilla": 4.0 / 3.0}
 const POSES: Dictionary = MonkeyFrames.POSES

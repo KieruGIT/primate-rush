@@ -69,11 +69,36 @@ class Silhouettes extends Node2D:
 
 
 class Canopy extends Node2D:
+	# Close to the level's own leaves, just a shade deeper, so the canopy
+	# reads as the same trees as the ones you stand on.
+	const LEAF_INK := Color8(14, 40, 28)
+	const LEAF_DEEP := Color8(26, 66, 40)
+	const LEAF_SHADOW := Color8(22, 58, 36)
+	const LEAF_MID := Color8(40, 98, 42)
+	const LEAF_LIT := Color8(70, 142, 56)
+	const LEAF_BRIGHT := Color8(110, 178, 72)
+	## Thickness of the leaf band, underside to the lumpy top edge. Above it
+	## the night sky shows through.
+	const BAND: float = 230.0
+	## How far the trunks reach down from the underside: past any ground or
+	## water, which the level then draws over.
+	const TRUNK_DROP: float = 1500.0
+	const BARK := Color8(78, 52, 30)
+	const BARK_DARK := Color8(54, 36, 22)
+	const BARK_LIT := Color8(102, 68, 38)
+	const BARK_FAR := Color8(34, 30, 34)
+	const BARK_FAR_LIT := Color8(46, 40, 42)
 	var span: float = 1440.0
-	var parallax: float = 0.9
+	## 1.0: the canopy moves with the level, so the things hanging from it
+	## stay attached and it reads as right there, not far off.
+	var parallax: float = 1.0
 	var seed_value: int = 1
+	## Where the leaf tiles go, and the world height of their top edge.
+	## Set by LevelSkin: a camera-following layer, so the frame stays put
+	## in the level. Unset, the tiles ride along at the top of the screen.
+	var tile_host: Node2D = null
+	var anchor_y: float = 0.0
 	var _time: float = 0.0
-	var _vines: Array = []
 	var _clumps: Array = []
 	var _flies: Array = []
 	## The leaves and vines are drawn once into these tiles (one per repeat)
@@ -87,23 +112,23 @@ class Canopy extends Node2D:
 		rng.seed = seed_value * 977 + 3
 		var x := 0.0
 		while x < span:
-			_clumps.append([x, rng.randf_range(-20.0, 26.0), int(rng.randf_range(9.0, 16.0))])
-			x += rng.randf_range(60.0, 120.0)
-		x = rng.randf_range(20.0, 80.0)
-		while x < span:
-			_vines.append([x, rng.randf_range(90.0, 260.0), rng.randf() < 0.5])
-			x += rng.randf_range(90.0, 230.0)
+			_clumps.append([x, rng.randf_range(-6.0, 30.0), int(rng.randf_range(9.0, 16.0))])
+			x += rng.randf_range(44.0, 90.0)
 		for i in 26:
 			_flies.append([rng.randf_range(0.0, 1.0), rng.randf_range(0.15, 0.9), rng.randf_range(0.0, TAU)])
 		# One bake, three sprites sharing it (it used to be baked three times).
-		var key := "canopy:%d:%d" % [seed_value, int(span)]
+		var key := "canopy5:%d:%d" % [seed_value, int(span)]
 		for i in 3:
 			var tile := RectBake.bake_shared(key, _draw_tile)
 			tile.show_behind_parent = true
-			add_child(tile)
+			if tile_host != null:
+				tile_host.add_child(tile)
+			else:
+				add_child(tile)
 			_tiles.append(tile)
 			PerfOverlay.track(tile, &"canopy")
 		PerfOverlay.track(self, &"fireflies")
+		process_priority = 1000
 
 	func _fx_refresh() -> void:
 		queue_redraw()
@@ -113,34 +138,78 @@ class Canopy extends Node2D:
 		var camera := get_viewport().get_camera_2d()
 		var cam_x := camera.get_screen_center_position().x if camera != null else 0.0
 		var shift := -fposmod(cam_x * parallax, span)
+		if tile_host != null:
+			# Screen left edge in world x, so the same shift lands the same.
+			var half_w := get_viewport_rect().size.x * 0.5
+			tile_host.position = Vector2(roundf(cam_x - half_w), anchor_y)
 		for i in _tiles.size():
-			_tiles[i].position.x = shift + span * i
+			_tiles[i].position.x = shift + span * (i - 1)
 		if PerfOverlay.fx_on(&"fireflies"):
 			queue_redraw()
 
-	## One repeat of the leaf frame: vines hanging from it, then the clumps.
+	## One repeat of the canopy: trunks rising out of the dark into a thick
+	## band of leaves, lumpy on top and underneath. Background only: nothing
+	## here can be held, and nothing hangs down looking like it could be.
 	func _draw_tile(canvas: Variant) -> void:
-		var ink := Color8(8, 22, 16)
-		var body := Color8(14, 36, 26)
-		var lit := Color8(24, 58, 38)
-		var vine := Color8(58, 120, 46)
-		var leaf := Color8(90, 163, 63)
-		for v in _vines:
-			var vx := snappedf(float(v[0]), P)
-			var length := float(v[1])
-			var y := 30.0
-			while y < length:
-				# A fixed gentle curve instead of a per-frame sway.
-				var wobble := snappedf(sin(y * 0.03 + float(v[0])) * 3.0, P)
-				canvas.draw_rect(Rect2(vx + wobble, y, P, P * 2.0), vine)
-				if int(y / P) % 7 == 0:
-					canvas.draw_rect(Rect2(vx + wobble + (P if bool(v[2]) else -P * 2.0), y, P * 2.0, P), leaf)
-				y += P * 2.0
+		var rng := RandomNumberGenerator.new()
+		rng.seed = seed_value * 613 + 11
+		# A far row first: thin, dark trunks close together, the depth of the
+		# forest behind the main trees.
+		var fx := rng.randf_range(10.0, 60.0)
+		while fx < span:
+			var fw := snappedf(rng.randf_range(12.0, 20.0), P)
+			var ftx := snappedf(fx, P)
+			canvas.draw_rect(Rect2(ftx - fw * 0.5, -BAND * 0.4, fw, TRUNK_DROP + BAND * 0.4), BARK_FAR)
+			canvas.draw_rect(Rect2(ftx - fw * 0.5, -BAND * 0.4, P, TRUNK_DROP + BAND * 0.4), BARK_FAR_LIT)
+			fx += rng.randf_range(70.0, 150.0)
+		# Then the main trunks, so the leaves sit over their tops.
+		var x := rng.randf_range(40.0, 160.0)
+		while x < span:
+			var w := snappedf(rng.randf_range(22.0, 38.0), P)
+			var tx := snappedf(x, P)
+			canvas.draw_rect(Rect2(tx - w * 0.5 - P, -BAND * 0.5, w + P * 2.0, TRUNK_DROP + BAND * 0.5), BARK_DARK)
+			canvas.draw_rect(Rect2(tx - w * 0.5, -BAND * 0.5, w, TRUNK_DROP + BAND * 0.5), BARK)
+			canvas.draw_rect(Rect2(tx - w * 0.5 + P, -BAND * 0.5, P, TRUNK_DROP + BAND * 0.5), BARK_LIT)
+			# Bark: short dark marks down the trunk.
+			var y := 40.0
+			while y < TRUNK_DROP:
+				canvas.draw_rect(Rect2(tx + snappedf(rng.randf_range(-w * 0.3, w * 0.2), P), y, P, P * 3.0), BARK_DARK)
+				y += rng.randf_range(40.0, 90.0)
+			# A branch or two climbing into the leaves.
+			for b in 2:
+				var side := -1.0 if b == 0 else 1.0
+				var by := rng.randf_range(10.0, 60.0)
+				for k in 10:
+					canvas.draw_rect(Rect2(tx + side * (w * 0.4 + k * P * 1.5), by - k * P * 1.2, P * 2.0, P * 2.0), BARK)
+			x += rng.randf_range(150.0, 280.0)
+		# The leaf mass, mottled so it reads as leaves.
+		canvas.draw_rect(Rect2(-P * 20.0, -BAND, span + P * 40.0, BAND), LEAF_DEEP)
+		for i in int(span / 14.0):
+			var at := Vector2(rng.randf_range(0.0, span), rng.randf_range(-BAND + 10.0, -10.0))
+			_disc(canvas, at, int(rng.randf_range(3.0, 7.0)), LEAF_MID if rng.randf() < 0.6 else LEAF_SHADOW)
+		# The top edge: big round crowns catching the moonlight.
+		x = 0.0
+		while x < span:
+			var r := int(rng.randf_range(10.0, 18.0))
+			var top := Vector2(x, -BAND + rng.randf_range(0.0, 30.0))
+			_disc(canvas, top, r + 1, LEAF_INK)
+			_disc(canvas, top, r, LEAF_MID)
+			_disc(canvas, top + Vector2(-P * 2.0, -P * 2.0), maxi(r - 4, 3), LEAF_LIT)
+			_disc(canvas, top + Vector2(-P * 3.0, -P * 4.0), maxi(r / 3, 2), LEAF_BRIGHT)
+			x += rng.randf_range(50.0, 100.0)
+		# The underside: overlapping clumps, outline first, then body, then a
+		# lit top-left and a few bright leaf tips.
 		for c in _clumps:
-			_disc(canvas, Vector2(float(c[0]), float(c[1])), int(c[2]) + 1, ink)
+			_disc(canvas, Vector2(float(c[0]), float(c[1])), int(c[2]) + 1, LEAF_INK)
 		for c in _clumps:
-			_disc(canvas, Vector2(float(c[0]), float(c[1])), int(c[2]), body)
-			_disc(canvas, Vector2(float(c[0]) - P * 3.0, float(c[1]) + P * 2.0), int(c[2]) / 2, lit)
+			var at := Vector2(float(c[0]), float(c[1]))
+			var r := int(c[2])
+			_disc(canvas, at, r, LEAF_MID)
+			_disc(canvas, at + Vector2(-P * 2.0, -P * 2.0), maxi(r - 3, 3), LEAF_LIT)
+			_disc(canvas, at + Vector2(-P * 3.0, -P * 3.0), maxi(r / 3, 2), LEAF_BRIGHT)
+			for k in 3:
+				var tip := at + Vector2(rng.randf_range(-r, r) * P * 0.8, r * P - P)
+				canvas.draw_rect(Rect2(snappedf(tip.x, P), snappedf(tip.y, P), P * 2.0, P * 2.0), LEAF_LIT)
 
 	## Fireflies only: 26 small squares.
 	func _draw() -> void:

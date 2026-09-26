@@ -27,13 +27,13 @@ const SAVE_PATH: String = "user://loot.cfg"
 const PULL_COST: int = 100
 const TEN_PULL_COST: int = 900
 const START_BANANAS: int = 200
-const DUPLICATE_REFUND: Array[int] = [25, 60, 150]
+const DUPLICATE_REFUND: Array[int] = [25, 60, 150, 400]
 
-enum Rarity { COMMON, RARE, LEGENDARY }
-const RARITY_NAMES: Array[String] = ["COMMON", "RARE", "LEGENDARY"]
-const RARITY_COLORS: Array[Color] = [Color8(200, 210, 225), Color8(90, 170, 255), Color8(255, 196, 52)]
+enum Rarity { COMMON, RARE, LEGENDARY, MYTHIC }
+const RARITY_NAMES: Array[String] = ["COMMON", "RARE", "LEGENDARY", "MYTHIC"]
+const RARITY_COLORS: Array[Color] = [Color8(200, 210, 225), Color8(90, 170, 255), Color8(255, 196, 52), Color8(255, 80, 190)]
 ## Chance of each rarity per pull, in percent.
-const ODDS: Array[float] = [65.0, 28.0, 7.0]
+const ODDS: Array[float] = [64.0, 28.0, 7.0, 1.0]
 
 const SLOTS: Array[StringName] = [&"trail", &"punch", &"climb", &"win"]
 const SLOT_NAMES: Dictionary = {&"trail": "TRAIL", &"punch": "PUNCH", &"climb": "CLIMB", &"win": "WIN"}
@@ -63,6 +63,8 @@ const ITEMS: Dictionary = {
 	# Looks from the style screen that can also drop
 	&"skin_midnight": {"slot": &"skin", "name": "Midnight Skin", "rarity": Rarity.RARE, "plus": false, "look": &"midnight"},
 	&"skin_golden": {"slot": &"skin", "name": "Golden Skin", "rarity": Rarity.LEGENDARY, "plus": false, "look": &"golden"},
+	&"skin_night_swinger": {"slot": &"skin", "name": "Night Swinger", "rarity": Rarity.MYTHIC, "plus": false, "look": &"night_swinger"},
+	&"skin_molten_titan": {"slot": &"skin", "name": "Molten Titan", "rarity": Rarity.MYTHIC, "plus": false, "look": &"molten_titan"},
 	&"hat_tophat": {"slot": &"hat", "name": "Top Hat", "rarity": Rarity.RARE, "plus": false, "look": &"tophat"},
 	&"hat_halo": {"slot": &"hat", "name": "Halo", "rarity": Rarity.LEGENDARY, "plus": false, "look": &"halo"},
 	&"hat_crown": {"slot": &"hat", "name": "Crown", "rarity": Rarity.LEGENDARY, "plus": true, "look": &"crown"},
@@ -245,9 +247,11 @@ func pull(count: int = 1, free: bool = false) -> Array:
 func _pull_one(floor_rarity: int) -> Dictionary:
 	var roll := _rng.randf() * 100.0
 	var rarity: int = Rarity.COMMON
-	if roll < ODDS[2]:
+	if roll < ODDS[3]:
+		rarity = Rarity.MYTHIC
+	elif roll < ODDS[3] + ODDS[2]:
 		rarity = Rarity.LEGENDARY
-	elif roll < ODDS[2] + ODDS[1]:
+	elif roll < ODDS[3] + ODDS[2] + ODDS[1]:
 		rarity = Rarity.RARE
 	rarity = maxi(rarity, floor_rarity)
 	var pool: Array[StringName] = []

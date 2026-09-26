@@ -117,15 +117,23 @@ static func ledge(canvas: Variant, rect: Rect2, index: int) -> void:
 			_block(canvas, x0 + cx * P, y0 + P * 2.0, P, P * float(1 + k % 3), GRASS)
 
 
+## Where plank ropes end at the top: the canopy's underside (set by
+## LevelSkin), so a plank hangs from the trees rather than from nothing.
+static var rope_top_y: float = INF
+
+
 static func plank(canvas: Variant, rect: Rect2) -> void:
 	var x0 := rect.position.x
 	var y0 := rect.position.y
 	var w := rect.size.x
 	var h := minf(rect.size.y, P * 6.0)
 	# rope-hung, as in the mock: two ropes rising from the plank ends
+	var top := y0 - 180.0
+	if rope_top_y < y0 - 20.0:
+		top = rope_top_y
 	for rx in [x0 + P * 3.0, x0 + w - P * 4.0]:
 		var ry := y0 - P
-		while ry > y0 - 180.0:
+		while ry > top:
 			_block(canvas, rx, ry - P * 2.0, P, P * 2.0, Color8(201, 184, 154) if int((y0 - ry) / (P * 2.0)) % 2 == 0 else Color8(160, 142, 112))
 			ry -= P * 2.0
 	_block(canvas, x0 - P, y0 - P, w + P * 2.0, h + P * 2.0, INK)

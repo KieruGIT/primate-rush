@@ -1,5 +1,22 @@
 # Multiplayer: what works, and how far it can go
 
+## Current decision (Shipaton build): no matchmaking
+
+For the submission the game ships **without online matchmaking**. Decided
+2026-09-24.
+
+- **PLAY** goes straight to the monkey pick and fills every empty seat with
+  AI. The old "SEARCHING" screen, which listened on the LAN for a few
+  seconds before giving up and adding AI, was removed: nobody was ever found,
+  so it was only a wait.
+- **Playing with friends** is done from the **PARTY** page (host, or join by
+  the hosts list or an IP), same network or over UPnP / Tailscale, as below.
+  Once friends are in your room, PLAY starts for everyone.
+- The search code is kept, unused: `Matchmaker.begin()` in
+  `scripts/ui/Matchmaker.gd`. Bring it back only together with a real
+  matchmaking backend (section 5), since a LAN-only search finds nobody.
+
+
 Short answer: **yes, multiplayer works, and playing over the internet is
 possible without paying for anything.** What it costs is reliability — the
 free routes fail on some networks and there is no way around that without a

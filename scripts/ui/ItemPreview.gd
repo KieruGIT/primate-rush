@@ -39,7 +39,8 @@ func _ready() -> void:
 			_host.add_child(_trail)
 		&"skin":
 			var stage := MonkeyStage.new()
-			stage.pixel_scale = 2
+			# Bigger boxes (the Style page viewer) get a bigger monkey.
+			stage.pixel_scale = 4 if custom_minimum_size.y >= 140.0 else 2
 			stage.pedestal = false
 			stage.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 			add_child(stage)

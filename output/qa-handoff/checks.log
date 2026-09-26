@@ -545,3 +545,41 @@
 2026-09-24T00:27:31  MOVE ok    platform holds when not pressing down  y 348
 2026-09-24T00:27:32  MOVE ok    down drops through a platform  y 468
 2026-09-24T00:27:32  MOVE CHECK OK
+2026-09-24T18:59:46  SKILL gorilla: dummy moved 233 px, state then STUN, my skill timer 3.7
+2026-09-24T18:59:46  SKILL orangutan: dummy moved 1008 px, state then GROUND, my skill timer 3.8
+2026-09-24T18:59:46  SKILL macaque: dummy moved 82 px, state then STUN, my skill timer 0.0
+2026-09-24T18:59:46  SKILL gibbon: dummy moved 521 px, state then STUN, my skill timer 1.9
+2026-09-24T18:59:46  SKILL capuchin: dummy moved 130 px, state then STUN, my skill timer 3.6
+2026-09-24T18:59:46  SKILL PROBE DONE
+2026-09-24T19:00:43  SKILL gorilla: dummy moved 1075 px, state then STUN, my skill timer 3.8
+2026-09-24T19:00:43  SKILL orangutan: dummy moved 986 px, state then GROUND, my skill timer 3.8
+2026-09-24T19:00:43  SKILL macaque: dummy moved 82 px, state then STUN, my skill timer 0.0
+2026-09-24T19:00:43  SKILL gibbon: dummy moved 604 px, state then STUN, my skill timer 1.9
+2026-09-24T19:00:43  SKILL capuchin: dummy moved 130 px, state then STUN, my skill timer 3.6
+2026-09-24T19:00:43  SKILL PROBE DONE
+2026-09-24T19:22:55  SKILL gorilla: dummy moved 4285 px, state then STUN, my skill timer 3.8
+2026-09-24T19:22:55  SKILL orangutan: dummy moved 297 px, state then GROUND, my skill timer 3.8
+2026-09-24T19:22:55  SKILL macaque: dummy moved 0 px, state then GROUND, my skill timer 0.0
+2026-09-24T19:22:55  SKILL gibbon: dummy moved 0 px, state then GROUND, my skill timer 0.0
+2026-09-24T19:22:55  SKILL capuchin: dummy moved 0 px, state then GROUND, my skill timer 0.0
+2026-09-24T19:22:55  SKILL PROBE DONE
+2026-09-24T19:24:04  SKILL gorilla: dummy moved 982 px, state then STUN, my skill timer 3.8
+2026-09-24T19:24:04  SKILL orangutan: dummy moved 4291 px, state then GROUND, my skill timer 3.8
+2026-09-24T19:24:04  SKILL macaque: dummy moved 329 px, state then STUN, my skill timer 0.0
+2026-09-24T19:24:04  SKILL gibbon: dummy moved 686 px, state then STUN, my skill timer 1.9
+2026-09-24T19:24:04  SKILL capuchin: dummy moved 0 px, state then GROUND, my skill timer 0.0
+2026-09-24T19:24:04  SKILL PROBE DONE
+2026-09-24T19:27:10  SKILL gorilla: dummy moved 245 px, state then STUN, my skill timer 3.8
+2026-09-24T19:27:10  SKILL orangutan: dummy moved 4363 px, state then GROUND, my skill timer 3.8
+2026-09-24T19:27:10  SKILL macaque: dummy moved 381 px, state then STUN, my skill timer 0.0
+2026-09-24T19:27:10  SKILL gibbon: dummy moved 521 px, state then STUN, my skill timer 1.9
+2026-09-24T19:27:10  SKILL capuchin: dummy moved 0 px, state then GROUND, my skill timer 0.0
+2026-09-24T19:27:10  SKILL PROBE DONE
+2026-09-24T22:25:09  SKILL gorilla: dummy moved 420 px, state then STUN, my skill timer 3.8
+2026-09-24T22:25:09  SKILL orangutan: dummy moved 207 px, state then GROUND, my skill timer 3.8
+2026-09-24T22:25:09  SKILL macaque: dummy moved 94 px, state then STUN, my skill timer 0.0
+2026-09-24T22:25:09  SKILL gibbon: dummy moved 0 px, state then GROUND, my skill timer 0.0
+2026-09-24T22:25:09  SKILL gibbon swing ground: 11 frames, speed 1296..1300 px/s
+2026-09-24T22:25:09  SKILL gibbon swing air: 10 frames, speed 1296..1300 px/s
+2026-09-24T22:25:09  SKILL capuchin: dummy moved 109 px, state then STUN, my skill timer 3.6
+2026-09-24T22:25:09  SKILL PROBE DONE

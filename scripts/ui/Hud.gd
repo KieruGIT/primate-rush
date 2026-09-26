@@ -187,7 +187,7 @@ func _update_plank() -> void:
 	match Net.mode:
 		GameConfig.Mode.HOARD:
 			if _hoard != null:
-				mode = "BANANA RUSH"
+				mode = "FIRST TO %d" % _hoard.win_target
 				seconds = _hoard.time_left if _hoard.is_running() else _hoard.round_seconds
 		GameConfig.Mode.SLAP:
 			if _slap != null:
@@ -207,7 +207,7 @@ func _update_plank() -> void:
 	if _card != null:
 		_card.visible = not carrying
 	if carrying:
-		_carry_count.text = str(_player.bananas)
+		_carry_count.text = "%d/%d" % [_player.bananas, _hoard.win_target]
 
 
 ## Wraps the scene's Title and Info labels in a card with the monkey's face,
@@ -239,19 +239,19 @@ func _build_card() -> void:
 	top.queue_free()
 
 
-## Keyboard players get the controls along the bottom edge, always. The
-## touch layout draws its own; a keyboard has nothing on screen to learn
+## Keyboard players get the controls as a list in the lower left, always.
+## The touch layout draws its own; a keyboard has nothing on screen to learn
 ## from, which is how "where are the controls" gets asked.
 func _build_key_strip() -> void:
-	var strip := HBoxContainer.new()
+	var strip := VBoxContainer.new()
 	strip.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
 	strip.grow_vertical = Control.GROW_DIRECTION_BEGIN
-	strip.offset_left = 18.0
+	strip.offset_left = 14.0
 	strip.offset_bottom = -14.0
-	strip.add_theme_constant_override(&"separation", 14)
+	strip.add_theme_constant_override(&"separation", 6)
 	strip.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	strip.modulate = Color(1, 1, 1, 0.85)
-	for pair in [["A D", "MOVE"], ["SPACE", "JUMP x2"], ["SHIFT", "GRAB / SWING"], ["S", "DROP / SLIDE"], ["LEFT CLICK", "PUNCH"], ["E", "SKILL"], ["ESC", "PAUSE"]]:
+	for pair in [["A D", "MOVE"], ["SPACE", "JUMP x2"], ["L CLICK", "PUNCH"], ["R CLICK", "GRAB / SWING"], ["E", "SKILL"], ["S", "DROP / SLIDE"], ["ESC", "PAUSE"]]:
 		var item := HBoxContainer.new()
 		item.add_theme_constant_override(&"separation", 6)
 		var chip := PanelContainer.new()
@@ -356,6 +356,9 @@ func _update_skill_card() -> void:
 	var cooling := left > 0.0
 	_skill_bar.value = 1.0 - (left / total if cooling and total > 0.0 else 0.0)
 	_skill_state.text = "%.1fs" % left if cooling else "READY"
+	if _player.stats.skill_charges > 1 and not cooling:
+		# Stacked skill: how many are banked.
+		_skill_state.text = "READY x%d" % _player.skill_charges_left()
 	if _skill_style_cooling != int(cooling):
 		_skill_style_cooling = int(cooling)
 		_skill_state.add_theme_color_override(&"font_color", UiTheme.INK_DIM if cooling else UiTheme.LEAF)
@@ -541,6 +544,8 @@ func _skill_text() -> String:
 	var label := String(_player.stats.skill_id).replace("_", " ")
 	if _player.skill_timer > 0.0:
 		return "%s %.1fs" % [label, _player.skill_timer]
+	if _player.stats.skill_charges > 1:
+		return "%s ready x%d" % [label, _player.skill_charges_left()]
 	return "%s ready" % label
 
 
@@ -615,31 +620,31 @@ func _on_slap_scores(_scores: Array) -> void:
 
 func _on_slap_round_won(team: int, scores: Array) -> void:
 	var head := "DRAW - REPLAY" if team < 0 else "TEAM %s TAKES THE ROUND" % GameConfig.TEAM_NAMES[team].to_upper()
-	_center.text = "%s\n%d  -  %d" % [head, scores[0], scores[1]]
+	_show_center("%s\n%d  -  %d" % [head, scores[0], scores[1]])
 	_center_timer = 2.4
 	Sfx.play(&"finish")
 
 
 func _on_slap_round_reset(round_number: int) -> void:
-	_center.text = "ROUND %d" % round_number
+	_show_center("ROUND %d" % round_number)
 	_center_timer = 1.4
 
 
 func _on_slap_out(player_id: int) -> void:
 	if player_id != Net.local_id():
 		return
-	_center.text = "YOU'RE OUT\nWATCHING YOUR TEAMMATE"
+	_show_center("YOU'RE OUT\nWATCHING YOUR TEAMMATE")
 	_center_timer = 1.8
 
 
 func _on_countdown(value: int) -> void:
-	_center.text = str(value) if value > 0 else "GO"
+	_show_center(str(value) if value > 0 else "GO")
 	_center_timer = GO_FLASH_SECONDS if value <= 0 else 2.0
 	Sfx.play(&"beep" if value > 0 else &"go")
 
 
 func _on_race_began() -> void:
-	_center.text = "GO"
+	_show_center("GO")
 	_center_timer = GO_FLASH_SECONDS
 	Sfx.play(&"go")
 
@@ -647,7 +652,7 @@ func _on_race_began() -> void:
 func _on_player_finished(player_id: int, place: int, seconds: float) -> void:
 	if player_id != Net.local_id():
 		return
-	_center.text = "FINISHED  %d%s  -  %.2fs" % [place, _ordinal_suffix(place), seconds]
+	_show_center("FINISHED  %d%s  -  %.2fs" % [place, _ordinal_suffix(place), seconds])
 	_center_timer = 3.0
 	Sfx.play(&"finish")
 
@@ -692,3 +697,26 @@ class _SkillIcon extends Control:
 	func _draw() -> void:
 		var r := minf(size.x, size.y)
 		SkillFx.draw_icon(self, skill_id, size * 0.5, r * 0.34, SkillFx.colour_of(skill_id))
+
+
+## Big centre messages: shrunk until the widest line fits the screen with a
+## margin. "TEAM BANANA TAKES THE ROUND" at 88 px ran off both edges.
+const CENTER_MAX_SIZE: int = 88
+const CENTER_MIN_SIZE: int = 28
+
+
+func _show_center(text: String) -> void:
+	_center.text = text
+	var font := _center.get_theme_font(&"font")
+	if font == null:
+		return
+	var room := get_viewport().get_visible_rect().size.x - 96.0
+	var size := CENTER_MAX_SIZE
+	while size > CENTER_MIN_SIZE:
+		var widest := 0.0
+		for line in text.split("\n"):
+			widest = maxf(widest, font.get_string_size(line, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x)
+		if widest <= room:
+			break
+		size -= 4
+	_center.add_theme_font_size_override(&"font_size", size)

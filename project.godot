@@ -28,6 +28,7 @@ Purchases="*res://scripts/autoload/Purchases.gd"
 Profile="*res://scripts/autoload/Profile.gd"
 Sfx="*res://scripts/autoload/Sfx.gd"
 PerfOverlay="*res://scripts/autoload/PerfOverlay.gd"
+MCPRuntimeServer="*res://addons/godot_mcp_toolkit/runtime/mcp_runtime_server.gd"
 
 [display]
 
@@ -36,8 +37,12 @@ window/size/viewport_height=720
 window/stretch/mode="canvas_items"
 window/stretch/aspect="expand"
 window/stretch/scale_mode="integer"
-window/stretch/scale_mode.mobile="fractional"
 window/handheld/orientation=4
+window/stretch/scale_mode.mobile="fractional"
+
+[editor_plugins]
+
+enabled=PackedStringArray("res://addons/godot_mcp_toolkit/plugin.cfg", "res://addons/godotx_revenue_cat/plugin.cfg")
 
 [input]
 

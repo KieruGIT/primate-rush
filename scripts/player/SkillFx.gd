@@ -20,19 +20,19 @@ const PATH := "res://scripts/player/SkillFx.gd"
 
 const INFO: Dictionary = {
 	&"grapple_dash": ["GRAPPLE SLAM", Color8(255, 200, 58)],
-	&"air_launch": ["SKY LAUNCH", Color8(120, 200, 255)],
-	&"counter_roll": ["COUNTER ROLL", Color8(110, 220, 130)],
+	&"air_launch": ["SWING RUSH", Color8(120, 200, 255)],
+	&"counter_roll": ["ROLL COMBO", Color8(110, 220, 130)],
 	&"long_arm": ["LONG ARM", Color8(255, 140, 90)],
-	&"snatch": ["SNATCH", Color8(255, 110, 200)],
+	&"snatch": ["BANANA BANDIT", Color8(255, 110, 200)],
 }
 
 ## What each skill does, for the monkey select page. Plain sentences.
 const DESCRIPTIONS: Dictionary = {
 	&"grapple_dash": "Lunge forward. Catch a monkey, lift it over your head and slam it into the ground. Hold up to grapple onto a ledge instead.",
-	&"air_launch": "Blast off the way you aim, even from the ground. Anyone standing next to you gets blown away.",
-	&"counter_roll": "Curl into a ball and roll. Bowls over anyone in the way, and a hit taken mid-roll stuns the attacker.",
+	&"air_launch": "Grab thin air and swing from it like a web-slinger. Nothing can hit or stun you mid-swing, and anyone you swing into goes flying.",
+	&"counter_roll": "Curl into a ball and roll into a monkey to bowl it over. Every hit makes the roll ready again, so keep rolling to chain them.",
 	&"long_arm": "Wind up, then throw a giant punch across the screen. Miss everyone and the arm grabs the terrain and pulls you there.",
-	&"snatch": "Dash straight through a monkey and rob it: bananas if it has some, its speed if not.",
+	&"snatch": "Dash forward and snatch a banana off the first monkey you reach, then keep dashing (jump out any time). The peel drops where you stop: whoever steps on it slips.",
 }
 
 ## burst: the skill firing. popup: a word over someone. slam: a ground hit.
@@ -105,13 +105,15 @@ static func draw_icon(canvas: CanvasItem, skill_id: StringName, at: Vector2, s: 
 			# A fist lifting over an arrow slamming down.
 			cells = ["..XXXX..", ".XXXXXX.", ".XXXXXX.", "..XXXX..", "...XX...", "X..XX..X", ".X.XX.X.", "..XXXX..", "...XX..."]
 		&"air_launch":
-			cells = ["...XX...", "..XXXX..", ".XXXXXX.", "XXXXXXXX", "...XX...", ".X.XX.X.", "X..XX..X", "...XX...", "...XX..."]
+			# A swoop: down, along and up.
+			cells = ["X......XX", "X.....XXX", "XX...XX.X", ".XX.XX...", "..XXX....", "...X....."]
 		&"counter_roll":
 			cells = ["..XXXX..", ".XX..XX.", "XX.XX.XX", "X.X..X.X", "X.X..X.X", "XX.XX.XX", ".XX..XX.", "..XXXX.."]
 		&"long_arm":
 			cells = [".........", "......XXX", "XXXXXXXXX", "XXXXXXXXX", "......XXX", "........."]
 		&"snatch":
-			cells = ["X.X.X...", "XXXXX...", "XXXXX.XX", ".XXX.XXX", ".XXX.XX.", "....XX..", "...XX...", "..XX...."]
+			# A heart: the hug.
+			cells = [".XX..XX.", "XXXXXXXX", "XXXXXXXX", "XXXXXXXX", ".XXXXXX.", "..XXXX..", "...XX..."]
 		_:
 			cells = ["XXXX", "XXXX", "XXXX", "XXXX"]
 	var rows := cells.size()

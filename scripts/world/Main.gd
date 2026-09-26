@@ -60,7 +60,8 @@ func _ready() -> void:
 	_spawn_ui()
 	_spawn_all_players()
 	_start_mode()
-	Sfx.play_music(&"battle")
+	# Every map has its own track; Sfx falls back to the battle loop.
+	Sfx.play_music(GameConfig.MAP_MUSIC.get(Net.map_id, &"battle"))
 	# A ranked match takes the banana stake now; any other match has none.
 	Loot.last_stake = {}
 	if Net.queue == GameConfig.Queue.RANKED:
@@ -93,7 +94,21 @@ func _load_map() -> void:
 		push_error("Map %s failed to load." % Net.map_id)
 		return
 	map = scene.instantiate() as MapData
+	_make_ground_one_way(map)
 	_map_slot.add_child(map)
+
+
+## The dirt islands and stone ledges are solid only from above: a monkey
+## that falls short and catches the edge comes straight up through the dirt,
+## and one climbing a trunk never gets stuck under a ledge. Walls and the
+## level bounds stay solid all round.
+static func _make_ground_one_way(root: Node) -> void:
+	for body in root.find_children("*", "StaticBody2D", true, false):
+		for child in body.get_children():
+			var col := child as CollisionShape2D
+			if col != null and (String(col.name).begins_with("ColGround") or String(col.name).begins_with("ColLedge")):
+				col.one_way_collision = true
+				col.one_way_collision_margin = 12.0
 
 
 func _spawn_ui() -> void:

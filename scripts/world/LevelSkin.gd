@@ -60,6 +60,8 @@ var _decor: Array = []         # [tile, world position, flip]
 var _bounds: Rect2 = Rect2()
 var _water_y: float = 0.0
 var _back_layer: CanvasLayer = null
+## World height of the canopy's underside, once the backdrop is built.
+var canopy_underside_y: float = INF
 
 
 func _ready() -> void:
@@ -686,12 +688,14 @@ func _build_backdrop() -> void:
 	sky_layer.layer = -100
 	add_child(sky_layer)
 	sky_layer.add_child(_sky())
-	# Every parallax plane lives in screen space. They used to be world
-	# nodes that chased the camera each frame, and reading a smoothed camera
-	# a frame late made the painted treetops bob up and down whenever the
-	# monkey jumped or fell. Here nothing but the sideways scroll moves.
+	# The planes follow the camera exactly (follow_viewport), so the painted
+	# treetops stay at one height in the world: jump or fall and they move
+	# with the level instead of riding along with the screen. Only the
+	# sideways scroll is worked out by hand, after the camera has moved
+	# this frame (see SnappedParallax), so nothing bobs.
 	_back_layer = CanvasLayer.new()
 	_back_layer.layer = -50
+	_back_layer.follow_viewport_enabled = true
 	add_child(_back_layer)
 
 	# Anchored to where the camera actually looks, not to the water line.
@@ -737,12 +741,53 @@ func _mock_layers(eye: float) -> void:
 	trees.ground_y = eye + 140.0
 	trees.seed_value = seed_value
 	plane.add_child(trees)
+	# The forest roof: solid leaves from just above the highest ground all
+	# the way up, fixed in the world. Scenery only, no grab anchor, nothing
+	# climbable.
+	# Behind the level (the monkeys stay visible if they jump up into it),
+	# in front of the far backdrop, which it covers above its underside.
+	var leaves := CanvasLayer.new()
+	leaves.layer = -10
+	leaves.follow_viewport_enabled = true
+	add_child(leaves)
+	var host := Node2D.new()
+	leaves.add_child(host)
 	var frame := CanvasLayer.new()
 	frame.layer = 1
 	add_child(frame)
 	var canopy := MockLayers.Canopy.new()
 	canopy.seed_value = seed_value
+	canopy.tile_host = host
+	var reach := 360.0 / maxf(_camera_zoom(), 0.2)
+	# Low enough that the roof is in view from the start, a strip across the
+	# top of the screen at spawn. It sits behind the level, so anything
+	# built higher up simply stands in front of the leaves.
+	canopy.anchor_y = _canopy_height(eye - reach * 0.72)
+	canopy_underside_y = canopy.anchor_y
+	# Everything that hangs (vines, the ropes of the wooden planks) now
+	# hangs from the canopy: their tops are drawn on up into the leaves.
+	Mock.rope_top_y = to_local(Vector2(0.0, canopy_underside_y + 40.0)).y
+	Vine.canopy_y = canopy_underside_y + 40.0
+	for node in get_parent().find_children("*", "", true, false):
+		if node is Vine:
+			(node as Vine).queue_redraw()
 	frame.add_child(canopy)
+
+
+## The canopy's underside: where it sits in view at spawn, raised if need
+## be so every vine and plank rope reaches up into it rather than stopping
+## short in the open air.
+func _canopy_height(preferred: float) -> float:
+	var top := INF
+	for node in get_parent().find_children("*", "", true, false):
+		if node is Vine:
+			top = minf(top, (node as Node2D).global_position.y)
+	for i in _thin.size():
+		if i % 3 == 2:
+			top = minf(top, to_global(_thin[i].position).y - 180.0)
+	if top == INF:
+		return preferred
+	return minf(preferred, top + 60.0)
 
 
 ## Eye level: the spawn point if the map declares one, since that is where
@@ -855,8 +900,14 @@ class SnappedParallax extends Node2D:
 	## Screen space (the plane sits in a CanvasLayer): the world point
 	## anchor_y is pinned to the middle of the screen vertically, and only
 	## the sideways scroll follows the camera.
+	func _ready() -> void:
+		# After the camera: reading it before it moves this frame is what
+		# used to make the backdrop lag a frame behind and wobble.
+		process_priority = 1000
+
+	## World space (the layer follows the camera): the art keeps its world
+	## height, and sideways the plane sits at camera * (1 - scroll_scale).
 	func _process(_delta: float) -> void:
-		var half := get_viewport().get_visible_rect().size * 0.5
 		var eye_x := 0.0
 		var camera := get_viewport().get_camera_2d()
 		if camera != null:
@@ -864,8 +915,7 @@ class SnappedParallax extends Node2D:
 		# Keep copies near the camera while retaining each layer's scroll
 		# phase. Rounding the offset to a whole span erased the parallax and
 		# eventually left long maps outside the four copies altogether.
-		var base := Vector2(half.x - fposmod(eye_x * scroll_scale.x, span), half.y - anchor_y)
-		position = LevelSkin.snap(base)
+		position = LevelSkin.snap(Vector2(eye_x - fposmod(eye_x * scroll_scale.x, span), 0.0))
 
 
 ## The air behind everything. A flat wash under the baked layers: the sky

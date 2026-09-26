@@ -41,3 +41,8 @@ output/qa/
 # Local dev output: perf logs, probe screenshots, source zips, icon drafts.
 # Kept on disk, never committed (a source zip could carry secrets.cfg).
 output/
+
+# Android Gradle build template and its build output (hundreds of MB).
+# Recreate with Project > Install Android Build Template.
+android/build/
+android/.build_version

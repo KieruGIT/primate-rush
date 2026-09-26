@@ -39,8 +39,9 @@ var local_hat: StringName = &"none"
 var local_skin: StringName = &"natural"
 ## Match setup. Host owns it; clients receive it and never edit it, so two
 ## people cannot load two different maps into the same match.
-var map_id: StringName = &"map_a"
-var mode: int = GameConfig.Mode.RACE
+var map_id: StringName = &"map_c"
+## 2v2 Slap is the default: it is the mode people come back for.
+var mode: int = GameConfig.Mode.SLAP
 ## Filled into the roster at match start. Bots are ordinary roster entries
 ## with a negative id, so clients spawn them exactly like people.
 var bot_count: int = GameConfig.DEFAULT_BOTS
@@ -489,6 +490,25 @@ func broadcast_grab(target_id: int, attacker_id: int, seconds: float) -> void:
 	if not is_host():
 		return
 	_push_grab.rpc(target_id, attacker_id, seconds)
+
+
+## Host only. The chimp's banana peel: where it was thrown from and where
+## it lands, so every screen has the same trap in the same place.
+func broadcast_peel(owner_id: int, from: Vector2, to: Vector2) -> void:
+	if not is_host():
+		return
+	_push_peel.rpc(owner_id, from, to)
+
+
+@rpc("authority", "reliable")
+func _push_peel(owner_id: int, from: Vector2, to: Vector2) -> void:
+	if is_host() or arena == null:
+		return
+	var table: Variant = arena.get(&"players")
+	if table is Dictionary and (table as Dictionary).has(owner_id):
+		var thrower: Node = (table as Dictionary)[owner_id]
+		if thrower != null and thrower.has_method(&"spawn_peel"):
+			thrower.call(&"spawn_peel", from, to)
 
 
 @rpc("authority", "reliable")

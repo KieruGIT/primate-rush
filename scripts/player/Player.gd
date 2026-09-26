@@ -33,6 +33,8 @@ signal ability_changed(ability_id: StringName)
 enum State { GROUND, AIR, CLIMB, SWING, STUN, DASH, SLIDE }
 
 const SkillFx = preload("res://scripts/player/SkillFx.gd")
+const BANANA_ICON = preload("res://scripts/ui/BananaIcon.gd")
+const BANANA_PEEL = preload("res://scripts/world/BananaPeel.gd")
 const ATTACK_FLAVORS: Array[StringName] = [&"slap", &"punch", &"kick"]
 ## How far forward of the monkey's centre a slap connects, before arm length
 ## stretches it. Matched to where the drawn hand actually lands, so nobody
@@ -122,6 +124,11 @@ const SLAP_HEIGHT: float = 84.0
 
 @export_group("Swing")
 @export var swing_min_length: float = 48.0
+## Free hop: this close to the grip (past the shortest rope) and pushing
+## toward it, the monkey pops up and over for free.
+@export var free_hop_slack: float = 36.0
+@export var free_hop_lift: float = 1.0
+@export var free_hop_push: float = 230.0
 @export var swing_max_length: float = 260.0
 ## Pumping the stick adds angular velocity, which is the whole skill.
 @export var swing_pump: float = 8.2
@@ -164,8 +171,8 @@ const SLAP_HEIGHT: float = 84.0
 ## Gibbon. One launch per landing, in the aimed direction.
 @export var air_launch_speed: float = 1150.0
 ## Macaque. Short roll that ignores knockback and punishes whoever swung.
-@export var roll_speed: float = 900.0
-@export var roll_time: float = 0.26
+@export var roll_speed: float = 1150.0
+@export var roll_time: float = 0.42
 ## Orangutan. Twice the gorilla's reach, paid for with a visible windup.
 @export var long_arm_range_multiplier: float = 2.0
 @export var long_arm_windup: float = 0.32
@@ -290,10 +297,28 @@ var skin_id: StringName = &"natural"
 var team: int = -1
 var slap_damage: float = 0.0
 ## Share of extra knockback per percent of damage.
-const SLAP_SCALING: float = 0.022
+const SLAP_SCALING: float = 0.012
 ## Knockback at 0%, as a share of the normal amount. Low, so the first
 ## slaps shove rather than launch and a fight has a middle, not just an end.
-const SLAP_BASE: float = 0.4
+const SLAP_BASE: float = 0.6
+## Combo (2v2 Slap): hits taken within COMBO_WINDOW of the last one chain,
+## from any enemy. Each hit already in the chain adds COMBO_STEP to the
+## knockback, up to COMBO_MAX hits: the cap on how strong a combo gets.
+const COMBO_WINDOW: float = 1.6
+const COMBO_BASE: float = 0.8
+const COMBO_STEP: float = 0.12
+const COMBO_MAX: int = 6
+var combo_hits: int = 0
+var combo_timer: float = 0.0
+
+
+## Knockback multiplier for the next hit on this monkey: 0.8 fresh, up to
+## 1.52 deep in a combo, back to 0.8 once the hitting stops.
+func combo_multiplier() -> float:
+	var n := combo_hits if combo_timer > 0.0 else 0
+	return COMBO_BASE + COMBO_STEP * float(mini(n, COMBO_MAX))
+## Damage at which the readout gets its "!".
+const LAUNCHABLE_DAMAGE: float = 100.0
 ## Invulnerable after coming back, so nobody is slapped off the moment
 ## they land. Shown as a blink.
 const SPAWN_SHIELD: float = 1.5
@@ -366,6 +391,7 @@ func _ready() -> void:
 ## Call right after instancing, before the monkey is added to the tree.
 func setup(monkey: MonkeyStats, id: int, is_local: bool, tint: Color = Color(0, 0, 0, 0), hat: StringName = &"none", skin: StringName = &"natural") -> void:
 	stats = monkey
+	_charges = monkey.skill_charges
 	player_id = id
 	local_control = is_local
 	hat_id = hat
@@ -463,22 +489,11 @@ func _refresh_name_label() -> void:
 		return
 	# Team colour on the name in 2v2, so allies read at a glance.
 	name_label.add_theme_color_override(&"font_color", GameConfig.TEAM_COLORS[team])
-	# Damage as its own big number over the head, white going to red as it
-	# climbs: the one number that says how close this monkey is to flying.
-	if _damage_label == null:
-		_damage_label = Label.new()
-		_damage_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		_damage_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		_damage_label.add_theme_font_size_override(&"font_size", 22)
-		_damage_label.add_theme_color_override(&"font_outline_color", Color(0.08, 0.06, 0.05))
-		_damage_label.add_theme_constant_override(&"outline_size", 8)
-		add_child(_damage_label)
-	_damage_label.size = Vector2(120, 30)
-	_damage_label.position = name_label.position + Vector2(-60.0 + name_label.size.x * 0.5, -26.0)
-	_damage_label.text = str(int(slap_damage))
-	var heat := clampf(slap_damage / 120.0, 0.0, 1.0)
-	var colour := Color.WHITE.lerp(Color(1.0, 0.85, 0.2), minf(heat * 2.0, 1.0)).lerp(Color(1.0, 0.25, 0.2), maxf(heat * 2.0 - 1.0, 0.0))
-	_damage_label.add_theme_color_override(&"font_color", colour)
+	# No number over the head any more: how close a monkey is to flying
+	# shows in the hit flashes instead (the combo, see take_hit).
+	if _damage_label != null:
+		_damage_label.queue_free()
+		_damage_label = null
 
 
 ## Bots read as a name, people read as a monkey. Four rows of "Gibbon" on a
@@ -559,6 +574,11 @@ func _tick_timers(delta: float) -> void:
 	_buffer_timer = maxf(_buffer_timer - delta, 0.0)
 	var cooling := skill_timer > 0.0
 	skill_timer = maxf(skill_timer - delta, 0.0)
+	_tick_charges(delta)
+	_roll_combo_timer = maxf(_roll_combo_timer - delta, 0.0)
+	combo_timer = maxf(combo_timer - delta, 0.0)
+	if combo_timer <= 0.0:
+		combo_hits = 0
 	if cooling and skill_timer <= 0.0:
 		# Ready again: a quick flash on the monkey so you notice without
 		# looking at the corner of the screen.
@@ -1043,6 +1063,17 @@ func _process_swing(delta: float) -> void:
 	if not swing_on_trunk and _input.move.y < -0.5 and _swing_length <= swing_min_length + 2.0:
 		_jump_off_swing()
 		return
+	# Pulling in toward the grip, close to it: a free hop up and over. This
+	# is what gets a monkey that caught the lip of the ground back on top
+	# without spending a jump.
+	# Only at a top edge (the lip of the ground, the end of a ledge, the top
+	# of a trunk): partway up a tall trunk there is nothing to hop onto, and
+	# the pull-up climb there works as before.
+	if swing_on_trunk and _grip_at_top() and _swing_length <= swing_min_length + free_hop_slack and _input.move.length() > 0.5:
+		var to_grip := (_swing_anchor - global_position).normalized()
+		if _input.move.normalized().dot(to_grip) > 0.55:
+			_free_hop()
+			return
 
 	var old_length := _swing_length
 	_swing_length = clampf(
@@ -1066,6 +1097,10 @@ func _process_swing(delta: float) -> void:
 
 	if get_slide_collision_count() > 0:
 		_swing_ang_vel *= 0.6
+	# Climbing up and something solid is overhead: climb round it instead of
+	# pushing into it forever.
+	if swing_on_trunk and _input.move.y < -0.5 and is_on_ceiling():
+		_climb_around()
 
 
 ## Long arms hang from further down: the orangutan's reach is its swing.
@@ -1106,6 +1141,51 @@ func _release_swing(boosted: bool) -> void:
 
 func _jump_off_swing() -> void:
 	_release_swing(true)
+
+
+## Blocked overhead while climbing: hop out to whichever side is clear and
+## up past the obstacle. Keeps the double jump, like the free hop.
+func _climb_around() -> void:
+	var space := get_world_2d().direct_space_state
+	var side := 0.0
+	for dist in [60.0, 110.0, 170.0]:
+		for dir in ([float(facing), -float(facing)] if _input.move.x == 0.0 else [signf(_input.move.x), -signf(_input.move.x)]):
+			var from := global_position + Vector2(dir * dist, 0.0)
+			var ray := PhysicsRayQueryParameters2D.create(from, from + Vector2(0.0, -stats.body_size.y - 60.0), GameConfig.LAYER_WORLD, [get_rid()])
+			var side_ray := PhysicsRayQueryParameters2D.create(global_position, from, GameConfig.LAYER_WORLD, [get_rid()])
+			if space.intersect_ray(ray).is_empty() and space.intersect_ray(side_ray).is_empty():
+				side = dir
+				break
+		if side != 0.0:
+			break
+	if side == 0.0:
+		return
+	_release_swing(false)
+	velocity = Vector2(side * 330.0, stats.jump_velocity() * 0.95)
+	_jump_rising = true
+	_double_jump_ready = true
+
+
+## Is the grip at the very top of what is held, with room to stand above?
+func _grip_at_top() -> bool:
+	var area := _swing_node as Climbable
+	if area == null:
+		return false
+	var top := area.global_position.y - area.size.y * 0.5
+	return _swing_anchor.y <= top + 26.0
+
+
+## Up and over the grip: a jump's lift, drifting toward the grip, and the
+## double jump still in hand afterwards.
+func _free_hop() -> void:
+	var side := signf(_swing_anchor.x - global_position.x)
+	if absf(_swing_anchor.x - global_position.x) < 6.0:
+		side = signf(_input.move.x)
+	_release_swing(false)
+	velocity = Vector2(side * free_hop_push, stats.jump_velocity() * free_hop_lift)
+	_jump_rising = true
+	_double_jump_ready = true
+	_sfx(&"jump", _voice_pitch())
 	# The leap off counts as the first of the two jumps.
 	_swing_jump_ready = false
 	velocity.y = minf(velocity.y, stats.jump_velocity() * 0.9)
@@ -1237,7 +1317,7 @@ func _resolve_hit(area: Area2D) -> void:
 	var super_hit := ability == &"super_hit"
 	var force := dir * stats.knockback_dealt() * punch_power * (super_hit_multiplier if super_hit else 1.0)
 	if target.team >= 0:
-		force *= SLAP_BASE * (1.0 + target.slap_damage * SLAP_SCALING)
+		force *= target.combo_multiplier()
 	if super_hit:
 		# One shot, spent on contact rather than on the swing, so a whiffed
 		# Super Hit is not the whole pickup wasted.
@@ -1256,7 +1336,7 @@ func _resolve_hit(area: Area2D) -> void:
 ## client: knockback that disagrees between machines is the single most
 ## broken-feeling desync in this game.
 func take_hit(attacker_id: int, force: Vector2, base_stun: float, double_drop: bool = false) -> void:
-	if _spawn_shield > 0.0:
+	if _spawn_shield > 0.0 or is_unstoppable():
 		return
 	if invuln_timer > 0.0:
 		_counter_attacker(attacker_id)
@@ -1265,22 +1345,36 @@ func take_hit(attacker_id: int, force: Vector2, base_stun: float, double_drop: b
 	if is_carrying():
 		# Hit while carrying: drop them.
 		_end_dash()
+	# Any other move in progress (a lunge, a roll, a snack) is cut short.
+	_dash_kind = &""
 	if is_ghost():
 		return
 	if _is_authority() and bananas > 0:
-		_knock_bananas_loose(double_drop)
+		_knock_bananas_loose(double_drop, attacker_id)
 	var applied := force.normalized() * stats.knockback_taken(force.length())
+	if team < 0:
+		applied *= CALM_KNOCKBACK
+	if ability == &"slipped":
+		# Just slipped on a peel: off balance, every hit sends you further.
+		applied *= SLIPPED_KNOCKBACK
 	velocity = applied
 	# Runs on every machine that applies the hit, so everyone sees the burst.
 	# It sits on the side the slap came from, where the hand met the face.
-	SlapBurst.spawn(get_parent(), global_position + Vector2(-signf(force.x) * 14.0, -14.0), force.length() > 900.0)
-	_jolt_time = 0.12
+	var heat := 0.0
 	if team >= 0:
-		# Every machine applies the same hits in the same order, so every
-		# machine arrives at the same percentage without shipping it.
+		# The combo: hits from anyone that keep coming, each within the
+		# window of the last, stack; a gap in the hitting resets it.
+		combo_hits = mini((combo_hits if combo_timer > 0.0 else 0) + 1, COMBO_MAX)
+		combo_timer = COMBO_WINDOW
+		heat = float(combo_hits) / float(COMBO_MAX)
+		# Kept only as the time-up tiebreak (total hits taken this round).
 		slap_damage += SLAP_DAMAGE_PER_HIT
-		_refresh_name_label()
+	# The flash where the hand lands goes from pale to bright red as the
+	# combo climbs: the warning that this monkey is about to fly.
+	SlapBurst.spawn(get_parent(), global_position + Vector2(-signf(force.x) * 14.0, -14.0), force.length() > 900.0, heat)
+	_jolt_time = 0.12
 	stun_timer = base_stun / maxf(stats.weight, 0.2)
+	_stun_elapsed = 0.0
 	is_attacking = false
 	_set_hitbox_open(false)
 
@@ -1304,14 +1398,32 @@ func take_hit(attacker_id: int, force: Vector2, base_stun: float, double_drop: b
 ## owns the number and this only asks: the score it broadcasts is the single
 ## source of truth, and a monkey deducting its own bananas would be undone
 ## by the next scores packet.
-func _knock_bananas_loose(double_drop: bool) -> void:
+func _knock_bananas_loose(double_drop: bool, attacker_id: int = 0) -> void:
 	var director: Node = get_tree().get_first_node_in_group(&"hoard_director")
 	if director != null and director.has_method(&"knock_bananas_loose"):
-		director.call(&"knock_bananas_loose", player_id, global_position, double_drop, drop_fraction)
+		director.call(&"knock_bananas_loose", player_id, global_position, double_drop, drop_fraction, attacker_id)
+
+
+## Slipped on a peel: the skid keeps going (low friction) until the stun ends.
+func slide_after_slip() -> void:
+	_slip_time = 0.85
 
 
 func _process_stun(delta: float) -> void:
 	stun_timer -= delta
+	_stun_elapsed += delta
+	_slip_time = maxf(_slip_time - delta, 0.0)
+	# Knocked into the air, a monkey can jump out of the stun once the first
+	# moment has passed: a slam or a launch no longer means certain death.
+	# Not on the ground, not while held, not on a banana skid.
+	if _held_by == null and not is_on_floor() and _slip_time <= 0.0 and _stun_elapsed >= STUN_RECOVER_AFTER \
+			and _buffer_timer > 0.0 and _double_jump_ready:
+		stun_timer = 0.0
+		_end_stun_speed()
+		_double_jump()
+		SkillFx.popup(get_parent(), global_position + Vector2(0.0, -60.0), "SAVED!", Color8(255, 255, 255))
+		_set_state(State.AIR)
+		return
 	if _held_by != null:
 		if is_instance_valid(_held_by) and _held_by.is_carrying():
 			# Carried overhead by a gorilla: ride its grip, no gravity.
@@ -1322,10 +1434,26 @@ func _process_stun(delta: float) -> void:
 	_apply_gravity(delta)
 	# Friction still applies during stun, otherwise a hard hit slides you
 	# forever and the stun never visibly ends.
-	velocity.x = move_toward(velocity.x, 0.0, air_friction * 0.5 * delta)
+	velocity.x = move_toward(velocity.x, 0.0, air_friction * (0.12 if _slip_time > 0.0 else 0.5) * delta)
+	# Steering while flying: a little control over where a hit sends you,
+	# so a good player can drift back toward the island.
+	if _held_by == null and not is_on_floor():
+		velocity += Vector2(_input.move.x, _input.move.y * 0.6) * KNOCKBACK_STEER * delta
 	move_and_slide()
 	if stun_timer <= 0.0:
+		_end_stun_speed()
 		_set_state(State.GROUND if is_on_floor() else State.AIR)
+
+
+## Force rework: whatever speed a hit left you with ends with the stun.
+## Knockback is not momentum you earned, so it is trimmed back to a little
+## over run speed instead of carrying on into the air-momentum rules.
+func _end_stun_speed() -> void:
+	var cap := stats.run_speed() * STUN_EXIT_SPEED
+	velocity.x = clampf(velocity.x, -cap, cap)
+	velocity.y = maxf(velocity.y, stats.jump_velocity() * 0.5)
+	_launch_trail = 0.0
+	_momentum_grace = 0.0
 
 
 # --- Skills --------------------------------------------------------
@@ -1335,25 +1463,53 @@ func _process_stun(delta: float) -> void:
 #   Gorilla     GRAPPLE SLAM  lunge forward; catch a monkey, lift it over
 #                             your head and slam it down. Stick up: the old
 #                             grapple, pulling you to the terrain above.
-#   Gibbon      SKY LAUNCH    launch the way you aim (from the ground too),
-#                             blasting anyone next to you away
-#   Macaque     COUNTER ROLL  roll as a ball: bowls monkeys over, and a hit
-#                             taken mid-roll stuns the attacker instead
+#   Gibbon      SWING RUSH    grabs a point in thin air and swings from it
+#                             like a web-slinger; nothing can hit or stun
+#                             it mid-swing, and anyone it runs into is
+#                             knocked flying
+#   Macaque     ROLL COMBO    roll as a ball; it stops on the first monkey it
+#                             hits, bowls it over and the skill is ready
+#                             again at once, so hits chain
 #   Orangutan   LONG ARM      wind up, then a huge punch across the screen;
 #                             hit terrain instead and it pulls you there
-#   Chimpanzee  SNATCH        dash through: steal bananas, or their speed
+#   Chimpanzee  BANANA BANDIT dash forward and snatch the first monkey you
+#                             reach (a split-second grab), then dash on
+#                             with a banana in hand; jump out any time.
+#                             The peel drops where the dash ends: whoever
+#                             steps on it slips
 
 @export_group("Skill moves")
 @export var lunge_speed: float = 1050.0
 @export var lunge_time: float = 0.28
-@export var lunge_catch_radius: float = 58.0
+@export var lunge_catch_radius: float = 64.0
 @export var slam_lift_time: float = 0.32
 @export var slam_drop_time: float = 0.1
-@export var slam_power: float = 1.5
+@export var slam_power: float = 1.32
 @export var launch_shove_radius: float = 110.0
-@export var roll_bowl_power: float = 0.95
-@export var long_arm_reach: float = 420.0
-@export var long_arm_power: float = 2.0
+## Macaque's roll lands as hard as a punch.
+@export var roll_bowl_power: float = 1.4
+@export var long_arm_reach: float = 330.0
+@export var long_arm_power: float = 1.7
+## Chimp: the grab, and the getaway dash after it.
+## The hugged monkey stays stunned this long after the chimp lets go.
+@export var hug_stun_time: float = 0.35
+@export var hug_hold_time: float = 0.14
+@export var hug_dash_speed: float = 820.0
+@export var hug_dash_time: float = 0.55
+## Gibbon: the swing from thin air. A pendulum around a point up ahead:
+## rope length, and how far either side of straight down it swings.
+@export var swoop_radius: float = 300.0
+## The swing's oval: stretched sideways, flattened top to bottom, so it
+## travels far and stays low like a half oval rather than a deep U.
+@export var swoop_stretch_x: float = 0.84
+@export var swoop_squash_y: float = 0.35
+@export_range(20.0, 88.0) var swoop_half_angle_deg: float = 80.0
+@export var swoop_time: float = 0.42
+## Swing speed along the arc, px/s. Fixed: the same fast swing whether it
+## starts on the ground or in the air, with no easing and no momentum.
+@export var swoop_speed: float = 1300.0
+## Macaque: cooldown left after a roll that connects, so hits chain.
+@export var roll_chain_cooldown: float = 0.15
 
 const LONG_ARM_OUT: float = 0.1
 const LONG_ARM_HOLD: float = 0.14
@@ -1368,6 +1524,61 @@ var _held_target_id: int = 0
 var _long_arm_t: float = -1.0
 var _long_arm_len: float = 0.0
 var _long_arm_hit: bool = false
+## Chimp's hug dash: which way it carries the hugged monkey.
+var _hug_dir: Vector2 = Vector2.RIGHT
+## Where the hugged monkey was caught: it is held right there, not moved.
+var _hug_anchor: Vector2 = Vector2.INF
+## Gibbon's swoop: its heading, and time into it (the arc is worked from it).
+var _swoop_dir: float = 1.0
+var _swoop_t: float = 0.0
+## The invisible point the gibbon swings from.
+var _swoop_anchor: Vector2 = Vector2.INF
+var _swoop_from_ground: bool = false
+## Distance travelled along the swing, and the arc's cumulative lengths.
+var _swoop_s: float = 0.0
+var _swoop_lengths: PackedFloat32Array = PackedFloat32Array()
+const SWOOP_SAMPLES := 48
+## Time left skidding on a banana peel.
+var _slip_time: float = 0.0
+## Time into the current stun, and how long before a jump can break it.
+var _stun_elapsed: float = 0.0
+const STUN_RECOVER_AFTER: float = 0.22
+## Knockback taken while "slipped" (banana peel debuff).
+const SLIPPED_KNOCKBACK: float = 1.4
+## Force rework knobs.
+## How hard a knocked monkey can steer mid-flight (px/s per second).
+const KNOCKBACK_STEER: float = 900.0
+## Leaving a stun, horizontal speed is capped at this many times run speed.
+const STUN_EXIT_SPEED: float = 1.15
+## Outside 2v2 Slap (races, Banana Hoard, free play) hits push less.
+const CALM_KNOCKBACK: float = 0.75
+## Presentation clock for whatever skill is playing (eating, lunging):
+## counted locally from when the kind changed, so replicas animate too.
+var _skill_anim_t: float = 0.0
+var _skill_anim_kind: StringName = &""
+
+
+## Skills with stacks (the gibbon's two swings): charges left, and the time
+## until the next one refills. Single-charge skills ignore all of this.
+const SKILL_CHARGE_GAP: float = 0.25
+var _charges: int = 1
+var _recharge: float = 0.0
+
+
+func skill_charges_left() -> int:
+	return _charges if stats != null and stats.skill_charges > 1 else (1 if skill_timer <= 0.0 else 0)
+
+
+func _tick_charges(delta: float) -> void:
+	if stats == null or stats.skill_charges <= 1:
+		return
+	if _charges < stats.skill_charges:
+		_recharge -= delta
+		if _recharge <= 0.0:
+			_charges += 1
+			_recharge = stats.skill_cooldown if _charges < stats.skill_charges else 0.0
+	if _charges == 0:
+		skill_timer = maxf(skill_timer, _recharge)
 
 
 func _try_skill() -> void:
@@ -1385,7 +1596,15 @@ func _try_skill() -> void:
 			fired = _skill_long_arm()
 		&"snatch":
 			fired = _skill_snatch()
-	skill_timer = stats.skill_cooldown if fired else skill_whiff_cooldown
+	if fired and stats.skill_charges > 1:
+		# Stacked skill: spend a charge; the next one is ready almost at
+		# once while the spent ones refill one at a time.
+		_charges -= 1
+		if _recharge <= 0.0:
+			_recharge = stats.skill_cooldown
+		skill_timer = SKILL_CHARGE_GAP if _charges > 0 else _recharge
+	else:
+		skill_timer = stats.skill_cooldown if fired else skill_whiff_cooldown
 	if fired:
 		skill_used.emit(stats.skill_id)
 		SkillFx.burst(get_parent(), global_position, stats.skill_id)
@@ -1400,7 +1619,12 @@ func _aim_direction() -> Vector2:
 
 ## Is this gorilla mid lift or slam (so the monkey it holds rides along)?
 func is_carrying() -> bool:
-	return _dash_kind == &"lift" or _dash_kind == &"slam"
+	return _dash_kind == &"lift" or _dash_kind == &"slam" or _dash_kind == &"hug"
+
+
+## Mid swoop the gibbon cannot be hit, grabbed or stunned.
+func is_unstoppable() -> bool:
+	return _dash_kind == &"swoop"
 
 
 ## Where a carried monkey sits: overhead during the lift, then swung down
@@ -1409,6 +1633,14 @@ func held_point() -> Vector2:
 	var other_half := 30.0
 	if _held_target != null and is_instance_valid(_held_target):
 		other_half = _held_target.stats.body_size.y * 0.5
+	if _dash_kind == &"hug" and _hug_anchor != Vector2.INF:
+		return _hug_anchor
+	if _dash_kind == &"hug":
+		# Squeezed chest to chest, feet level with the chimp's.
+		var other_w := 30.0
+		if _held_target != null and is_instance_valid(_held_target):
+			other_w = _held_target.stats.body_size.x
+		return global_position + Vector2(float(facing) * (stats.body_size.x + other_w) * 0.35, stats.body_size.y * 0.5 - other_half)
 	var overhead := global_position + Vector2(float(facing) * 6.0, -(stats.body_size.y * 0.5 + other_half + 18.0))
 	if _dash_kind != &"slam":
 		return overhead
@@ -1484,7 +1716,7 @@ func _finish_slam() -> void:
 			target._held_by = null
 			target.global_position = drop_at
 			var force := Vector2(float(facing), -0.55).normalized() * stats.knockback_dealt() * slam_power
-			_deal_hit(target, force, GameConfig.BASE_STUN_TIME * 1.6)
+			_deal_hit(target, force, GameConfig.BASE_STUN_TIME * 1.0)
 		# Anyone standing where it lands is shoved away too.
 		for other in _opponents_near(ground, 90.0):
 			if other == target:
@@ -1498,7 +1730,7 @@ func _finish_slam() -> void:
 ## broadcast to everyone, and scaled by damage in 2v2.
 func _deal_hit(target: Player, force: Vector2, stun: float) -> void:
 	if target.team >= 0:
-		force *= SLAP_BASE * (1.0 + target.slap_damage * SLAP_SCALING) * 1.5
+		force *= target.combo_multiplier() * 1.3
 	target.take_hit(player_id, force, stun)
 	hit_landed.emit(target.player_id)
 	if _net_live():
@@ -1539,11 +1771,14 @@ func _opponents_in(query: PhysicsShapeQueryParameters2D) -> Array[Player]:
 ## Grabbed: a rolling macaque slips out (and counters), a ghost cannot be
 ## held, and nobody is lifted twice.
 func can_be_grabbed() -> bool:
-	return invuln_timer <= 0.0 and not is_ghost() and _spawn_shield <= 0.0 and _held_by == null and not is_carrying()
+	return invuln_timer <= 0.0 and not is_ghost() and _spawn_shield <= 0.0 and _held_by == null and not is_carrying() and not is_unstoppable()
 
 
 func grabbed_by(attacker: Player, seconds: float) -> void:
 	_held_by = attacker
+	if attacker != null and attacker.stats != null and attacker.stats.skill_id == &"snatch":
+		# A chimp's hug pins you where you stand.
+		attacker._hug_anchor = global_position
 	stun_timer = seconds
 	is_attacking = false
 	_set_hitbox_open(false)
@@ -1556,36 +1791,86 @@ func grabbed_by(attacker: Player, seconds: float) -> void:
 
 
 func _skill_air_launch() -> bool:
-	if not _air_launch_ready:
-		return false
 	var aim := _aim_direction()
-	if is_on_floor() and aim.y > -0.3:
-		# From the ground a launch always goes up: that is the point of it.
-		aim = Vector2(float(facing) * 0.55, -0.85).normalized()
-	# Take-off blasts anyone standing next to you away.
-	if _is_authority():
-		for other in _opponents_near(global_position, launch_shove_radius):
-			var away := (other.global_position - global_position).normalized()
-			away.y = minf(away.y, -0.45)
-			_deal_hit(other, away.normalized() * stats.knockback_dealt() * 1.3, GameConfig.BASE_STUN_TIME)
-	velocity = aim * air_launch_speed
+	_swoop_dir = signf(aim.x) if absf(aim.x) > 0.2 else float(facing)
+	facing = int(_swoop_dir)
 	_air_launch_ready = false
-	_double_jump_ready = true
-	_jump_rising = false
-	# Clearing the regrab lock is what lets a launch chain straight into a
+	_dash_kind = &"swoop"
+	_dash_time = swoop_time
+	_swoop_t = 0.0
+	# From the ground there is no room to dip: start at the bottom of the
+	# swing, straight under the grip, and swoop forward and up.
+	_swoop_from_ground = is_on_floor()
+	_swoop_anchor = swoop_anchor_from(global_position)
+	_build_swoop_table()
+	_swoop_s = 0.0
+	_dash_time = _swoop_total() / swoop_speed
+	_snatch_hit.clear()
+	# Clearing the regrab lock is what lets a swing chain straight into a
 	# vine, which is the gibbon's whole identity.
 	_swing_lock = 0.0
 	_swing_node = null
-	_roll_time = ROLL_SECONDS
-	_launch_trail = 0.45
-	_set_state(State.AIR)
+	_set_state(State.DASH)
 	return true
 
 
+## The point in thin air a swing starting here hangs from: up and ahead,
+## so the gibbon starts behind it and swoops under and past.
+func swoop_anchor_from(start: Vector2) -> Vector2:
+	var a := _swoop_start_angle()
+	return start - Vector2(_swoop_dir * sin(a) * swoop_stretch_x, cos(a) * swoop_squash_y) * swoop_radius
+
+
+## Angles from straight down: where the swing starts and where it lets go.
+func _swoop_start_angle() -> float:
+	return 0.0 if _swoop_from_ground else -deg_to_rad(swoop_half_angle_deg)
+
+
+func _swoop_end_angle() -> float:
+	# Never past level with the grip: the swing stays the lower half of the oval.
+	return minf(deg_to_rad(swoop_half_angle_deg) * (1.45 if _swoop_from_ground else 1.0), deg_to_rad(86.0))
+
+
+## Where on the swing the gibbon is, 0..1 of the way through its angle.
+func _swoop_point(k: float) -> Vector2:
+	var theta := lerpf(_swoop_start_angle(), _swoop_end_angle(), k)
+	return _swoop_anchor + Vector2(_swoop_dir * sin(theta) * swoop_stretch_x, cos(theta) * swoop_squash_y) * swoop_radius
+
+
+## The arc is an oval, so equal steps of angle are not equal steps of
+## distance. This table maps distance to angle, so the swing can move at
+## one steady speed.
+func _build_swoop_table() -> void:
+	_swoop_lengths.resize(SWOOP_SAMPLES + 1)
+	_swoop_lengths[0] = 0.0
+	var before := _swoop_point(0.0)
+	for i in range(1, SWOOP_SAMPLES + 1):
+		var at := _swoop_point(float(i) / SWOOP_SAMPLES)
+		_swoop_lengths[i] = _swoop_lengths[i - 1] + before.distance_to(at)
+		before = at
+
+
+func _swoop_total() -> float:
+	return maxf(_swoop_lengths[SWOOP_SAMPLES], 1.0) if _swoop_lengths.size() > SWOOP_SAMPLES else 1.0
+
+
+## The point `dist` px along the swing.
+func _swoop_at(dist: float) -> Vector2:
+	if _swoop_lengths.size() <= SWOOP_SAMPLES:
+		return _swoop_point(clampf(dist / 500.0, 0.0, 1.0))
+	dist = clampf(dist, 0.0, _swoop_total())
+	var i := _swoop_lengths.bsearch(dist)
+	i = clampi(i, 1, SWOOP_SAMPLES)
+	var span := maxf(_swoop_lengths[i] - _swoop_lengths[i - 1], 0.001)
+	var f := (dist - _swoop_lengths[i - 1]) / span
+	return _swoop_point((float(i - 1) + f) / SWOOP_SAMPLES)
+
+
+## Macaque: a roll that stops on the first monkey it hits. No invincibility;
+## the reward for connecting is that the skill is ready again straight away.
 func _skill_counter_roll() -> bool:
 	_dash_kind = &"roll"
 	_dash_time = roll_time
-	invuln_timer = roll_time + 0.05
 	_snatch_hit.clear()
 	_swing_node = null
 	_set_state(State.DASH)
@@ -1675,51 +1960,157 @@ func _long_arm_extent() -> float:
 
 
 func _skill_snatch() -> bool:
-	_dash_kind = &"snatch"
-	_dash_time = snatch_time
-	_snatch_hit.clear()
+	_dash_kind = &"hug_lunge"
+	_dash_time = lunge_time
 	_swing_node = null
+	velocity = Vector2(float(facing) * lunge_speed, minf(velocity.y, -120.0))
 	_set_state(State.DASH)
 	return true
 
 
-## Passing through someone steals from them: bananas where there are
-## bananas, their speed where there are not, and a stumble either way.
-## Host only, like every other interaction that moves a number on somebody
-## else's screen.
-func _resolve_snatch() -> void:
+## Caught: a split-second grab. The victim is only held while the chimp's
+## hands are on it; the chimp grabs a banana off it and is gone.
+func _begin_hug(target: Player) -> void:
+	_held_target = target
+	_held_target_id = target.player_id
+	_dash_kind = &"hug"
+	_dash_time = hug_hold_time
+	velocity = Vector2.ZERO
+	var hold := hug_hold_time + hug_stun_time
+	target.grabbed_by(self, hold)
+	if _net_live():
+		Net.broadcast_grab(target.player_id, player_id, hold)
+	var word := "SNATCHED!"
+	# Banana Hoard: the bananas go straight to the thief.
+	var director: Node = get_tree().get_first_node_in_group(&"hoard_director")
+	if director != null and director.has_method(&"steal_bananas") and target.bananas > 0:
+		director.call(&"steal_bananas", target.player_id, player_id, snatch_fraction)
+		word = "STOLEN!"
+	SkillFx.popup(get_parent(), global_position + Vector2(0.0, -90.0), word, SkillFx.colour_of(stats.skill_id))
+	_sfx(&"grab", _voice_pitch() * 1.2)
+
+
+## Let go and dash on forward, banana in hand.
+func _start_hug_dash() -> void:
+	var target := _held_target
+	_held_target = null
+	_held_target_id = 0
+	if target != null and is_instance_valid(target):
+		target._held_by = null
+		target.velocity = Vector2.ZERO
+	_hug_dir = Vector2(float(facing), 0.0)
+	_dash_kind = &"hug_dash"
+	_dash_time = hug_dash_time
+	# The getaway is a leap: forward and up, gravity bringing it down.
+	velocity = Vector2(float(facing) * hug_dash_speed, stats.jump_velocity() * 0.85)
+	# Bananas fly out of the stolen bunch as it goes: all but one land
+	# somewhere random nearby; the last one drops where the leap ends.
+	var bunch := randi_range(3, 5)
+	for i in bunch - 1:
+		_toss_peel()
+	_sfx(&"dash", _voice_pitch())
+
+
+## End of the getaway (or a jump out of it): the peel drops right here.
+func _finish_hug(jumped: bool = false) -> void:
+	_drop_peel()
+	if jumped:
+		velocity = Vector2(float(facing) * hug_dash_speed * 0.7, stats.jump_velocity())
+		_jump_rising = true
+		_sfx(&"jump", _voice_pitch())
+	else:
+		velocity.x *= 0.45
+	_end_dash()
+
+
+## Host only: a banana flung from the bunch to a random spot on the ground
+## nearby, either side.
+func _toss_peel() -> void:
 	if not _is_authority():
 		return
-	for victim in _opponents_near(global_position, snatch_radius + snatch_speed * get_physics_process_delta_time()):
-		if _snatch_hit.has(victim.player_id):
+	var space := get_world_2d().direct_space_state
+	for attempt in 6:
+		var side := -1.0 if randf() < 0.5 else 1.0
+		var x := global_position.x + side * randf_range(70.0, 340.0)
+		var query := PhysicsRayQueryParameters2D.create(Vector2(x, global_position.y - 60.0), Vector2(x, global_position.y + 500.0), GameConfig.LAYER_SOLID, [get_rid()])
+		var hit := space.intersect_ray(query)
+		if hit.is_empty():
 			continue
-		_snatch_hit.append(victim.player_id)
-		_deal_hit(victim, Vector2(float(facing) * 0.25, -0.6).normalized() * stats.knockback_dealt() * 0.6, 0.3)
-		var colour := SkillFx.colour_of(stats.skill_id)
-		var director: Node = get_tree().get_first_node_in_group(&"hoard_director")
-		if director != null and director.has_method(&"steal_bananas") and victim.bananas > 0:
-			director.call(&"steal_bananas", victim.player_id, player_id, snatch_fraction)
-			SkillFx.popup(get_parent(), victim.global_position + Vector2(0.0, -64.0), "STOLEN!", colour)
-			continue
-		# No bananas to take, so take the tempo instead.
-		victim.set_ability(&"slowed", snatch_slow_seconds)
-		set_ability(&"speed_boost", snatch_slow_seconds)
-		SkillFx.popup(get_parent(), victim.global_position + Vector2(0.0, -64.0), "SLOWED!", colour)
+		var from := global_position + Vector2(0.0, -stats.body_size.y * 0.4)
+		var to: Vector2 = hit.get("position", from)
+		spawn_peel(from, to)
 		if _net_live():
-			Net.broadcast_ability(victim.player_id, &"slowed", snatch_slow_seconds)
-			Net.broadcast_ability(player_id, &"speed_boost", snatch_slow_seconds)
+			Net.broadcast_peel(player_id, from, to)
+		return
 
 
-## A rolling macaque bowls over whoever it rolls into.
-func _resolve_roll() -> void:
+## Host only: the peel falls from the chimp's hand to the ground below it.
+func _drop_peel() -> void:
 	if not _is_authority():
 		return
+	var from := global_position + Vector2(float(facing) * 10.0, -stats.body_size.y * 0.2)
+	var query := PhysicsRayQueryParameters2D.create(global_position, global_position + Vector2(0.0, 700.0), GameConfig.LAYER_SOLID, [get_rid()])
+	var hit := get_world_2d().direct_space_state.intersect_ray(query)
+	if hit.is_empty():
+		return
+	var to: Vector2 = hit.get("position", from)
+	spawn_peel(from, to)
+	if _net_live():
+		Net.broadcast_peel(player_id, from, to)
+
+
+func spawn_peel(from: Vector2, to: Vector2) -> void:
+	BANANA_PEEL.throw(get_parent(), self, from, to)
+
+
+## Macaque's combo: who it last bowled over, how many times in a row, and
+## how long it has to land the next roll for the chain to keep going.
+const ROLL_COMBO_WINDOW: float = 1.8
+const ROLL_COMBO_STEP: float = 0.3
+const ROLL_COMBO_MAX: int = 5
+var _roll_combo_id: int = 0
+var _roll_combo: int = 0
+var _roll_combo_timer: float = 0.0
+
+
+## A rolling macaque stops on the first monkey it rolls into and bowls it
+## over; connecting makes the skill ready again, so rolls chain.
+func _resolve_roll() -> bool:
 	for other in _opponents_near(global_position, 42.0):
 		if _snatch_hit.has(other.player_id):
 			continue
 		_snatch_hit.append(other.player_id)
-		_deal_hit(other, Vector2(float(facing), -1.15).normalized() * stats.knockback_dealt() * roll_bowl_power, GameConfig.BASE_STUN_TIME * 1.3)
-		SkillFx.popup(get_parent(), other.global_position + Vector2(0.0, -64.0), "BOWLED!", SkillFx.colour_of(stats.skill_id))
+		# Rolling into the same monkey again and again builds a combo, each
+		# hit harder than the last, as long as the next roll lands in time.
+		if other.player_id == _roll_combo_id and _roll_combo_timer > 0.0:
+			_roll_combo = mini(_roll_combo + 1, ROLL_COMBO_MAX)
+		else:
+			_roll_combo = 1
+		_roll_combo_id = other.player_id
+		_roll_combo_timer = ROLL_COMBO_WINDOW
+		var boost := 1.0 + ROLL_COMBO_STEP * float(_roll_combo - 1)
+		if _is_authority():
+			_deal_hit(other, Vector2(float(facing), -1.15).normalized() * stats.knockback_dealt() * roll_bowl_power * boost, GameConfig.BASE_STUN_TIME * 1.3)
+			var word := "BOWLED!" if _roll_combo == 1 else "COMBO x%d!" % _roll_combo
+			SkillFx.popup(get_parent(), other.global_position + Vector2(0.0, -64.0), word, SkillFx.colour_of(stats.skill_id))
+		skill_timer = minf(skill_timer, roll_chain_cooldown)
+		# Bump off it rather than passing through.
+		velocity = Vector2(-float(facing) * 180.0, -220.0)
+		return true
+	return false
+
+
+## The swoop knocks away anyone it touches, once each.
+func _resolve_swoop() -> void:
+	if not _is_authority():
+		return
+	for other in _opponents_near(global_position, 48.0):
+		if _snatch_hit.has(other.player_id):
+			continue
+		_snatch_hit.append(other.player_id)
+		var away := Vector2(_swoop_dir, -0.6).normalized()
+		_deal_hit(other, away * stats.knockback_dealt() * 1.35, GameConfig.BASE_STUN_TIME)
+		SkillFx.popup(get_parent(), other.global_position + Vector2(0.0, -64.0), "WHOOSH!", SkillFx.colour_of(stats.skill_id))
 
 
 func _process_dash(delta: float) -> void:
@@ -1747,11 +2138,6 @@ func _process_dash(delta: float) -> void:
 					if other.can_be_grabbed():
 						_begin_lift(other)
 						return
-					if other.invuln_timer > 0.0:
-						# Lunged into a rolling macaque: the counter wins.
-						other._counter_attacker(player_id)
-						_end_dash()
-						return
 			if _dash_time <= 0.0 or is_on_wall():
 				velocity.x *= 0.3
 				_end_dash()
@@ -1766,18 +2152,65 @@ func _process_dash(delta: float) -> void:
 				_dash_time = slam_drop_time
 			else:
 				_finish_slam()
-		&"snatch":
-			velocity = Vector2(float(facing) * snatch_speed, 0.0)
+		&"hug_lunge":
+			velocity.x = float(facing) * lunge_speed
+			_apply_gravity(delta)
 			move_and_slide()
-			_resolve_snatch()
+			if _is_authority():
+				var reach := global_position + Vector2(float(facing) * (stats.body_size.x * 0.5 + 10.0), 0.0)
+				for other in _opponents_near(reach, lunge_catch_radius):
+					if other.can_be_grabbed():
+						_begin_hug(other)
+						return
+			if _dash_time <= 0.0 or is_on_wall():
+				velocity.x *= 0.3
+				_end_dash()
+		&"hug":
+			velocity = Vector2.ZERO
 			if _dash_time <= 0.0:
+				_start_hug_dash()
+		&"hug_dash":
+			if _buffer_timer > 0.0:
+				# Jump out of the getaway, keeping most of the speed.
+				_buffer_timer = 0.0
+				_finish_hug(true)
+				return
+			velocity.x = _hug_dir.x * hug_dash_speed
+			# Plain gravity: _apply_gravity pins a grounded monkey to the
+			# floor, which would squash the leap flat on its first frame.
+			velocity.y = minf(velocity.y + GameConfig.BASE_GRAVITY * delta, max_fall_speed)
+			move_and_slide()
+			var landed := is_on_floor() and velocity.y >= 0.0 and _dash_time < hug_dash_time - 0.12
+			if _dash_time <= 0.0 or is_on_wall() or landed:
+				_finish_hug()
+		&"swoop":
+			_swoop_t += delta
+			# One steady speed along the arc: aim for the point a fixed
+			# distance further on. Capped, so if something held the gibbon
+			# back it does not lurch to catch up.
+			_swoop_s += swoop_speed * delta
+			var next := _swoop_at(_swoop_s)
+			velocity = (next - global_position) / maxf(delta, 0.001)
+			velocity = velocity.limit_length(swoop_speed * 1.1)
+			move_and_slide()
+			_resolve_swoop()
+			if _swoop_s >= _swoop_total() or is_on_wall() or is_on_ceiling():
+				# Let go at the top of the arc: flung on along the swing.
+				var tangent := (_swoop_point(1.0) - _swoop_point(0.9)).normalized()
+				# Flung mostly forward: the end of a wide, shallow swing points
+				# nearly straight up, and flinging along it shot the gibbon
+				# sky-high. Capped at 30 degrees above level.
+				var lift := minf(absf(tangent.y), 0.5)
+				tangent = Vector2(_swoop_dir * sqrt(1.0 - lift * lift), -lift)
+				velocity = tangent * 900.0
+				_double_jump_ready = true
+				_launch_trail = 0.3
 				_end_dash()
 		_:
 			velocity.x = float(facing) * roll_speed
 			_apply_gravity(delta)
 			move_and_slide()
-			_resolve_roll()
-			if _dash_time <= 0.0:
+			if _resolve_roll() or _dash_time <= 0.0:
 				_end_dash()
 
 
@@ -1805,6 +2238,7 @@ func bounce(strength: float) -> void:
 func _end_dash() -> void:
 	if is_carrying() and _held_target != null and is_instance_valid(_held_target):
 		_held_target._held_by = null
+		_held_target.stun_timer = minf(_held_target.stun_timer, 0.3)
 	_held_target = null
 	_held_target_id = 0
 	_dash_kind = &""
@@ -1841,6 +2275,8 @@ func respawn_at(point: Vector2) -> void:
 	global_position = point
 	velocity = Vector2.ZERO
 	slap_damage = 0.0
+	combo_hits = 0
+	combo_timer = 0.0
 	_spawn_shield = SPAWN_SHIELD if team >= 0 else 0.0
 	_refresh_name_label()
 	stun_timer = 0.0
@@ -1853,6 +2289,8 @@ func respawn_at(point: Vector2) -> void:
 	_held_target = null
 	_held_target_id = 0
 	_air_launch_ready = true
+	_charges = stats.skill_charges if stats != null else 1
+	_recharge = 0.0
 	_drop_timer = 0.0
 	collision_mask = GameConfig.LAYER_SOLID
 	# Bananas survive a fall. Falling already costs time, and losing a
@@ -1983,6 +2421,12 @@ func _draw() -> void:
 		_draw_stretch_arm(to_local(_dash_target))
 	if is_carrying():
 		_draw_carry_arms()
+	if state == State.DASH and (_dash_kind == &"lunge" or _dash_kind == &"hug_lunge"):
+		_draw_lunge_arms()
+	if state == State.DASH and (_dash_kind == &"hug" or _dash_kind == &"hug_dash"):
+		_draw_held_banana()
+	if state == State.DASH and _dash_kind == &"swoop":
+		_draw_swoop_line()
 	if _long_arm_t >= 0.0:
 		_draw_long_arm()
 
@@ -2007,6 +2451,58 @@ func _draw_carry_arms() -> void:
 	var other_shoulder := Vector2(-shoulder.x, shoulder.y)
 	MonkeyArm.draw_arm(self, stats.id, other_shoulder, local + Vector2(-12.0, 16.0), true, facing, Color(0.8, 0.8, 0.8), 1.2, 1.2)
 	MonkeyArm.draw_arm(self, stats.id, shoulder, local + Vector2(12.0, 16.0), true, facing, Color.WHITE, 1.2, 1.2)
+
+
+## Lunge: both arms thrown out ahead, hands open and grasping, and dirt
+## kicked up behind the feet. Reads as "about to grab" from across a map.
+func _draw_lunge_arms() -> void:
+	if sprite == null:
+		return
+	var k := clampf(_skill_anim_t / 0.12, 0.0, 1.0)
+	var shoulder := sprite.position + sprite.shoulder_position()
+	var reach := (stats.body_size.x * 0.5 + 30.0) * (0.5 + 0.5 * k)
+	var grasp := sin(_skill_anim_t * 40.0) * 4.0
+	var hand_high := Vector2(float(facing) * reach, shoulder.y - 8.0 + grasp)
+	var hand_low := Vector2(float(facing) * (reach - 6.0), shoulder.y + 10.0 - grasp)
+	var other_shoulder := Vector2(-shoulder.x * 0.3, shoulder.y + 4.0)
+	MonkeyArm.draw_arm(self, stats.id, other_shoulder, hand_low, true, facing, Color(0.8, 0.8, 0.8), 1.1, 1.1)
+	MonkeyArm.draw_arm(self, stats.id, shoulder, hand_high, true, facing, Color.WHITE, 1.1, 1.1)
+	# Dust clods flung back from the feet.
+	var feet := Vector2(-float(facing) * stats.body_size.x * 0.4, stats.body_size.y * 0.5 - 4.0)
+	for i in 4:
+		var t := fmod(_skill_anim_t * 3.0 + i * 0.25, 1.0)
+		var at := feet + Vector2(-float(facing) * (10.0 + t * 46.0), -t * 26.0 + t * t * 20.0)
+		var size := 8.0 * (1.0 - t) + 2.0
+		draw_rect(Rect2(((at / 4.0).floor() * 4.0) - Vector2(size, size) * 0.5, Vector2(size, size)), Color(0.55, 0.42, 0.28, 1.0 - t))
+
+
+## The snatched banana, held up in the chimp's hand while it runs.
+func _draw_held_banana() -> void:
+	var cell := 2.0
+	var art: Array = BANANA_ICON.MAP
+	var cols := String(art[0]).length()
+	var hand := Vector2(float(facing) * (stats.body_size.x * 0.5 + 4.0), -stats.body_size.y * 0.25)
+	var origin := hand + Vector2(0.0 if facing > 0 else -cols * cell, -art.size() * cell)
+	for y in art.size():
+		var row: String = art[y]
+		for x in cols:
+			var key := row[x]
+			if BANANA_ICON.COLORS.has(key):
+				draw_rect(Rect2(origin + Vector2(x, y) * cell, Vector2(cell, cell)), BANANA_ICON.COLORS[key])
+
+
+## The gibbon's swing: the arm stretched up to the point in thin air it is
+## hanging from, and a little burst where the hand grips nothing at all.
+func _draw_swoop_line() -> void:
+	if _swoop_anchor == Vector2.INF:
+		return
+	var grip := to_local(_swoop_anchor)
+	_draw_stretch_arm(grip)
+	var pulse := 0.5 + 0.5 * sin(_skill_anim_t * 30.0)
+	var tint := SkillFx.colour_of(stats.skill_id)
+	for i in 4:
+		var d := Vector2.from_angle(TAU * i / 4.0 + PI / 4.0) * (8.0 + pulse * 6.0)
+		draw_rect(Rect2(((grip + d) / 2.0).floor() * 2.0 - Vector2(3, 3), Vector2(6, 6)), Color(tint, 0.9))
 
 
 ## The orangutan's long punch: the arm shot straight out across the screen,
@@ -2039,9 +2535,20 @@ func _sfx(id: StringName, pitch: float = 1.0) -> void:
 ## the first moments of a launch), in the skill's colour.
 func _tick_skill_fx(delta: float) -> void:
 	_skill_ready_flash = maxf(_skill_ready_flash - delta, 0.0)
+	if _dash_kind != _skill_anim_kind:
+		if _dash_kind == &"swoop" and not _simulates():
+			# A replica never ran the skill: work the grip point out from
+			# where the swing starts, the same way the owner did.
+			_swoop_dir = float(facing)
+			_swoop_from_ground = is_on_floor()
+			_swoop_anchor = swoop_anchor_from(global_position)
+		_skill_anim_kind = _dash_kind
+		_skill_anim_t = 0.0
+	else:
+		_skill_anim_t += delta
 	if sprite == null or not is_inside_tree():
 		return
-	if state != State.DASH and _launch_trail <= 0.0:
+	if (state != State.DASH and _launch_trail <= 0.0) or _dash_kind == &"hug":
 		_ghost_clock = 0.0
 		return
 	_ghost_clock -= delta
@@ -2277,6 +2784,18 @@ func _update_visual() -> void:
 					sprite.play(&"cheer")
 				&"slam":
 					sprite.play(&"punch")
+				&"lunge", &"hug_lunge":
+					# Thrown forward, body leaning into it, arms out (drawn
+					# in _draw_lunge_arms).
+					sprite.play(&"dash")
+					sprite.rotation = float(facing) * 0.32
+				&"hug":
+					sprite.play(&"cheer")
+				&"swoop":
+					# Stretched along the swoop, like a body at the bottom
+					# of a swing.
+					sprite.play(&"swing")
+					sprite.rotation = clampf(Vector2(float(facing), 0.0).angle_to(velocity), -0.7, 0.7) if velocity.length() > 1.0 else 0.0
 				_:
 					sprite.play(&"dash")
 			tint = Color(1.0, 0.97, 0.8)
@@ -2300,6 +2819,9 @@ func _update_visual() -> void:
 		sprite.play(&"punch")
 		if _hitbox_open:
 			tint = Color(1.25, 1.2, 1.05)
+	if ability == &"slipped":
+		# Slipped on a peel: a banana-yellow blink while off balance.
+		tint *= Color(1.15, 1.05, 0.55) if int(Time.get_ticks_msec() / 120) % 2 == 0 else Color.WHITE
 	if state != State.AIR:
 		_roll_time = 0.0
 	# A slap lands as a jolt: the struck monkey's sprite snaps a pixel or

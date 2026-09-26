@@ -35,9 +35,9 @@ func _register_grab_action() -> void:
 	if InputMap.has_action(&"grab"):
 		return
 	InputMap.add_action(&"grab", 0.2)
-	# Shift is grab (sprint is automatic now, so Shift was free); L and Ctrl
-	# stay as alternatives. The skill is E.
-	for code in [KEY_SHIFT, KEY_L, KEY_CTRL]:
+	# Right click is grab. L stays for keyboard-only play (J punch, K skill,
+	# L grab); Shift and Ctrl were duplicates and are gone. The skill is E.
+	for code in [KEY_L]:
 		var key := InputEventKey.new()
 		key.physical_keycode = code
 		InputMap.action_add_event(&"grab", key)

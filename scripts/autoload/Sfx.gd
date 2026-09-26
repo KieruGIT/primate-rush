@@ -92,6 +92,8 @@ func _load_music(id: StringName) -> AudioStream:
 		# Not imported yet (fresh from git): read the file itself.
 		stream = AudioStreamOggVorbis.load_from_file(ProjectSettings.globalize_path(path))
 	if stream == null:
+		if id != &"battle":
+			return _load_music(&"battle")
 		push_warning("Music missing: %s" % path)
 		return null
 	stream.loop = true

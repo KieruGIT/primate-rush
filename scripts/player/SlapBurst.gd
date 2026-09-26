@@ -24,17 +24,20 @@ const DEBRIS := 6
 static var _textures: Dictionary = {}
 
 var _big: bool = false
+## 0..1: how deep the victim is in a combo. Tints the burst pale to red.
+var _heat: float = 0.0
 var _age: float = 0.0
 var _star: Sprite2D
 var _flash: Sprite2D
 var _debris: Array[Vector2] = []
 
 
-static func spawn(parent: Node, at: Vector2, big: bool) -> void:
+static func spawn(parent: Node, at: Vector2, big: bool, heat: float = 0.0) -> void:
 	if parent == null or not parent.is_inside_tree():
 		return
 	var burst := SlapBurst.new()
-	burst._big = big
+	burst._big = big or heat >= 0.66
+	burst._heat = heat
 	burst.position = (at / JunglePalette.ART_PIXEL).round() * JunglePalette.ART_PIXEL
 	burst.z_index = 30
 	parent.add_child(burst)
@@ -52,6 +55,11 @@ func _ready() -> void:
 	_flash.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	_flash.scale = Vector2(px, px)
 	add_child(_flash)
+	if _heat > 0.0:
+		# Combo tint: a light pink on the first hit, bright red at the cap.
+		var tint := Color(1.0, lerpf(0.82, 0.18, _heat), lerpf(0.78, 0.12, _heat))
+		_star.modulate = tint
+		_flash.modulate = tint.lightened(0.25)
 
 	# Chips of light flung outward. Fixed angles with a little spread, not
 	# random, so every machine in a match sees the same burst.
@@ -89,11 +97,13 @@ func _draw() -> void:
 	for i in _debris.size():
 		var at := (_debris[i] * radius / px).round() * px
 		# Alternate chips: a three-pixel one with an outline, a bare one.
+		var chip_light := JunglePalette.BANANA_LIGHT if _heat <= 0.0 else Color(1.0, lerpf(0.75, 0.25, _heat), lerpf(0.7, 0.2, _heat))
+		var chip := JunglePalette.BANANA if _heat <= 0.0 else Color(1.0, lerpf(0.6, 0.12, _heat), lerpf(0.55, 0.1, _heat))
 		if i % 2 == 0:
 			draw_rect(Rect2(at - Vector2(px, px), Vector2(px, px) * 3.0), JunglePalette.OUTLINE)
-			draw_rect(Rect2(at, Vector2(px, px)), JunglePalette.BANANA_LIGHT)
+			draw_rect(Rect2(at, Vector2(px, px)), chip_light)
 		else:
-			draw_rect(Rect2(at, Vector2(px, px)), JunglePalette.BANANA)
+			draw_rect(Rect2(at, Vector2(px, px)), chip)
 
 
 ## The flash, built once per size. Thin spikes of alternating length, a

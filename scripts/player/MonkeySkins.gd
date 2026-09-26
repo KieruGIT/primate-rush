@@ -21,6 +21,15 @@ uniform float hue_mix = 0.0;
 uniform float sat_add = 0.0;
 uniform float sat_mul = 1.0;
 uniform float val_mul = 1.0;
+// Mythic two-tone: the light parts (face, belly, hands) get their own dye,
+// so a skin can read as a suit with a mask rather than one flat colour.
+uniform float face_mix = 0.0;
+uniform float face_hue = 0.0;
+uniform float face_sat = 0.3;
+uniform float face_val_mul = 1.0;
+// Mythic shimmer: a band of light that sweeps across the fur.
+uniform float shimmer = 0.0;
+uniform vec3 shimmer_color = vec3(1.0, 1.0, 1.0);
 
 // The node's modulate, carried from the vertex stage so the art is read
 // straight from TEXTURE and tinted exactly once.
@@ -55,7 +64,16 @@ void fragment() {
 		float hue = mix(hsv.x, target_hue, hue_mix);
 		float sat = clamp(hsv.y * sat_mul + sat_add, 0.0, 1.0);
 		float val = clamp(hsv.z * val_mul, 0.0, 1.0);
+		if (face_mix > 0.0 && hsv.z > 0.62) {
+			hue = mix(hue, face_hue, face_mix);
+			sat = face_sat;
+			val = clamp(hsv.z * face_val_mul, 0.0, 1.0);
+		}
 		c.rgb = hsv2rgb(vec3(hue, sat, val));
+		if (shimmer > 0.0) {
+			float band = pow(max(0.0, sin(TIME * 2.4 - (UV.x + UV.y) * 22.0)), 10.0);
+			c.rgb += shimmer * band * shimmer_color;
+		}
 	}
 	COLOR = c * tint_color;
 }

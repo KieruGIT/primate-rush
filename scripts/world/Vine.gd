@@ -52,7 +52,15 @@ func _rebuild() -> void:
 	queue_redraw()
 
 
+## World height the vines hang from: the canopy's underside (LevelSkin
+## sets it). Above the grip the stem is drawn on up into the leaves; only
+## the part below the pivot can be grabbed.
+static var canopy_y: float = INF
+
+
 func _draw() -> void:
+	if canopy_y < global_position.y - 8.0:
+		draw_vine(self, Vector2(0.0, canopy_y - global_position.y), Vector2.ZERO, rope_color)
 	draw_vine(self, Vector2.ZERO, Vector2(0.0, length), rope_color)
 
 

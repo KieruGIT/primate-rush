@@ -31,7 +31,7 @@ const LAYER_SOLID: int = LAYER_WORLD | LAYER_PLATFORM
 # reference monkey and every other value readable as a percentage of it.
 const BASE_RUN_SPEED: float = 420.0
 const BASE_CLIMB_SPEED: float = 300.0
-const BASE_JUMP_VELOCITY: float = -720.0
+const BASE_JUMP_VELOCITY: float = -785.0
 const BASE_GRAVITY: float = 1900.0
 const BASE_KNOCKBACK: float = 640.0
 const BASE_STUN_TIME: float = 0.45
@@ -134,6 +134,15 @@ const MAP_NAMES: Dictionary = {
 	&"map_b": "Canopy Climb",
 	&"map_c": "Slap Island",
 	&"map_d": "Banana Grove",
+}
+
+## Each map's music: assets/music/music_<id>.ogg. A map missing here, or a
+## track missing on disk, plays the shared battle loop instead.
+const MAP_MUSIC: Dictionary = {
+	&"map_a": &"jungle_run",
+	&"map_b": &"canopy_climb",
+	&"map_c": &"slap_island",
+	&"map_d": &"banana_grove",
 }
 
 ## Which maps a mode can be played on. A race needs a finish line, and a
@@ -252,6 +261,16 @@ const SKINS: Dictionary = {
 		"params": {"target_hue": 0.12, "hue_mix": 1.0, "sat_add": 0.4, "sat_mul": 1.0, "val_mul": 1.2}},
 	&"midnight": {"name": "Midnight", "premium": true, "swatch": Color8(60, 70, 150),
 		"params": {"target_hue": 0.66, "hue_mix": 1.0, "sat_add": 0.25, "sat_mul": 1.0, "val_mul": 0.8}},
+	# Mythic: two-tone with a moving shimmer. Only from the Banana Pull, never
+	# from Monkey Plus, so they stay the rarest thing in the game.
+	&"night_swinger": {"name": "Night Swinger", "premium": true, "mythic": true, "swatch": Color8(58, 40, 130),
+		"params": {"target_hue": 0.72, "hue_mix": 1.0, "sat_add": 0.35, "sat_mul": 1.0, "val_mul": 0.7,
+			"face_mix": 1.0, "face_hue": 0.48, "face_sat": 0.55, "face_val_mul": 1.15,
+			"shimmer": 0.45, "shimmer_color": Vector3(0.4, 1.0, 0.95)}},
+	&"molten_titan": {"name": "Molten Titan", "premium": true, "mythic": true, "swatch": Color8(60, 40, 36),
+		"params": {"target_hue": 0.03, "hue_mix": 1.0, "sat_add": 0.1, "sat_mul": 0.5, "val_mul": 0.45,
+			"face_mix": 1.0, "face_hue": 0.07, "face_sat": 0.95, "face_val_mul": 1.25,
+			"shimmer": 0.6, "shimmer_color": Vector3(1.0, 0.45, 0.1)}},
 }
 
 var _cache: Dictionary = {}
@@ -324,6 +343,8 @@ func get_skin(id: StringName) -> Dictionary:
 
 ## A premium skin or hat is yours with Monkey Plus, or if the gacha gave it.
 func is_skin_unlocked(id: StringName) -> bool:
+	if bool(get_skin(id).get("mythic", false)):
+		return Loot.owns_look(&"skin", id)
 	return not bool(get_skin(id).get("premium", false)) or Purchases.has_premium() or Loot.owns_look(&"skin", id)
 
 

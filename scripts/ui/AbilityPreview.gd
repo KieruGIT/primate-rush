@@ -19,10 +19,10 @@ const FLOOR_Y: float = 0.0
 ## stick direction held while it plays.
 const SCRIPTS: Dictionary = {
 	&"grapple_dash": {"dummy_x": 150.0, "press_at": 0.45, "hold": Vector2.ZERO, "walk": 0.0},
-	&"air_launch": {"dummy_x": 40.0, "press_at": 0.5, "hold": Vector2(1, 0), "walk": 0.0},
+	&"air_launch": {"dummy_x": 130.0, "press_at": 0.45, "hold": Vector2(1, 0), "walk": 0.0},
 	&"counter_roll": {"dummy_x": 170.0, "press_at": 0.45, "hold": Vector2.ZERO, "walk": 0.0},
 	&"long_arm": {"dummy_x": 300.0, "press_at": 0.35, "hold": Vector2.ZERO, "walk": 0.0},
-	&"snatch": {"dummy_x": 140.0, "press_at": 0.45, "hold": Vector2.ZERO, "walk": 0.0},
+	&"snatch": {"dummy_x": 150.0, "press_at": 0.45, "hold": Vector2(0, -1), "walk": 0.0},
 }
 
 var monkey_id: StringName = &""

@@ -34,7 +34,7 @@ enum Page { HOME, MONKEYS, PLAY, PARTY, SHOP, SETTINGS, STYLE, RANKS }
 ## What every key does, in the order a new player needs them.
 const KEYS: Array = [
 	["A  D", "Move"], ["SPACE", "Tap to jump, again in the air to double jump"],
-	["SHIFT  or  RIGHT CLICK", "Hold to grab and swing. Let go to release"],
+	["RIGHT CLICK  or  L", "Hold to grab and swing. Let go to release"],
 	["W  S", "Climb up / down, pull the arm in / out"],
 	["S  or  DOWN", "Drop through a platform. Slide when running fast"],
 	["LEFT CLICK  or  J", "Punch"], ["E  or  K", "Monkey skill"], ["ESC", "Pause"],
@@ -60,7 +60,7 @@ const STAT_MAX: float = 2.0
 const MODE_BLURBS: Dictionary = {
 	GameConfig.Mode.FREE_PLAY: "No clock, no score. Learn the ropes and shove your friends off them.",
 	GameConfig.Mode.RACE: "First to the finish wins. Knock the leader off the route.",
-	GameConfig.Mode.HOARD: "Grab the most bananas before time runs out. Steal the rest.",
+	GameConfig.Mode.HOARD: "First to 30 bananas wins. Race for the few that spawn, or hit a carrier to steal one.",
 	GameConfig.Mode.SLAP: "Two teams, one tiny island. Slap the other team into the sea. First to 5.",
 }
 const MODE_COLOURS: Dictionary = {
@@ -174,6 +174,9 @@ var _detail_icon: Control
 var _style_stage: MonkeyStage
 var _style_name: Label
 var _skin_buttons: Dictionary = {}
+var _fx_view: Control = null
+var _fx_view_name: Label = null
+var _fx_view_id: StringName = &"" 
 var _style_hat_buttons: Dictionary = {}
 
 # Play setup
@@ -412,17 +415,12 @@ func _build_home() -> Control:
 	_banana_count = _label("0", &"Display", 16)
 	wallet_row.add_child(_banana_count)
 	corner.add_child(wallet)
-	var cog := _button("", &"QuietButton", Vector2(66, 66), _show.bind(Page.SETTINGS))
+	var cog := _button("", &"QuietButton", Vector2(66, 66), _open_settings)
 	cog.add_child(_glyph_fill(&"cog"))
 	corner.add_child(cog)
 
-	# Title, top centre.
-	var title := _label("PRIMATE RUSH", &"DisplayBig", 40)
-	title.set_anchors_preset(Control.PRESET_CENTER_TOP)
-	title.grow_horizontal = Control.GROW_DIRECTION_BOTH
-	title.offset_top = 14.0
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	root.add_child(title)
+	# No title on the lobby: the splash already said the name, and the top
+	# centre is clearer empty.
 
 	# Navigation, down the left edge where a left thumb reaches.
 	var nav := VBoxContainer.new()
@@ -441,7 +439,7 @@ func _build_home() -> Control:
 	_shop_badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	shop.add_child(_shop_badge)
 	nav.add_child(shop)
-	nav.add_child(_nav_button("CONTROLS", &"pad", &"NavButton", _show.bind(Page.SETTINGS)))
+	nav.add_child(_nav_button("GUIDE", &"pad", &"NavButton", _open_guide.bind("CONTROLS")))
 	root.add_child(nav)
 
 	# The monkey, centre stage, with arrows to swap without leaving home.
@@ -644,15 +642,13 @@ func _on_play() -> void:
 	if Net.is_online() and not Net.is_host():
 		_deny("Waiting for the host to start.")
 		return
-	if Net.is_host() and _mm.call(&"people") > 1:
-		# A party with friends already in it: no search, straight to the pick.
-		_mm.call(&"start_now")
-		_refresh_search()
-		return
-	# Solo, or a room with nobody else in it: search the network, then AI.
 	if Net.queue == GameConfig.Queue.RANKED and not GameConfig.RANKED_MODES.has(Net.mode):
-		_set_lobby_mode(GameConfig.Mode.RACE)
-	_mm.call(&"begin")
+		_set_lobby_mode(GameConfig.Mode.SLAP)
+	# No searching the network for strangers: playing with friends goes
+	# through the CONNECT tab. PLAY goes straight to the monkey pick, with
+	# AI in every empty seat (and any friends already in your room).
+	# Matchmaker.begin() still exists for when online matchmaking returns.
+	_mm.call(&"start_now")
 	_refresh_search()
 
 
@@ -679,7 +675,7 @@ func _set_queue(q: int) -> void:
 	Net.set_queue(q)
 	if q == GameConfig.Queue.RANKED and not GameConfig.RANKED_MODES.has(Net.mode):
 		# Free play has nobody to rank against.
-		_set_lobby_mode(GameConfig.Mode.RACE)
+		_set_lobby_mode(GameConfig.Mode.SLAP)
 	_refresh()
 
 
@@ -977,8 +973,9 @@ func _refresh_search() -> void:
 
 func _refresh_home() -> void:
 	var stats := GameConfig.get_monkey(Net.local_monkey)
-	if _home_stage.monkey_id != Net.local_monkey:
-		_home_stage.set_monkey(Net.local_monkey)
+	# The look picked on the Style page (skin and accessory) shows here too.
+	if _home_stage.monkey_id != Net.local_monkey or _home_stage.skin_id != Net.local_skin or _home_stage.hat_id != Net.local_hat:
+		_home_stage.set_monkey(Net.local_monkey, false, Net.local_skin, Net.local_hat)
 	_home_name.text = stats.display_name.to_upper()
 	_home_skill.text = "SKILL  %s" % _skill_name(stats)
 	var face := _pages[Page.HOME].find_child("ProfileFace", true, false) as TextureRect
@@ -1358,11 +1355,23 @@ func _build_style() -> Control:
 	stage_row.add_child(_arrow("<", _style_cycle.bind(-1), Vector2(64, 90)))
 	_style_stage = MonkeyStage.new()
 	_style_stage.pixel_scale = 6
-	_style_stage.custom_minimum_size = Vector2(260, 330)
+	_style_stage.custom_minimum_size = Vector2(260, 290)
 	stage_row.add_child(_style_stage)
 	stage_row.add_child(_arrow(">", _style_cycle.bind(1), Vector2(64, 90)))
 	_style_name = _centered("", &"Display", 22)
 	left_box.add_child(_style_name)
+	# Effect viewer: the effect you point at or tap, playing for real.
+	var viewer := PanelContainer.new()
+	viewer.theme_type_variation = &"Glass"
+	viewer.custom_minimum_size = Vector2(360, 150)
+	viewer.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	left_box.add_child(viewer)
+	_fx_view = Control.new()
+	_fx_view.custom_minimum_size = Vector2(360, 150)
+	_fx_view.clip_contents = true
+	viewer.add_child(_fx_view)
+	_fx_view_name = _centered("POINT AT AN EFFECT TO SEE IT", &"Display", 13)
+	left_box.add_child(_fx_view_name)
 
 	# Right: skins (per monkey) and accessories (worn by any monkey).
 	var right := PanelContainer.new()
@@ -1416,7 +1425,8 @@ func _build_style() -> Control:
 		for id in Loot.items_in(slot):
 			var entry := Loot.item(id)
 			var label := String(entry["name"]) + (" +" if bool(entry["plus"]) else "")
-			var b := _swatch_button(label, Loot.RARITY_COLORS[int(entry["rarity"])], _on_effect.bind(id))
+			var b := _effect_tile(id, label)
+			b.mouse_entered.connect(_show_fx_view.bind(id))
 			flow.add_child(b)
 			_effect_buttons[id] = b
 	right_box.add_child(_label("Gold-edged items come with Monkey Plus. Effects come from the Banana Pull.", &"Body", 15))
@@ -1457,7 +1467,55 @@ func _swatch_button(text: String, chip: Color, on_pressed: Callable, icon: Contr
 	return b
 
 
+## The viewer on the Style page: one live preview at a time, swapped out.
+func _show_fx_view(id: StringName) -> void:
+	if _fx_view == null or _fx_view_id == id:
+		return
+	_fx_view_id = id
+	for child in _fx_view.get_children():
+		child.queue_free()
+	var preview: Control = ItemPreviewUI.new(id, Vector2(360, 150))
+	preview.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_fx_view.add_child(preview)
+	var entry := Loot.item(id)
+	var rarity := int(entry["rarity"])
+	_fx_view_name.text = "%s  -  %s%s" % [String(entry["name"]).to_upper(), Loot.RARITY_NAMES[rarity], "" if Loot.owns(id) else "  (LOCKED)"]
+	_fx_view_name.add_theme_color_override(&"font_color", Loot.RARITY_COLORS[rarity])
+
+
+## A gallery card for one effect: the effect itself playing, its name
+## under it, and a rarity-coloured strip along the bottom.
+func _effect_tile(id: StringName, label: String) -> Button:
+	var entry := Loot.item(id)
+	var colour: Color = Loot.RARITY_COLORS[int(entry["rarity"])]
+	var b := _button("", &"ChoiceButton", Vector2(168, 128), _on_effect.bind(id))
+	b.toggle_mode = true
+	b.clip_contents = true
+	var box := VBoxContainer.new()
+	box.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	box.offset_left = 6.0
+	box.offset_right = -6.0
+	box.offset_top = 6.0
+	box.offset_bottom = -10.0
+	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	box.add_theme_constant_override(&"separation", 2)
+	b.add_child(box)
+	var preview: Control = ItemPreviewUI.new(id, Vector2(150, 80))
+	preview.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	box.add_child(preview)
+	var name_label := _centered(label, &"Display", 10)
+	name_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	box.add_child(name_label)
+	var strip := ColorRect.new()
+	strip.color = colour
+	strip.custom_minimum_size = Vector2(0, 4)
+	strip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	box.add_child(strip)
+	return b
+
+
 func _on_effect(id: StringName) -> void:
+	_show_fx_view(id)
 	if not Loot.owns(id):
 		_deny("%s comes from the Banana Pull in the SHOP." % Loot.item(id)["name"])
 		_refresh_style()
@@ -1699,7 +1757,7 @@ func _lobby_seat(seat: Dictionary) -> Control:
 		stage.pedestal = false
 		stage.custom_minimum_size = Vector2(0, 146)
 		box.add_child(stage)
-		stage.set_monkey(StringName(seat["monkey"]))
+		stage.set_monkey(StringName(seat["monkey"]), false, StringName(seat.get("skin", &"natural")), StringName(seat.get("hat", &"none")))
 	else:
 		card.modulate = Color(1, 1, 1, 0.45)
 		var dash := _centered("+", &"DisplayBig", 36)
@@ -1929,7 +1987,10 @@ func _build_party_choice() -> void:
 		seat.custom_minimum_size = Vector2(120, 160)
 		seat.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		preview.add_child(seat)
-		seat.set_monkey(Net.local_monkey, i > 0)
+		if i == 0:
+			seat.set_monkey(Net.local_monkey, false, Net.local_skin, Net.local_hat)
+		else:
+			seat.set_monkey(Net.local_monkey, true)
 	host_box.add_child(_button("HOST", &"GoButton", Vector2(0, 90), _on_host))
 
 	var join := PanelContainer.new()
@@ -2322,9 +2383,14 @@ func _build_gacha_tab(body: Control) -> void:
 		var free := _button("FREE DAILY PULL" if Loot.has_free_pull() else "FREE PULL TOMORROW", &"GoButton", Vector2(380, 52), _on_pull.bind(1, true))
 		free.disabled = not Loot.has_free_pull()
 		controls.add_child(free)
-	controls.add_child(_centered("COMMON %d%%   RARE %d%%   LEGENDARY %d%%" % [int(Loot.ODDS[0]), int(Loot.ODDS[1]), int(Loot.ODDS[2])], &"Display", 11))
-	var fine := _centered("x10 guarantees a rare or better.\nDuplicates return %d / %d / %d bananas.%s" % [
-		Loot.DUPLICATE_REFUND[0], Loot.DUPLICATE_REFUND[1], Loot.DUPLICATE_REFUND[2],
+	var anim_on := bool(Profile.get_stat("pull_anim", true))
+	controls.add_child(_button("PULL ANIMATION: %s" % ("ON" if anim_on else "OFF"), &"QuietButton", Vector2(380, 44), func() -> void:
+		Profile.set_stat("pull_anim", not bool(Profile.get_stat("pull_anim", true)))
+		Sfx.play(&"ui_select")
+		_refresh_shop()))
+	controls.add_child(_centered("COMMON %d%%   RARE %d%%   LEGENDARY %d%%   MYTHIC %d%%" % [int(Loot.ODDS[0]), int(Loot.ODDS[1]), int(Loot.ODDS[2]), int(Loot.ODDS[3])], &"Display", 11))
+	var fine := _centered("x10 guarantees a rare or better.\nDuplicates return %d / %d / %d / %d bananas.%s" % [
+		Loot.DUPLICATE_REFUND[0], Loot.DUPLICATE_REFUND[1], Loot.DUPLICATE_REFUND[2], Loot.DUPLICATE_REFUND[3],
 		"" if Purchases.has_plus() else "\nGold-edged items drop only with Monkey Plus."], &"Body", 13)
 	controls.add_child(fine)
 
@@ -2338,14 +2404,14 @@ func _build_gacha_tab(body: Control) -> void:
 	stage.add_child(reveal)
 	if _last_pull.is_empty():
 		# Nothing pulled yet: show off the legendaries in the pool.
-		reveal.add_child(_centered("LEGENDARIES IN THE POOL", &"Display", 18))
+		reveal.add_child(_centered("MYTHICS AND LEGENDARIES IN THE POOL", &"Display", 18))
 		var showcase := HFlowContainer.new()
 		showcase.alignment = FlowContainer.ALIGNMENT_CENTER
 		showcase.add_theme_constant_override(&"h_separation", 12)
 		showcase.add_theme_constant_override(&"v_separation", 12)
 		reveal.add_child(showcase)
-		for id in [&"trail_fire", &"punch_thunder", &"win_fireworks", &"skin_golden", &"hat_halo", &"climb_gold"]:
-			showcase.add_child(_result_card({"id": id, "rarity": Loot.Rarity.LEGENDARY, "new": false, "refund": 0}, false))
+		for id in [&"skin_night_swinger", &"skin_molten_titan", &"trail_fire", &"punch_thunder", &"win_fireworks", &"skin_golden"]:
+			showcase.add_child(_result_card({"id": id, "rarity": int(Loot.item(id)["rarity"]), "new": false, "refund": 0}, false))
 		return
 	reveal.add_child(_centered("YOU GOT", &"Display", 18))
 	var grid := HFlowContainer.new()
@@ -2366,10 +2432,45 @@ func _on_pull(count: int, free: bool) -> void:
 	var best := 0
 	for r in results:
 		best = maxi(best, int(r["rarity"]))
-	Sfx.play(&"finish" if best == Loot.Rarity.LEGENDARY else &"ui_select")
 	_last_pull = results
 	_refresh_shop()
 	_refresh_home()
+	if bool(Profile.get_stat("pull_anim", true)):
+		_start_pull_show(results, best)
+	else:
+		Sfx.play(&"finish" if best >= Loot.Rarity.LEGENDARY else &"ui_select")
+
+
+# --- Pull reveal -----------------------------------------------------
+#
+# The lucky-box reel (PullReel): items race past, slow and land on each
+# result in turn, with bananas raining behind. Results were decided by
+# Loot.pull before it starts; the reel only shows them.
+
+const PULL_REEL = preload("res://scripts/ui/PullReel.gd")
+var _pull_show: Control = null
+
+
+func _start_pull_show(results: Array, _best: int) -> void:
+	_end_pull_show()
+	var reel: Control = PULL_REEL.new()
+	reel.set(&"results", results)
+	reel.set(&"card_maker", _result_card)
+	reel.z_index = 40
+	add_child(reel)
+	_pull_show = reel
+	reel.connect(&"closed", func() -> void: _pull_show = null)
+
+
+func _pull_skip() -> void:
+	if _pull_show != null and is_instance_valid(_pull_show):
+		_pull_show.call(&"_skip")
+
+
+func _end_pull_show() -> void:
+	if _pull_show != null and is_instance_valid(_pull_show):
+		_pull_show.queue_free()
+	_pull_show = null
 
 
 func _on_purchase_finished(success: bool, message: String) -> void:
@@ -2383,27 +2484,74 @@ func _on_purchase_finished(success: bool, message: String) -> void:
 # --- Settings and controls -----------------------------------------
 
 func _build_settings() -> Control:
-	var root := _page_root("SETTINGS")
-	var row := HBoxContainer.new()
-	row.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	row.offset_top = 104.0
-	row.offset_left = 30.0
-	row.offset_right = -30.0
-	row.offset_bottom = -24.0
-	row.add_theme_constant_override(&"separation", 20)
-	root.add_child(row)
+	var root := _page_root("GUIDE")
+	var column := VBoxContainer.new()
+	column.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	column.offset_top = 104.0
+	column.offset_left = 30.0
+	column.offset_right = -30.0
+	column.offset_bottom = -20.0
+	column.add_theme_constant_override(&"separation", 12)
+	root.add_child(column)
+	var tabs := HBoxContainer.new()
+	tabs.add_theme_constant_override(&"separation", 10)
+	column.add_child(tabs)
+	for tab in GUIDE_TABS:
+		var b := _button(tab, &"ChoiceButton", Vector2(0, 54), _set_guide_tab.bind(tab))
+		b.toggle_mode = true
+		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		tabs.add_child(b)
+		_guide_tab_buttons[tab] = b
+	var panel := PanelContainer.new()
+	panel.theme_type_variation = &"Glass"
+	panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	column.add_child(panel)
+	var scroll := ScrollContainer.new()
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	panel.add_child(scroll)
+	_guide_body = VBoxContainer.new()
+	_guide_body.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_guide_body.add_theme_constant_override(&"separation", 14)
+	scroll.add_child(_guide_body)
+	_set_guide_tab.call_deferred(_guide_tab)
+	return root
 
-	var left := PanelContainer.new()
-	left.theme_type_variation = &"Glass"
-	left.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	row.add_child(left)
-	var left_box := VBoxContainer.new()
-	left_box.add_theme_constant_override(&"separation", 10)
-	left.add_child(left_box)
-	left_box.add_child(_label("KEYBOARD", &"Display", 28))
-	for pair in KEYS:
-		left_box.add_child(_key_row(pair[0], pair[1]))
-	left_box.add_child(_label("VOLUME", &"Display", 24))
+
+const GUIDE_TABS: Array[String] = ["CONTROLS", "MOVING", "FIGHTING", "MODES", "MONKEYS"]
+var _guide_tab: String = "CONTROLS"
+var _guide_body: VBoxContainer = null
+var _guide_tab_buttons: Dictionary = {}
+
+
+## The cog: a settings pop-up over whatever page you are on. The GUIDE
+## button is the other thing, the how-to-play pages.
+func _open_settings() -> void:
+	_close_settings()
+	var layer := Control.new()
+	layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	layer.z_index = 35
+	add_child(layer)
+	_settings_popup = layer
+	var dim := ColorRect.new()
+	dim.color = Color(0.02, 0.03, 0.08, 0.8)
+	dim.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	dim.gui_input.connect(func(event: InputEvent) -> void:
+		if event is InputEventMouseButton and event.pressed:
+			_close_settings())
+	layer.add_child(dim)
+	var center := CenterContainer.new()
+	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	center.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	layer.add_child(center)
+	var card := PanelContainer.new()
+	card.theme_type_variation = &"Glass"
+	card.custom_minimum_size = Vector2(560, 0)
+	center.add_child(card)
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override(&"separation", 14)
+	card.add_child(box)
+	box.add_child(_centered("SETTINGS", &"DisplayBig", 30))
+	box.add_child(_label("VOLUME", &"Display", 18))
 	var volume := HSlider.new()
 	volume.min_value = 0.0
 	volume.max_value = 1.0
@@ -2414,23 +2562,361 @@ func _build_settings() -> Control:
 		Sfx.set_volume(value)
 		Profile.set_stat("volume", value))
 	volume.drag_ended.connect(func(_changed: bool) -> void: Sfx.play(&"ui_select"))
-	left_box.add_child(volume)
+	box.add_child(volume)
+	box.add_child(_label("BANANA PULL", &"Display", 18))
+	var anim := Button.new()
+	anim.theme_type_variation = &"ChoiceButton"
+	anim.custom_minimum_size = Vector2(0, 54)
+	anim.toggle_mode = true
+	var refresh_anim := func() -> void:
+		var on := bool(Profile.get_stat("pull_anim", true))
+		anim.set_pressed_no_signal(on)
+		anim.text = "ROLL ANIMATION: %s" % ("ON" if on else "OFF")
+	refresh_anim.call()
+	anim.pressed.connect(func() -> void:
+		Profile.set_stat("pull_anim", not bool(Profile.get_stat("pull_anim", true)))
+		Sfx.play(&"ui_select")
+		refresh_anim.call())
+	box.add_child(anim)
+	var perf := _button("PERFORMANCE OVERLAY", &"QuietButton", Vector2(0, 54), func() -> void:
+		_close_settings()
+		if PerfOverlay.has_method(&"toggle"):
+			PerfOverlay.call(&"toggle"))
+	box.add_child(perf)
+	box.add_child(_button("CLOSE", &"PrimaryButton", Vector2(0, 58), _close_settings))
 
-	var right := PanelContainer.new()
-	right.theme_type_variation = &"Glass"
-	right.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	row.add_child(right)
-	var right_box := VBoxContainer.new()
-	right_box.add_theme_constant_override(&"separation", 10)
-	right.add_child(right_box)
-	right_box.add_child(_label("TOUCH", &"Display", 28))
-	for pair in TOUCH:
-		right_box.add_child(_key_row(pair[0], pair[1]))
-	right_box.add_child(_label("MOVES", &"Display", 24))
-	var tips := _label("Hold JUMP in the air near anything - a vine, tree, branch, bush, torch, rope or the edge of a ledge - and the arm takes hold. Push left and right to pump, let go to release at the bottom for the most speed, or press jump to leap off.\nPlatforms: jump up through them from below, hold down to drop back through. Springs throw you high. Every slap in 2v2 adds to your damage number: the higher it is, the further the next slap sends you.", &"Body", 17)
-	tips.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	right_box.add_child(tips)
-	return root
+
+func _close_settings() -> void:
+	if _settings_popup != null and is_instance_valid(_settings_popup):
+		_settings_popup.queue_free()
+	_settings_popup = null
+
+
+var _settings_popup: Control = null
+
+
+## Open the guide on a tab.
+func _open_guide(tab: String) -> void:
+	_guide_tab = tab
+	_show(Page.SETTINGS)
+	_set_guide_tab(tab)
+
+
+func _set_guide_tab(tab: String) -> void:
+	_guide_tab = tab
+	for key in _guide_tab_buttons.keys():
+		(_guide_tab_buttons[key] as Button).set_pressed_no_signal(key == tab)
+	if _guide_body == null:
+		return
+	for child in _guide_body.get_children():
+		child.queue_free()
+	match tab:
+		"CONTROLS":
+			_guide_controls()
+		"MOVING":
+			_guide_section("GETTING AROUND", "The jungle is built to be climbed, swung through and fallen out of.")
+			_guide_grid([
+				["DOUBLE JUMP", "Tap SPACE to jump, tap again in the air for a second jump. Swinging gives the double jump back.", &"jump", UiTheme.BANANA],
+				["GRAB AND SWING", "Hold RIGHT CLICK near a vine, rope, tree or the edge of a ledge. Push left and right to pump, let go to fly off with the speed.", &"swing", UiTheme.LEAF],
+				["CLIMB UP FOR FREE", "Caught the lip of the ground or a ledge? Hold toward where you are holding and you pop up and over without spending a jump.", &"hop", UiTheme.SKY],
+				["PASS-THROUGH GROUND", "Dirt islands and stone ledges are solid only from above. Jump or climb straight up through them from below.", &"through", Color8(160, 110, 70)],
+				["DROP AND SLIDE", "Hold S on a wooden platform to drop through it. Hold S while running fast to slide.", &"drop", UiTheme.CORAL],
+				["AUTO CLIMB", "Climbing a trunk into something solid? The monkey hops out to the clear side and keeps going.", &"climb", UiTheme.LEAF],
+			])
+		"FIGHTING":
+			_guide_section("HOW HITS WORK", "Every hit is knockback. Nobody has health: you lose by flying off the island.")
+			_guide_grid([
+				["PUNCH", "LEFT CLICK. Small monkeys punch fast, big ones punch hard. Long arms (orangutan, gibbon) reach further.", &"punch", UiTheme.CORAL],
+				["COMBO", "Hits that keep coming, from anyone, stack up to 6. Each one sends the target further. Stop hitting for a moment and it resets. The hit flash goes from pale to bright red as it climbs.", &"combo", Color8(255, 70, 60)],
+				["WEIGHT", "Heavy monkeys fly less far and get stunned for less time. Light monkeys fly further but move and hit faster.", &"weight", UiTheme.INK_DIM],
+				["SAVE YOURSELF", "Knocked into the air? Press JUMP a moment later to break out of the stun with your double jump. SAVED! Only in the air, and only if your double jump is still unused.", &"saved", UiTheme.LEAF],
+				["STUN CHAINS", "Every hit restarts your stun. A gorilla slam holds you, then stuns you on the ground where you cannot jump out, so a follow-up hit keeps you stuck. Keep your distance from gorillas.", &"chain", Color8(255, 120, 80)],
+				["STEER", "While flying from a hit, hold a direction to drift a little. Aim back at the island.", &"steer", UiTheme.SKY],
+				["BANANA PEEL", "Step on a chimp's peel and you skid, stunned, and for a moment every hit sends you further.", &"peel", UiTheme.BANANA],
+			])
+			_guide_section("BIG HITS STAY BIG, BUT FAIR", "Speed from a hit ends with the stun, so it never turns into a runaway slide. Races and Banana Hoard use gentler knockback than 2v2 Slap.")
+		"MODES":
+			_guide_section("MODES", "2v2 Slap is where the chaos lives. The others are for racing and farming.")
+			_guide_grid([
+				["2V2 SLAP", "Two teams on Slap Island. Knock both enemies off to win the round. One life per round, best of three.", &"slap", UiTheme.CORAL],
+				["RACE", "First to the flag wins. Knock the leader off the route on your way past.", &"race", UiTheme.BANANA],
+				["BANANA HOARD", "First to 30 bananas wins. One or two bananas appear at a time, in different spots: race for them. Every hit on a carrier steals one into your hands and knocks one loose.", &"hoard", UiTheme.LEAF],
+				["RANKED AND STAKES", "Ranked matches move your rank. Stake bananas before a match: win big, or lose the stake.", &"ranked", UiTheme.SKY],
+			])
+		"MONKEYS":
+			_guide_section("THE MONKEYS", "Five monkeys, five skills. Press E to use yours.")
+			_guide_monkeys()
+		"SETTINGS":
+			_guide_settings()
+
+
+func _guide_section(title: String, text: String) -> void:
+	_guide_body.add_child(_label(title, &"Display", 22))
+	var line := _label(text, &"Body", 16)
+	line.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	line.add_theme_color_override(&"font_color", UiTheme.INK_DIM)
+	_guide_body.add_child(line)
+
+
+## Cards two to a row: a little picture of the idea, a title in its colour,
+## and two lines of plain words.
+func _guide_grid(cards: Array) -> void:
+	var grid := GridContainer.new()
+	grid.columns = 2
+	grid.add_theme_constant_override(&"h_separation", 14)
+	grid.add_theme_constant_override(&"v_separation", 14)
+	grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_guide_body.add_child(grid)
+	for card in cards:
+		grid.add_child(_guide_card(card[0], card[1], card[2], card[3]))
+
+
+func _guide_card(title: String, text: String, art: StringName, accent: Color) -> Control:
+	var card := PanelContainer.new()
+	card.theme_type_variation = &"Card"
+	card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override(&"separation", 14)
+	card.add_child(row)
+	var picture := GuideArt.new()
+	picture.kind = art
+	picture.accent = accent
+	picture.custom_minimum_size = Vector2(112, 96)
+	row.add_child(picture)
+	var words := VBoxContainer.new()
+	words.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	words.alignment = BoxContainer.ALIGNMENT_CENTER
+	row.add_child(words)
+	var head := _label(title, &"Display", 16)
+	head.add_theme_color_override(&"font_color", accent)
+	words.add_child(head)
+	var body := _label(text, &"Body", 15)
+	body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	words.add_child(body)
+	return card
+
+
+func _guide_controls() -> void:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override(&"separation", 20)
+	_guide_body.add_child(row)
+	for block in [["KEYBOARD AND MOUSE", KEYS], ["TOUCH", TOUCH]]:
+		var box := VBoxContainer.new()
+		box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		box.add_theme_constant_override(&"separation", 10)
+		row.add_child(box)
+		box.add_child(_label(block[0], &"Display", 22))
+		for pair in block[1]:
+			box.add_child(_key_row(pair[0], pair[1]))
+
+
+func _guide_monkeys() -> void:
+	for id in [&"gorilla", &"orangutan", &"macaque", &"gibbon", &"capuchin"]:
+		var stats := GameConfig.get_monkey(id)
+		var card := PanelContainer.new()
+		card.theme_type_variation = &"Card"
+		var row := HBoxContainer.new()
+		row.add_theme_constant_override(&"separation", 16)
+		card.add_child(row)
+		var face := _portrait_picture(id)
+		face.custom_minimum_size = Vector2(84, 84)
+		row.add_child(face)
+		var words := VBoxContainer.new()
+		words.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		words.alignment = BoxContainer.ALIGNMENT_CENTER
+		row.add_child(words)
+		var head := HBoxContainer.new()
+		head.add_theme_constant_override(&"separation", 12)
+		words.add_child(head)
+		head.add_child(_label(stats.display_name.to_upper(), &"Display", 18))
+		var skill := _label(SkillFx.name_of(stats.skill_id), &"Display", 14)
+		skill.add_theme_color_override(&"font_color", SkillFx.colour_of(stats.skill_id))
+		head.add_child(skill)
+		var cooldown := _label("%.1fs%s" % [stats.skill_cooldown, "  x%d" % stats.skill_charges if stats.skill_charges > 1 else ""], &"Body", 14)
+		cooldown.add_theme_color_override(&"font_color", UiTheme.INK_DIM)
+		head.add_child(cooldown)
+		var text := _label(SkillFx.description_of(stats.skill_id), &"Body", 15)
+		text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		words.add_child(text)
+		var icon := GuideArt.new()
+		icon.kind = &"skill"
+		icon.skill_id = stats.skill_id
+		icon.accent = SkillFx.colour_of(stats.skill_id)
+		icon.custom_minimum_size = Vector2(80, 80)
+		row.add_child(icon)
+		_guide_body.add_child(card)
+
+
+func _guide_settings() -> void:
+	_guide_body.add_child(_label("VOLUME", &"Display", 22))
+	var volume := HSlider.new()
+	volume.min_value = 0.0
+	volume.max_value = 1.0
+	volume.step = 0.05
+	volume.value = Sfx.get_volume()
+	volume.custom_minimum_size = Vector2(0, 40)
+	volume.value_changed.connect(func(value: float) -> void:
+		Sfx.set_volume(value)
+		Profile.set_stat("volume", value))
+	volume.drag_ended.connect(func(_changed: bool) -> void: Sfx.play(&"ui_select"))
+	_guide_body.add_child(volume)
+	var anim_on := bool(Profile.get_stat("pull_anim", true))
+	_guide_body.add_child(_label("BANANA PULL", &"Display", 22))
+	_guide_body.add_child(_button("PULL ANIMATION: %s" % ("ON" if anim_on else "OFF"), &"QuietButton", Vector2(360, 54), func() -> void:
+		Profile.set_stat("pull_anim", not bool(Profile.get_stat("pull_anim", true)))
+		Sfx.play(&"ui_select")
+		_set_guide_tab("SETTINGS")))
+
+
+## The little pictures on the guide cards. Pixel blocks, same palette as
+## the game, one idea each: an arc for a jump, a rope for a swing, a bar
+## of reds for a combo.
+class GuideArt extends Control:
+	const SkillFxArt = preload("res://scripts/player/SkillFx.gd")
+	const PeelArt = preload("res://scripts/world/BananaPeel.gd")
+	const BananaArt = preload("res://scripts/ui/BananaIcon.gd")
+	var kind: StringName = &"jump"
+	var accent: Color = Color.WHITE
+	var skill_id: StringName = &""
+	var _t: float = 0.0
+
+	func _process(delta: float) -> void:
+		_t += delta
+		queue_redraw()
+
+	func _block(at: Vector2, size: Vector2, c: Color) -> void:
+		draw_rect(Rect2((at / 2.0).floor() * 2.0, size), c)
+
+	func _monkey(at: Vector2, c: Color = Color8(150, 106, 64)) -> void:
+		# A chunky little monkey: body, head, face.
+		_block(at + Vector2(-9, -26), Vector2(18, 18), c)
+		_block(at + Vector2(-7, -10), Vector2(14, 12), c.darkened(0.15))
+		_block(at + Vector2(-5, -22), Vector2(10, 8), Color8(236, 196, 150))
+		_block(at + Vector2(-3, -20), Vector2(2, 2), Color8(30, 20, 14))
+		_block(at + Vector2(1, -20), Vector2(2, 2), Color8(30, 20, 14))
+
+	func _arrow(from: Vector2, to: Vector2, c: Color) -> void:
+		draw_line(from, to, c, 4.0)
+		var dir := (to - from).normalized()
+		var side := Vector2(-dir.y, dir.x)
+		draw_colored_polygon(PackedVector2Array([to + dir * 8.0, to - dir * 4.0 + side * 7.0, to - dir * 4.0 - side * 7.0]), c)
+
+	func _draw() -> void:
+		var w := size.x
+		var h := size.y
+		var ground := h - 14.0
+		draw_rect(Rect2(Vector2.ZERO, size), Color(0.05, 0.07, 0.14, 0.6))
+		var bob := sin(_t * 3.0)
+		match kind:
+			&"jump":
+				_block(Vector2(0, ground), Vector2(w, 14), Color8(79, 154, 58))
+				var k := fmod(_t, 1.6) / 1.6
+				var x := lerpf(20.0, w - 20.0, k)
+				var y := ground - (sin(k * PI * 2.0) * 0.5 + 0.5 * absf(sin(k * PI * 2.0))) * 50.0
+				_monkey(Vector2(x, y))
+				_arrow(Vector2(16, ground - 40), Vector2(w * 0.5, ground - 64), accent)
+			&"swing":
+				var anchor := Vector2(w * 0.5, 10)
+				var angle := sin(_t * 2.4) * 0.9
+				var hand := anchor + Vector2(sin(angle), cos(angle)) * 62.0
+				draw_line(anchor, hand, Color8(58, 120, 46), 4.0)
+				_block(anchor - Vector2(4, 4), Vector2(8, 8), Color8(107, 68, 36))
+				_monkey(hand + Vector2(0, 26))
+			&"hop":
+				_block(Vector2(w * 0.5, ground - 36), Vector2(w * 0.5, 50), Color8(92, 58, 34))
+				_block(Vector2(w * 0.5, ground - 36), Vector2(w * 0.5, 6), Color8(79, 154, 58))
+				_monkey(Vector2(w * 0.38, ground + 6 - 10.0 * absf(bob)))
+				_arrow(Vector2(w * 0.38, ground - 40), Vector2(w * 0.62, ground - 56), accent)
+			&"through":
+				_block(Vector2(10, 36), Vector2(w - 20, 26), Color8(92, 58, 34))
+				_block(Vector2(10, 36), Vector2(w - 20, 6), Color8(79, 154, 58))
+				var k2 := fmod(_t, 1.4) / 1.4
+				_monkey(Vector2(w * 0.5, lerpf(h + 20.0, 30.0, k2)))
+				_arrow(Vector2(w * 0.8, h - 6), Vector2(w * 0.8, 20), accent)
+			&"drop":
+				_block(Vector2(14, 40), Vector2(w - 28, 8), Color8(138, 90, 46))
+				var k3 := fmod(_t, 1.4) / 1.4
+				_monkey(Vector2(w * 0.5, lerpf(40.0, h + 10.0, k3)))
+				_arrow(Vector2(w * 0.82, 24), Vector2(w * 0.82, h - 10), accent)
+			&"climb":
+				_block(Vector2(w * 0.3, 0), Vector2(18, h), Color8(107, 68, 36))
+				_block(Vector2(w * 0.3 - 30, 22), Vector2(54, 10), Color8(90, 96, 122))
+				_monkey(Vector2(w * 0.3 + 24, 70 + bob * 4.0))
+				_arrow(Vector2(w * 0.3 + 30, 60), Vector2(w * 0.3 + 44, 18), accent)
+			&"punch":
+				_monkey(Vector2(w * 0.3, ground))
+				var reach := 26.0 + 16.0 * absf(sin(_t * 5.0))
+				_block(Vector2(w * 0.3 + 8, ground - 22), Vector2(reach, 6), Color8(150, 106, 64))
+				_block(Vector2(w * 0.3 + 8 + reach, ground - 26), Vector2(12, 12), Color8(236, 196, 150))
+				_monkey(Vector2(w * 0.82, ground), Color8(120, 120, 140))
+			&"combo":
+				for i in 6:
+					var heat := float(i + 1) / 6.0
+					var c := Color(1.0, lerpf(0.82, 0.18, heat), lerpf(0.78, 0.12, heat))
+					var lit := int(fmod(_t * 3.0, 8.0)) > i
+					var bar_h := 14.0 + i * 11.0
+					_block(Vector2(10 + i * 16, h - 12 - bar_h), Vector2(12, bar_h), c if lit else Color(c, 0.25))
+			&"weight":
+				_block(Vector2(8, ground), Vector2(w - 16, 4), Color8(79, 154, 58))
+				_monkey(Vector2(26, ground), Color8(90, 84, 90))
+				_monkey(Vector2(26, ground - 44), Color8(200, 160, 110))
+				_arrow(Vector2(42, ground - 14), Vector2(62, ground - 14), accent)
+				_arrow(Vector2(42, ground - 58), Vector2(w - 8, ground - 58), accent)
+			&"chain":
+				_block(Vector2(0, ground), Vector2(w, 14), Color8(79, 154, 58))
+				_monkey(Vector2(w * 0.5, ground), Color8(120, 120, 140))
+				_monkey(Vector2(18, ground), Color8(80, 76, 84))
+				_monkey(Vector2(w - 18, ground), Color8(80, 76, 84))
+				# A hit every half second, and the stun bar refilling each time.
+				var beat := fmod(_t, 0.5) / 0.5
+				var side := -1.0 if int(_t * 2.0) % 2 == 0 else 1.0
+				if beat < 0.3:
+					var star := Vector2(w * 0.5 + side * 14.0, ground - 22.0)
+					for i in 4:
+						var d := Vector2.from_angle(TAU * i / 4.0 + 0.4) * (6.0 + beat * 20.0)
+						_block(star + d, Vector2(4, 4), accent)
+				var bar := 1.0 - beat
+				_block(Vector2(w * 0.5 - 20, ground - 42), Vector2(40, 6), Color(0, 0, 0, 0.5))
+				_block(Vector2(w * 0.5 - 20, ground - 42), Vector2(40.0 * bar, 6), accent)
+			&"saved":
+				var k4 := fmod(_t, 1.6) / 1.6
+				_monkey(Vector2(w * 0.5, lerpf(h, 40.0, k4) + 20.0))
+				draw_string(get_theme_default_font(), Vector2(w * 0.5 - 26, 18), "SAVED!", HORIZONTAL_ALIGNMENT_LEFT, -1, 13, accent)
+			&"steer":
+				var k5 := fmod(_t, 1.6) / 1.6
+				var p := Vector2(lerpf(w - 16.0, 30.0, k5), 30.0 + sin(k5 * PI) * -10.0 + k5 * 40.0)
+				_monkey(p + Vector2(0, 20))
+				_arrow(Vector2(w - 10, 20), Vector2(24, 70), Color(accent, 0.5))
+				_arrow(p + Vector2(12, 0), p + Vector2(-14, -14), accent)
+			&"peel":
+				_block(Vector2(0, ground), Vector2(w, 14), Color8(79, 154, 58))
+				var art: Array = PeelArt.ART
+				for yy in art.size():
+					var line: String = art[yy]
+					for xx in line.length():
+						if PeelArt.COLORS.has(line[xx]):
+							_block(Vector2(w * 0.5 - 12 + xx * 2, ground - 14 + yy * 2), Vector2(2, 2), PeelArt.COLORS[line[xx]])
+				var k6 := fmod(_t, 1.6) / 1.6
+				_monkey(Vector2(lerpf(10.0, w - 10.0, k6), ground - (8.0 if k6 > 0.5 else 0.0)))
+			&"slap":
+				_block(Vector2(20, ground), Vector2(w - 40, 14), Color8(92, 58, 34))
+				_block(Vector2(20, ground), Vector2(w - 40, 4), Color8(79, 154, 58))
+				_monkey(Vector2(w * 0.35, ground), Color8(230, 90, 80))
+				var k7 := fmod(_t, 1.6) / 1.6
+				_monkey(Vector2(w * 0.62 + k7 * 50.0, ground - k7 * 40.0), Color8(90, 140, 230))
+			&"race":
+				_block(Vector2(w * 0.6, 10), Vector2(4, 70), Color8(220, 220, 220))
+				for i in 4:
+					_block(Vector2(w * 0.6 + 4 + (i % 2) * 10, 10 + (i / 2) * 10), Vector2(10, 10), Color8(30, 30, 30) if (i + int(i / 2)) % 2 == 0 else Color8(240, 240, 240))
+				_monkey(Vector2(lerpf(10.0, w * 0.55, fmod(_t, 2.0) / 2.0), ground))
+			&"hoard":
+				BananaArt.draw_bunch(self, Rect2(8, 8, w - 16, h - 16), 4)
+			&"ranked":
+				var c2 := accent
+				draw_colored_polygon(PackedVector2Array([Vector2(w * 0.5, 10), Vector2(w * 0.5 + 30, 30), Vector2(w * 0.5 + 22, h - 14), Vector2(w * 0.5 - 22, h - 14), Vector2(w * 0.5 - 30, 30)]), c2)
+				BananaArt.draw_bunch(self, Rect2(w * 0.5 - 16, 30, 32, 28), 1)
+			&"skill":
+				SkillFxArt.draw_icon(self, skill_id, size * 0.5, minf(w, h) * 0.32, accent)
 
 
 ## One control, as a key chip and what it does.
@@ -2550,7 +3036,8 @@ func _portrait(id: StringName, edge: int) -> TextureRect:
 func _skill_name(stats: MonkeyStats) -> String:
 	if stats.skill_id == &"":
 		return "NONE"
-	return String(stats.skill_id).replace("_", " ").to_upper()
+	# The skill's display name (BANANA BANDIT, not SNATCH).
+	return SkillFx.name_of(stats.skill_id)
 
 
 ## Small drawn icons for buttons and the top bar. Chunky shapes with a dark

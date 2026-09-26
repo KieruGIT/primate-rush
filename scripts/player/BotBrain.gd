@@ -275,10 +275,16 @@ func _hoard_target(player: Player, arena: Node) -> Vector2:
 		if dist < best_dist:
 			best_dist = dist
 			best = pickup.global_position
+	# Hitting a carrier steals from it, so a monkey with bananas close by is
+	# often the better target than a banana across the map.
+	var richest := _richest_opponent(player, arena)
+	if richest != null and richest.bananas >= 2:
+		var to_rich := player.global_position.distance_squared_to(richest.global_position)
+		if best_dist == INF or to_rich < best_dist * 0.6 or to_rich < 380.0 * 380.0:
+			return richest.global_position
 	if best_dist < INF:
 		return best
 	# Nothing on the map: go bully whoever is carrying the most.
-	var richest := _richest_opponent(player, arena)
 	return richest.global_position if richest != null else player.global_position
 
 

@@ -40,6 +40,9 @@ extends Resource
 ## Identifier consumed by the skill system. Empty means no skill yet.
 @export var skill_id: StringName = &""
 @export var skill_cooldown: float = 3.0
+## Uses stored up. Above 1 the skill can be fired again straight away until
+## the stack is empty; spent charges refill one per cooldown.
+@export_range(1, 3) var skill_charges: int = 1
 
 
 # --- Derived values -------------------------------------------------
@@ -58,7 +61,11 @@ func jump_velocity() -> float:
 	# Heavier monkeys jump slightly lower, but only slightly. Tying jump
 	# height directly to weight would make the gorilla unable to clear the
 	# level geometry that the gibbon plays on.
-	return GameConfig.BASE_JUMP_VELOCITY * lerpf(1.0, 0.88, clampf((weight - 1.0) / 1.2, 0.0, 1.0))
+	var jump := GameConfig.BASE_JUMP_VELOCITY * lerpf(1.0, 0.88, clampf((weight - 1.0) / 1.2, 0.0, 1.0))
+	# Small monkeys spring a little higher.
+	if body_size.x < 30.0:
+		jump *= 1.05
+	return jump
 
 
 func knockback_dealt() -> float:
@@ -78,7 +85,7 @@ func swing_retention() -> float:
 ## How far the normal slap reaches, as a share of the base reach. Arm length
 ## as before, but a small body no longer reaches as far as a gorilla's.
 func slap_reach_scale() -> float:
-	return arm_length * clampf(body_size.x / 32.0, 0.75, 1.0)
+	return arm_length * clampf(body_size.x / 32.0, 0.88, 1.0)
 
 
 func air_control() -> float:

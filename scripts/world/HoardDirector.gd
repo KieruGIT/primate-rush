@@ -2,7 +2,12 @@ class_name HoardDirector
 extends Node
 
 # ============================================================
-# BANANA HOARD - fixed timer, open map, most bananas wins.
+# BANANA HOARD - first to 30 bananas wins (most bananas if time runs out).
+#
+# Bananas are scarce on purpose: one or two appear every few seconds, each
+# in a different spot, each worth exactly one. So every banana is a race,
+# and the other way to get them is to take them: every hit on a carrier
+# steals one straight into the attacker's hands and knocks one loose.
 #
 # The drop-on-hit rule is load bearing. Without it players ignore each other
 # and farm separate corners, and a party mode with no reason to interact is
@@ -22,19 +27,32 @@ signal hoard_over(results: Array)
 
 enum Phase { IDLE, COUNTDOWN, RUNNING, OVER }
 
-## Three minutes, per the design doc. Long enough for a comeback, short
-## enough that losing one is not an evening.
-@export var round_seconds: float = 180.0
+## First to this many bananas wins on the spot.
+@export var win_target: int = 30
+## A backstop only: if nobody reaches the target, most bananas wins when
+## time runs out.
+@export var round_seconds: float = 240.0
 @export var countdown_seconds: float = 3.0
-@export var spawn_interval: float = 1.4
-## Cap on bananas lying around. An uncapped spawner turns a contested map
-## into a field where nobody has to take a risk.
-@export var max_pickups: int = 18
+## Slow and few: bananas are rare, so the fight is over the ones people
+## are carrying, not a race to farm the map.
+@export var spawn_interval: float = 5.0
+## Cap on bananas lying around (knocked-loose ones included). An
+## uncapped spawner turns a contested map into a field where nobody has to
+## take a risk.
+@export var max_pickups: int = 4
+## New bananas land at least this far from each other and from any banana
+## already down, so two of them are two different races.
+@export var spawn_spread: float = 520.0
+## Per hit on a monkey carrying bananas: this many go straight to the
+## attacker, and this many more are knocked loose. Doubled for big hits.
+const STEAL_PER_HIT := 1
+const LOOSE_PER_HIT := 1
 @export var ability_duration: float = 8.0
 ## Four tuned abilities beat seven half-tuned ones.
 const ABILITIES: Array[StringName] = [&"speed_boost", &"super_hit", &"magnet", &"ghost"]
 
 const PICKUP_SCENE := preload("res://scenes/Pickup.tscn")
+const SkillFx = preload("res://scripts/player/SkillFx.gd")
 
 var phase: int = Phase.IDLE
 var time_left: float = 0.0
@@ -157,7 +175,9 @@ func _tick_running(delta: float) -> void:
 	_spawn_timer -= delta
 	if _spawn_timer <= 0.0:
 		_spawn_timer = spawn_interval
-		_spawn_at_free_anchor()
+		# One or two at a time, each in its own spot.
+		for i in randi_range(1, 2):
+			_spawn_at_free_anchor()
 
 	if time_left <= 0.0:
 		_send(&"over", [results()])
@@ -166,7 +186,7 @@ func _tick_running(delta: float) -> void:
 ## A few bananas already on the map at GO, so the first ten seconds are a
 ## race to a known thing rather than everyone standing still waiting.
 func _seed_field() -> void:
-	for i in mini(6, _anchors.size()):
+	for i in mini(2, _anchors.size()):
 		_spawn_at_free_anchor()
 
 
@@ -174,21 +194,28 @@ func _spawn_at_free_anchor() -> void:
 	if _anchors.is_empty() or _pickups.size() >= max_pickups:
 		return
 	var free: Array[BananaSpawn] = []
+	var near: Array[BananaSpawn] = []
 	for anchor in _anchors:
-		if not _anchor_occupied(anchor):
+		if _anchor_clear(anchor, spawn_spread):
 			free.append(anchor)
+		elif _anchor_clear(anchor, 50.0):
+			near.append(anchor)
+	# Far from every banana down if possible; otherwise anywhere empty.
+	if free.is_empty():
+		free = near
 	if free.is_empty():
 		return
 	var anchor: BananaSpawn = free[randi() % free.size()]
 	var kind := Pickup.Kind.LUCKY_BOX if randf() < anchor.lucky_chance else Pickup.Kind.BANANA
-	_spawn_pickup(anchor.global_position, kind, anchor.value)
+	# Always worth one: no stacks, every banana counts the same.
+	_spawn_pickup(anchor.global_position, kind, 1)
 
 
-func _anchor_occupied(anchor: BananaSpawn) -> bool:
+func _anchor_clear(anchor: BananaSpawn, radius: float) -> bool:
 	for pickup in _pickups.values():
-		if (pickup as Pickup).global_position.distance_squared_to(anchor.global_position) < 2500.0:
-			return true
-	return false
+		if is_instance_valid(pickup) and (pickup as Pickup).global_position.distance_squared_to(anchor.global_position) < radius * radius:
+			return false
+	return true
 
 
 func _spawn_pickup(point: Vector2, kind: int, value: int) -> void:
@@ -197,20 +224,33 @@ func _spawn_pickup(point: Vector2, kind: int, value: int) -> void:
 	_send(&"spawn", [id, kind, point, value])
 
 
-## Called by a monkey that just got hit. The director owns the score, so it
-## decides how much comes loose, then scatters it: a contested pile, not a
-## pile the attacker vacuums up on the spot.
-func knock_bananas_loose(player_id: int, point: Vector2, double_drop: bool, fraction: float) -> void:
+## Called by a monkey that just got hit. Fighting is a way to get bananas:
+## the attacker takes one straight away, and one more is knocked loose for
+## whoever is quickest (big hits: two and two). Small and steady per hit,
+## so a string of hits on a carrier pays, and one lucky hit does not end
+## the round.
+func knock_bananas_loose(player_id: int, point: Vector2, double_drop: bool, _fraction: float, attacker_id: int = 0) -> void:
 	if not _is_authority() or phase != Phase.RUNNING:
 		return
 	var held := int(scores.get(player_id, 0))
 	if held <= 0:
 		return
-	var share := fraction * (2.0 if double_drop else 1.0)
-	var dropped := clampi(int(ceil(float(held) * share)), 1, held)
-	scores[player_id] = held - dropped
+	var times := 2 if double_drop else 1
+	var thief := _player(attacker_id)
+	var stolen := 0
+	if thief != null and attacker_id != player_id:
+		stolen = mini(STEAL_PER_HIT * times, held)
+	var loose := mini(LOOSE_PER_HIT * times, held - stolen)
+	scores[player_id] = held - stolen - loose
+	if stolen > 0:
+		scores[attacker_id] = int(scores.get(attacker_id, 0)) + stolen
 	_send(&"scores", [scores.duplicate()])
-	_scatter(point, dropped)
+	if stolen > 0:
+		_send(&"stolen", [attacker_id, stolen])
+	if loose > 0:
+		_scatter(point, loose)
+	if stolen > 0:
+		_check_win(attacker_id)
 
 
 ## Capuchin's Snatch. A transfer, not a drop: the bananas go straight to the
@@ -226,15 +266,14 @@ func steal_bananas(from_id: int, to_id: int, fraction: float) -> void:
 	scores[from_id] = held - taken
 	scores[to_id] = int(scores.get(to_id, 0)) + taken
 	_send(&"scores", [scores.duplicate()])
+	_check_win(to_id)
 
 
 func _scatter(point: Vector2, count: int) -> void:
-	var drops := mini(count, 6)
-	var per_drop := maxi(int(round(float(count) / float(drops))), 1)
-	for i in drops:
-		var angle := randf() * TAU
-		var offset := Vector2(cos(angle), sin(angle)) * randf_range(40.0, 120.0)
-		_spawn_pickup(point + offset, Pickup.Kind.BANANA, per_drop)
+	for i in count:
+		# Up and to one side, off the monkey it came out of.
+		var offset := Vector2(randf_range(60.0, 130.0) * (1.0 if randf() < 0.5 else -1.0), randf_range(-60.0, -10.0))
+		_spawn_pickup(point + offset, Pickup.Kind.BANANA, 1)
 
 
 func _on_pickup_touched(pickup_id: int, player_id: int) -> void:
@@ -254,6 +293,14 @@ func _on_pickup_touched(pickup_id: int, player_id: int) -> void:
 		scores[player_id] = int(scores.get(player_id, 0)) + pickup.value
 		_send(&"scores", [scores.duplicate()])
 	_send(&"collect", [pickup_id])
+	if pickup.kind != Pickup.Kind.LUCKY_BOX:
+		_check_win(player_id)
+
+
+## Reached the target: the round ends right there.
+func _check_win(player_id: int) -> void:
+	if phase == Phase.RUNNING and int(scores.get(player_id, 0)) >= win_target:
+		_send(&"over", [results()])
 
 
 func _player(player_id: int) -> Player:
@@ -281,6 +328,7 @@ func _send(event: StringName, args: Array) -> void:
 		&"scores": &"_net_scores",
 		&"ability": &"_net_ability",
 		&"over": &"_net_over",
+		&"stolen": &"_net_stolen",
 	}
 	var method: StringName = callables[event]
 	if Net.is_online():
@@ -288,6 +336,15 @@ func _send(event: StringName, args: Array) -> void:
 		forwarded.append_array(args)
 		callv(&"rpc", forwarded)
 	callv(method, args)
+
+
+## Everyone sees the steal: a +1 over the monkey that took it.
+@rpc("authority", "reliable")
+func _net_stolen(player_id: int, amount: int) -> void:
+	var thief := _player(player_id)
+	if thief != null:
+		SkillFx.popup(thief.get_parent(), thief.global_position + Vector2(0.0, -70.0), "+%d STOLEN" % amount, JunglePalette.BANANA)
+		Sfx.play(&"pickup")
 
 
 @rpc("authority", "reliable")
