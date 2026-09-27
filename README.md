@@ -1,179 +1,143 @@
-# Monkey
+<div align="center">
 
-A 2D multiplayer party game about monkeys. Run, climb, swing, and knock each
-other around. **Nobody dies.** There is no health bar and no elimination —
-hitting someone costs them progress and time, never a life. That rule is the
-design spine: rounds stay short, everyone plays the whole round, and the skill
-is in movement recovery rather than survival.
+<img src="docs/media/icon.png" width="128" alt="Primate Rush icon"/>
 
-Engine: **Godot 4.7**, Compatibility (OpenGL 3) renderer, GDScript only.
+<img src="docs/media/wordmark.png" width="460" alt="Primate Rush"/>
+
+**Race. Swing. Slap.**
+A pixel-art multiplayer party game for Android where chibi monkeys race, brawl and steal bananas.
+
+![Godot 4.7](https://img.shields.io/badge/Godot-4.7-478CBF?logo=godotengine&logoColor=white)
+![Android](https://img.shields.io/badge/Android-7.0%2B-3DDC84?logo=android&logoColor=white)
+![RevenueCat](https://img.shields.io/badge/RevenueCat-SDK%2010-F2545B)
+![License: MIT](https://img.shields.io/badge/License-MIT-yellow)
+![RevenueCat Shipaton 2026](https://img.shields.io/badge/RevenueCat%20Shipaton-2026-FFD640)
+
+[**Demo video**](#) · [**Download APK**](#) · [Features](#features) · [Monetization](#monetization-with-revenuecat) · [Build it](#build-it-yourself)
+
+<img src="docs/media/gameplay.gif" width="640" alt="2v2 Slap gameplay"/>
+
+</div>
 
 ---
 
-## Getting updates
+## About
 
-`pull.bat` fetches the latest commits into this checkout; double-click it and
-click back into Godot, which rescans and reloads changed scripts by itself.
-`watch-pull.bat` does the same every 30 seconds if you would rather leave it
-running. Stop a running game before pulling: a live game does not hot-swap
-its code.
+Primate Rush is a short-round party game for up to four players. Pick a monkey, then race through the jungle, fight over bananas, or slap the other team off an island. **Nobody dies:** hits cost you time, position and bananas, never a life, so everyone plays the whole round and skill comes from movement and recovery.
 
-## Running it
+Built in **Godot 4.7** (GDScript only) for Android, with purchases powered by the **RevenueCat SDK**. Made for the RevenueCat Shipaton 2026 (Next Gen Award).
 
-1. Open the project folder in Godot 4.7.
-2. Press F5. The main scene is `scenes/Boot.tscn`, which opens the lobby.
-3. **Play solo** for movement testing, or **Host** on one machine and **Join**
-   from another on the same network using the IP shown on the host's screen.
+## Features
 
-### Controls
+<table>
+<tr>
+<td width="33%"><img src="docs/media/gameplay-race.png" alt="Race"/><br/><b>Race</b><br/>Parkour to the finish line through Jungle Run or Canopy Climb.</td>
+<td width="33%"><img src="docs/media/gameplay-banana-rush.png" alt="Banana Rush"/><br/><b>Banana Rush</b><br/>Grab bananas and steal them on hit. First to 30 wins.</td>
+<td width="33%"><img src="docs/media/gameplay-slap.png" alt="2v2 Slap"/><br/><b>2v2 Slap</b><br/>Knock the other team off Slap Island. Last team standing takes the round.</td>
+</tr>
+<tr>
+<td><img src="docs/media/style.png" alt="Style"/><br/><b>Customization</b><br/>Skins, hats, trails, punch, climb and win effects.</td>
+<td><img src="docs/media/banana-pull.png" alt="Banana Pull"/><br/><b>Banana Pull</b><br/>Spend bananas on lucky rolls for rare and mythic cosmetics.</td>
+<td><img src="docs/media/monkey-plus-unlocked.png" alt="Monkey select"/><br/><b>Five monkeys</b><br/>Same punch for everyone; body, stats and skill change.</td>
+</tr>
+</table>
 
-| Action | Keyboard | Touch |
+- **Swing, climb and fly:** stretchy-arm grabs, vine swinging with momentum, wall jumps and double jumps
+- **Multiplayer:** local Wi-Fi play with host discovery, or fill empty seats with bots
+- **Ranked:** climb from Bronze to Apex, plus local career stats
+- **Touch-first controls:** stick plus four buttons, with full keyboard support on desktop
+
+### The monkeys
+
+| | Monkey | Role | Skill |
+|:-:|---|---|---|
+| 🦍 | **Gorilla** | Heavy brawler | **Grapple Slam**: lunge, lift a monkey overhead and slam it |
+| 🦧 | **Orangutan** | Long range | **Long Arm**: a giant punch across the screen |
+| 🐒 | **Macaque** *(Monkey Plus)* | Combo roller | **Roll Combo**: bowl monkeys over; every hit recharges it |
+| 🐵 | **Gibbon** | Air speedster | **Swing Rush**: swing from thin air, untouchable mid-swing |
+| 🍌 | **Chimpanzee** | Trickster | **Banana Bandit**: dash, steal a banana, drop a slippery peel |
+
+## Monetization with RevenueCat
+
+All purchases run through the **RevenueCat Android SDK** (via the GodotX RevenueCat plugin). Entitlements are the source of truth, and consumables add to the in-game banana wallet.
+
+| Product | Type | Grants |
 |---|---|---|
-| Move | A / D or arrows | left-hand stick |
-| Climb, rope up/down | W / S or up/down | left-hand stick |
-| Jump, release vine, wall jump | Space | JUMP |
-| Attack | J | HIT |
-| Skill | K | SKILL |
-| Leave match | Esc | — |
+| `monkey_plus_v2` | Non-consumable → entitlement `monkey_plus` | Macaque, gold-edged skins and hats, premium effects |
+| `starter_pack_v2` | Non-consumable → entitlement `starter_pack` | Midnight skin and Leaf Swirl trail |
+| `bananas_small_v2` / `medium_v2` / `large_v3` | Consumable | 300 / 1,100 / 3,000 bananas |
 
-Climb and swing are **contextual**: touch a climbable surface while pushing
-into it and you climb, pass a vine in the air and you grab it. They get no
-button, which keeps the phone layout down to a stick and two buttons.
+<table>
+<tr>
+<td width="50%"><img src="docs/media/revenuecat-purchase.png" alt="RevenueCat purchase sheet"/><br/>Purchase sheet on device</td>
+<td width="50%"><img src="docs/media/revenuecat-dashboard.png" alt="RevenueCat dashboard"/><br/>Customers in the RevenueCat dashboard</td>
+</tr>
+</table>
 
----
+The build uses RevenueCat's **Test Store**, so purchases produce real customers, entitlements and dashboard data without a Play Console account. Store code is guarded, so desktop builds run in a stub mode that never touches the store.
 
-## What is built
+## Controls
 
-| Feature | State |
-|---|---|
-| Run, jump, coyote time, jump buffer, variable jump height | done |
-| Double jump (roll); hold jump to grab, release to let go; stretchy-arm trunk swing | done |
-| Momentum: jump push, swing carry, bunny hop, slide (no dash) | done |
-| Climb on climbable surfaces, wall jump off them | done |
-| Vine swing: pendulum, pumping, rope length, timed release | done |
-| Normal attack, randomized slap/punch/kick flavor | done |
-| Knockback scaled by attacker Power against target Weight | done |
-| Stun on hit, drops you off vines and walls | done |
-| Respawn on fall with per-player checkpoints, no death, no health | done |
-| Stat block system driving all five axes | done |
-| Five monkeys: gorilla, gibbon, macaque, orangutan, capuchin | done |
-| LAN multiplayer, host authoritative, up to 4 | done |
-| LAN host discovery by UDP broadcast, with IP entry as fallback | done |
-| Internet hosting via UPnP port mapping, with the reason shown on failure | done |
-| Rematch from the results screen | done |
-| Headwear attachment point, five hats, two of them premium | done |
-| Local career stats: races, wins, bananas, hits, falls, best times | done |
-| Bots filling empty seats, driven by the same input struct players use | done |
-| Live standings, hit feedback and camera kick | done |
-| Pause overlay with volume, on Esc, a touch button and Android back | done |
-| Sound effects, synthesised at startup, no audio files | done |
-| Visible rope, grapple line and attack telegraph | done |
-| Touch controls | done |
-| Character select, map and mode select, lobby, results | done |
-| Race mode: countdown, checkpoints, placement, results | done |
-| Map A horizontal run and Map B vertical ascent | done |
-| One skill per monkey, all five | done |
-| RevenueCat purchase unlocking a monkey | wired, needs a key and a device |
-| Banana Hoard: timer, scoring, drop on hit, lucky boxes | done |
-| Art, music, ranked backend | not yet, by design |
+| Action | Touch | Keyboard / mouse |
+|---|---|---|
+| Move | Left stick | A / D |
+| Jump (double jump) | JUMP | Space |
+| Punch | PUNCH | Left click |
+| Grab / swing | GRAB | Right click |
+| Skill | SKILL | E |
+| Drop / slide | Stick down | S |
+| Pause | ⏸ | Esc |
 
-## Repository layout
+## Build it yourself
 
-```
-scenes/      Boot, Splash, Menu, MatchLoading, Main (arena shell), Player, Vine, Climbable, Checkpoint,
-             FinishLine, Hud, Results, TouchControls
-scenes/maps/ MapA (horizontal run), MapB (vertical ascent)
-scripts/
-  autoload/  GameConfig (constants, roster), GameInput (devices), Net (LAN),
-             Discovery (UDP host beacons), PortMap (UPnP), Purchases
-             (RevenueCat), Profile (local career stats), Sfx (synthesised audio)
-  player/    Player.gd (movement, climb, swing, combat), MonkeyStats, InputFrame,
-             BotBrain (AI that emits input frames), Headwear (cosmetic anchor)
-  world/     Main.gd (arena, respawn, snapshots), RaceDirector, HoardDirector,
-             MapData, Vine, Climbable, Checkpoint, FinishLine, Pickup, BananaSpawn
-  ui/        Boot router, Splash, Menu, MatchLoading, Hud, TouchControls
-resources/monkeys/   one .tres per monkey, balancing without code changes
-docs/        design document and build brief
-tools/       check_project.py, static checks the engine only does at runtime
-.github/     CI running that same check on every push
+**Requirements:** Godot **4.7.2** with export templates, JDK **17 or 21** (Gradle 8.11 cannot run on Java 25), Android SDK with Platform 36 and Build-Tools 36.1.0.
+
+```bash
+git clone https://github.com/KieruGIT/Monkey-Game.git
 ```
 
-## Design notes worth knowing before editing
+1. Open the folder in Godot 4.7 and press **F5** to play on desktop (store runs in stub mode).
+2. For Android:
+   1. **Editor Settings → Export → Android**: set the Java SDK and Android SDK paths.
+   2. **Project → Install Android Build Template**.
+   3. Copy `secrets.cfg.example` to `secrets.cfg` and paste your RevenueCat **Test Store** API key (`test_...`). This file is gitignored.
+   4. **Project → Export → Android**: *Use Gradle Build* is on and *Revenue Cat → Enable* is ticked, then **Export Project**.
+3. Install the APK on a phone. In the shop, buying shows the RevenueCat Test Store sheet.
 
-**Input is a struct, not a device.** Nothing in `Player.gd` reads a key or a
-touch. It consumes an `InputFrame`, which keyboard, touch, and the network all
-produce. That is what lets local and networked play share one code path
-instead of two that drift apart.
+To test purchases with your own RevenueCat project, create the products listed above and attach them to the `monkey_plus` and `starter_pack` entitlements.
 
-**Bots get no special access.** A `BotBrain` produces an `InputFrame` and
-nothing else — no teleporting, no ignoring gravity, no reading state through
-a back door. That falls straight out of the input abstraction, and it means
-every movement fix helps bots and players at once.
+## Project structure
 
-**The host is truth.** The host simulates every monkey. A client simulates
-only its own as prediction and snaps when the host disagrees by more than
-64px. Hits and knockback resolve on the host only — knockback that disagrees
-between machines is the one desync in this game that reads as broken.
+```
+scenes/            Boot, Menu, Main arena, Player, HUD, Results, maps/
+scripts/autoload/  GameConfig, Net (LAN), Purchases (RevenueCat), Loot, Profile, Sfx
+scripts/player/    Player movement and combat, BotBrain, skills and effects
+scripts/world/     Race, Banana Rush and Slap directors, map pieces
+scripts/ui/        Menus, shop, Banana Pull reel, touch controls
+resources/monkeys/ One .tres per monkey: balancing without code changes
+addons/            GodotX RevenueCat plugin
+android/           RevenueCat Android libraries
+docs/              Design document, art bible, build notes
+```
 
-**No MultiplayerSpawner or MultiplayerSynchronizer.** Both store their
-configuration inside scene files, which puts netcode in a `.tscn` that cannot
-be reviewed in a diff. Spawning and snapshots are explicit in `Net.gd` and
-`Main.gd` instead.
+<details>
+<summary><b>Design notes</b></summary>
 
-**Attack flavors are cosmetic and must stay that way.** Slap, punch, and kick
-share range, knockback, stun, and cooldown. The moment a kick outranges a
-slap, players fish for an animation they cannot choose.
+- **Input is a struct, not a device.** `Player.gd` consumes an `InputFrame` that keyboard, touch, bots and the network all produce, so local and online play share one code path.
+- **Bots get no special access.** A `BotBrain` only emits input frames, so every movement fix helps bots and players at once.
+- **The host is truth.** The host simulates every monkey; hits and knockback resolve there only.
+- **Attack flavors are cosmetic.** Slap, punch and kick share range, knockback and cooldown.
+- **Stats are data.** Balancing is editing a `.tres` in the inspector.
 
-**Skills dispatch on a stat id, not a subclass.** A monkey is a `.tres` plus
-one branch in `_try_skill`. Adding the capuchin is data entry and one case,
-not a new script that re-implements movement.
+</details>
 
-**The banana drop is not optional.** Hitting someone knocks a share of their
-bananas loose for anyone to grab. Without it players farm separate corners
-and a party mode becomes a single player game with witnesses.
+## Credits
 
-**Stats are data.** Balancing is editing a `.tres` in the inspector. A stat of
-1.0 means "the base value in `GameConfig`", which makes the macaque the
-reference monkey and every other number readable as a percentage of it.
-
-## RevenueCat
-
-Store code is guarded by `Engine.has_singleton("GodotxRevenueCat")` and runs in
-stub mode everywhere the plugin is absent, so desktop development never touches
-the store. To wire it up on device:
-
-1. Install the GodotX RevenueCat plugin and enable it.
-2. `Project > Install Android Build Template`, tick **Use Gradle Build** in the
-   Android export preset, and enable the plugin there.
-3. Copy `secrets.cfg.example` to `secrets.cfg` and paste your **Test Store**
-   API key. `secrets.cfg` is gitignored; the key never goes in source.
-
-Test Store, not Google Play Billing: it needs no Play Console account and still
-produces real entitlements and dashboard rows.
-
-## Status
-
-The project runs headlessly in CI on the same Godot build as the editor: the
-import step fails on any parse error, `tools/Smoke.tscn` instances every
-scene and plays both maps in all three modes with bots, and
-`tools/NetReplay.tscn` drives the netcode handlers without a socket. Still
-unverified by machine: real sockets between two devices, touch input, the
-purchase flow, and how any of it feels. See [docs/BUILD_NOTES.md](docs/BUILD_NOTES.md) for the
-first-run checklist, the LAN test, Android export, and the known gaps, and
-[docs/MULTIPLAYER.md](docs/MULTIPLAYER.md) for how far multiplayer can go
-beyond the same wifi and what each step actually costs.
-
-Double-click `update.bat` to pull the latest from GitHub. It parks any local
-edits in a git stash first, so it does not abort the way `pull.bat` does when
-you have changed a file; `git stash pop` puts them back. Close Godot before
-running it - the editor rewrites `project.godot` while it is open and will
-fight the update over that file.
-
-The look is specified rather than improvised: [docs/ART_BIBLE.md](docs/ART_BIBLE.md)
-is authoritative for pixel size, lighting direction, visual hierarchy and
-platform anatomy, and every art change should be checked against it with a
-screenshot from `tools/CaptureUi.tscn` rather than by reading the diff.
+- Game design and development: **KieruGIT**
+- UI and sound assets: [Kenney](https://kenney.nl) (CC0)
+- Fonts: *Press Start 2P* by CodeMan38 and *Pixelify Sans* by Stefie Justprince (SIL Open Font License 1.1)
+- Monetization: [RevenueCat](https://www.revenuecat.com) · Engine: [Godot](https://godotengine.org)
 
 ## License
 
-MIT. See [LICENSE](LICENSE).
+Released under the [MIT License](LICENSE).

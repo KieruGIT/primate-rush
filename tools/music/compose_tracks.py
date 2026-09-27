@@ -1,8 +1,9 @@
+import os
 """The five Primate Rush tracks. Run: python3 songs.py [name ...]"""
 import sys
 from soundfont_engine import Song, render, chord, near, midi
 
-OUT = "/home/claude/music2/out/"
+OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "out") + os.sep
 
 # GM drum keys
 KICK, STICK, SNARE, CLAP, HAT, PHAT, OHAT = 36, 37, 38, 39, 42, 44, 46

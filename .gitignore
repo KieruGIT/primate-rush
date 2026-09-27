@@ -2,7 +2,6 @@
 .godot/
 .import/
 export.cfg
-export_presets.cfg
 *.translation
 
 # Build output
@@ -46,3 +45,10 @@ output/
 # Recreate with Project > Install Android Build Template.
 android/build/
 android/.build_version
+
+# Local AI/editor tool settings
+.claude/
+.codex/
+
+# Editor-only AI tooling addon, kept local
+addons/godot_mcp_toolkit/

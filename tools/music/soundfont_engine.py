@@ -1,3 +1,4 @@
+import os
 """Tiny sequencer + FluidSynth renderer for Primate Rush music.
 
 Songs are written note by note in Python, rendered through the GeneralUser GS
@@ -11,7 +12,7 @@ import numpy as np
 import fluidsynth
 
 SR = 44100
-SF2 = "/home/claude/music2/GU.sf2"
+SF2 = os.environ.get("SOUNDFONT", os.path.join(os.path.dirname(os.path.abspath(__file__)), "GeneralUser.sf2"))
 NAMES = {"C": 0, "D": 2, "E": 4, "F": 5, "G": 7, "A": 9, "B": 11}
 
 
