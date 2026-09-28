@@ -13,7 +13,7 @@ A pixel-art multiplayer party game for Android where chibi monkeys race, brawl a
 ![License: MIT](https://img.shields.io/badge/License-MIT-yellow)
 ![RevenueCat Shipaton 2026](https://img.shields.io/badge/RevenueCat%20Shipaton-2026-FFD640)
 
-[**Demo video**](#) · [**Download APK**](#) · [Features](#features) · [Monetization](#monetization-with-revenuecat) · [Build it](#build-it-yourself)
+[**Demo video**](https://youtu.be/xFwObxKIUPA?si=YJgqUS87QG7jNYwh) · [**Download APK**](https://github.com/KieruGIT/primate-rush/releases/download/v1.2/PrimateRush-v1.2.apk) · [Features](#features) · [Monetization](#monetization-with-revenuecat) · [Build it](#build-it-yourself)
 
 <img src="docs/media/gameplay.gif" width="640" alt="2v2 Slap gameplay"/>
 
